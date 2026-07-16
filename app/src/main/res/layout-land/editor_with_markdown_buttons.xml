@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal">
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/editor_scroller"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_margin="8dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <com.gl4a.widget.CommentEditor
+            android:id="@+id/editor"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:dropDownAnchor="@id/editor_scroller"
+            android:gravity="top"
+            android:inputType="textMultiLine|textCapSentences"
+            android:textSize="16sp"
+            tools:text="Enter comment" />
+
+    </androidx.core.widget.NestedScrollView>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <View
+            android:id="@+id/markdown_buttons_top_left_shadow"
+            android:layout_width="2dp"
+            android:layout_height="2dp"
+            android:layout_marginLeft="2dp"
+            android:layout_marginTop="2dp"
+            android:background="@drawable/top_left_shadow"
+            tools:ignore="InconsistentLayout" />
+
+        <View
+            android:layout_width="4dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/left_shadow" />
+
+    </LinearLayout>
+
+    <com.gl4a.widget.MarkdownButtonsBar
+        android:id="@+id/markdown_buttons"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent" />
+
+</LinearLayout>

@@ -1,0 +1,84 @@
+<resources>
+    <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <item name="android:windowSoftInputMode">adjustResize</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="windowActionModeOverlay">true</item>
+
+        <item name="preferenceTheme">@style/PreferenceTheme</item>
+        <item name="actionMenuTextAppearance">@style/TextAppearance.Widget.ActionBar.Menu</item>
+        <item name="actionBarTabStyle">@style/Widget.ActionBar.TabView</item>
+        <item name="overviewRowStyle">@style/OverviewRow</item>
+        <item name="cardViewTheme">@style/CardView.DayNight</item>
+        <item name="inlineButtonStyle">@style/Widget.MaterialComponents.Button.TextButton</item>
+
+        <item name="android:textColorLink">@color/link_text</item>
+
+        <item name="colorAccent">@color/accent</item>
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary_dark</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorSecondary">@color/primary</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorIssueOpen">@color/issue_open</item>
+        <item name="colorIssueClosed">@color/issue_closed</item>
+        <item name="colorPullRequestMerged">@color/pr_merged</item>
+        <item name="colorPullRequestDraft">@color/pr_draft</item>
+        <item name="colorIssueOpenDark">@color/issue_open_dark</item>
+        <item name="colorIssueClosedDark">@color/issue_closed_dark</item>
+        <item name="colorPullRequestMergedDark">@color/pr_merged_dark</item>
+        <item name="colorPullRequestDraftDark">@color/pr_draft_dark</item>
+        <item name="colorFab">@color/fab</item>
+        <item name="colorIssueEditFab">@color/issue_edit_fab</item>
+        <item name="colorScrollbarThumb">@color/scrollbar_thumb</item>
+        <item name="colorDiffAddBackground">@color/diff_add</item>
+        <item name="colorDiffRemoveBackground">@color/diff_remove</item>
+        <item name="colorDiffAddLineNumberBackground">@color/diff_add_line_number</item>
+        <item name="colorDiffRemoveLineNumberBackground">@color/diff_remove_line_number</item>
+        <item name="colorCommitAddition">@color/commit_addition</item>
+        <item name="colorCommitDeletion">@color/commit_deletion</item>
+        <item name="colorCodeBackground">@color/code_background</item>
+        <item name="colorBreadcrumbBackground">@color/breadcrumb_background</item>
+        <item name="colorIconForeground">@color/icon_foreground</item>
+        <item name="drawerBackground">@color/drawer_background</item>
+    </style>
+
+    <style name="TransparentTheme" parent="AppTheme">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Translucent</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+
+    <style name="BottomSheetTheme" parent="TransparentTheme">
+        <item name="android:windowAnimationStyle">@style/Animation.Design.BottomSheetDialog</item>
+    </style>
+
+    <style name="HeaderTheme" parent="Theme.MaterialComponents">
+        <item name="colorPrimary">#ffffff</item>
+        <item name="colorSecondary">#ffffff</item>
+        <item name="colorControlActivated">#ffffff</item>
+        <item name="colorSurface">@android:color/transparent</item>
+        <item name="colorOnSurface">#ffffffff</item>
+        <item name="android:spinnerStyle">@style/Widget.Spinner.ActionBar.Light</item>
+        <!-- used by appcompat to tint the spinner background drawable -->
+        <item name="android:colorBackground">#ffffff</item>
+    </style>
+
+    <style name="PreferenceTheme" parent="PreferenceThemeOverlay.v14.Material" />
+
+    <style name="CardView.DayNight" parent="CardView.Light">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginLeft">@dimen/card_margin</item>
+        <item name="android:layout_marginRight">@dimen/card_margin</item>
+        <item name="android:layout_marginTop">@dimen/card_top_bottom_margin</item>
+        <item name="android:layout_marginBottom">@dimen/card_top_bottom_margin</item>
+        <item name="android:foreground">?android:attr/selectableItemBackground</item>
+    </style>
+
+</resources>

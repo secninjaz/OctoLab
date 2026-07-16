@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/row_commit_status"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?selectableItemBackground"
+    android:paddingBottom="8dp"
+    android:paddingLeft="56dp"
+    android:paddingRight="@dimen/content_padding"
+    android:paddingTop="8dp">
+
+    <ImageView
+        android:id="@+id/iv_status_icon"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_centerVertical="true"
+        android:layout_marginRight="16dp"
+        android:scaleType="centerInside"
+        tools:src="@drawable/commit_status_unknown" />
+
+    <TextView
+        android:id="@+id/tv_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_toRightOf="@id/iv_status_icon"
+        android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+        tools:text="status/context" />
+
+    <TextView
+        android:id="@+id/tv_desc"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tv_label"
+        android:layout_toRightOf="@id/iv_status_icon"
+        android:textAppearance="@style/TextAppearance.AppCompat.Caption"
+        tools:text="Description" />
+
+</RelativeLayout>

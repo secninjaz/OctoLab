@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:installLocation="auto">
+
+    <!-- see http://stackoverflow.com/questions/32070670/preferencefragmentcompat-requires-preferencetheme-to-be-set -->
+    <uses-sdk tools:overrideLibrary="android.support.v14.preference" />
+
+    <uses-permission
+        android:name="android.permission.INTERNET" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+    </queries>
+
+    <application
+        android:name="com.gl4a.Gl4Application"
+        android:allowBackup="true"
+        android:icon="@mipmap/launcher_icon"
+        android:roundIcon="@mipmap/launcher_icon"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme"
+        android:fullBackupContent="@xml/backup_descriptor">
+        <activity
+            android:name=".activities.GitLabLoginActivity"
+            android:launchMode="singleTop"
+            android:exported="true"
+            android:configChanges="orientation|screenSize" >
+            <intent-filter>
+                <action
+                    android:name="android.intent.action.MAIN" />
+                <category
+                    android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <data android:scheme="gl4a" android:host="oauth" />
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+            </intent-filter>
+        </activity>
+
+        <activity-alias
+            android:name=".activities.GitLabLoginActivity.Alias"
+            android:label="@string/app_name"
+            android:targetActivity=".activities.GitLabLoginActivity"/>
+
+        <activity android:name=".activities.BlogActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize" />
+        <activity android:name=".activities.BlogListActivity" android:exported="false" />
+        <activity android:name=".activities.BookmarkListActivity" android:exported="false" />
+        <activity android:name=".activities.CollaboratorListActivity" android:exported="false" />
+        <activity android:name=".activities.CommitActivity" android:exported="false" />
+        <activity android:name=".activities.CommitDiffViewerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize" />
+        <activity android:name=".activities.CommitHistoryActivity" android:exported="false" />
+        <activity android:name=".activities.CompareActivity" android:exported="false" />
+        <activity android:name=".activities.ContributorListActivity" android:exported="false" />
+        <activity
+            android:name=".activities.EditCommitCommentActivity"
+            android:exported="false"
+            android:theme="@style/BottomSheetTheme"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name=".activities.EditIssueCommentActivity"
+            android:exported="false"
+            android:theme="@style/BottomSheetTheme"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name=".activities.EditPullRequestCommentActivity"
+            android:exported="false"
+            android:theme="@style/BottomSheetTheme"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name=".activities.EditDiffCommentActivity"
+            android:exported="false"
+            android:theme="@style/BottomSheetTheme"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name=".activities.EditPullRequestDiffCommentActivity"
+            android:exported="false"
+            android:theme="@style/BottomSheetTheme"
+            android:windowSoftInputMode="stateHidden" />
+        <activity android:name=".activities.FileViewerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize" />
+        <activity android:name=".activities.CreateReviewActivity"
+            android:exported="false"
+            android:theme="@style/BottomSheetTheme"
+            android:windowSoftInputMode="stateHidden" />
+        <activity android:name=".activities.ForkListActivity" android:exported="false" />
+        <activity android:name=".activities.FollowerFollowingListActivity" android:exported="false" />
+        <activity android:name=".activities.GistActivity" android:exported="false" />
+        <activity android:name=".activities.GistListActivity" android:exported="false" />
+        <activity android:name=".activities.GistViewerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize" />
+        <activity android:name=".activities.IssueActivity" android:exported="false" />
+        <activity android:name=".activities.IssueEditActivity" android:exported="false" />
+        <activity android:name=".activities.IssueLabelListActivity" android:exported="false" />
+        <activity android:name=".activities.IssueListActivity" android:exported="false" />
+        <activity android:name=".activities.IssueMilestoneEditActivity" android:exported="false" />
+        <activity android:name=".activities.IssueMilestoneListActivity" android:exported="false" />
+        <activity android:name=".activities.OrganizationMemberListActivity" android:exported="false" />
+        <activity android:name=".activities.PullRequestActivity" android:exported="false" />
+        <activity android:name=".activities.PullRequestDiffViewerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize" />
+        <activity android:name=".activities.ReleaseInfoActivity" android:exported="false" />
+        <activity android:name=".activities.ReleaseListActivity" android:exported="false" />
+        <activity android:name=".activities.RepositoryActivity" android:exported="false" />
+        <activity android:name=".activities.RepositoryListActivity" android:exported="false" />
+        <activity android:name=".activities.SearchActivity" android:exported="false" />
+        <activity android:name=".activities.StargazerListActivity" android:exported="false" />
+        <activity android:name=".activities.TimelineActivity" android:exported="false" />
+        <activity android:name=".activities.TrendingActivity" android:exported="false" />
+        <activity android:name=".activities.UserActivity" android:exported="false" />
+        <activity android:name=".activities.WatcherListActivity" android:exported="false" />
+        <activity android:name=".activities.WikiActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize" />
+        <activity android:name=".activities.WikiListActivity" android:exported="false" />
+        <activity android:name=".activities.home.HomeActivity" android:exported="false" />
+        <activity android:name=".activities.ReviewActivity" android:exported="false" />
+
+        <activity android:name=".activities.DiffViewerActivity" android:exported="false" />
+        <activity
+            android:name=".activities.EditCommentActivity"
+            android:exported="false"
+            android:theme="@style/BottomSheetTheme"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name=".activities.EditMergeRequestCommentActivity"
+            android:exported="false"
+            android:theme="@style/BottomSheetTheme"
+            android:windowSoftInputMode="stateHidden" />
+        <activity android:name=".activities.FragmentContainerActivity" android:exported="false" />
+        <activity
+            android:name=".activities.WebViewerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize" />
+
+        <activity
+            android:name=".activities.SettingsActivity"
+            android:title="@string/settings"
+            android:exported="false" />
+
+        <activity android:name=".resolver.BrowseFilter"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:exported="true"
+            android:theme="@style/TransparentTheme">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:host="gitlab.com" android:scheme="https" />
+                <data android:host="gitlab.com" android:scheme="http" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:host="gitlab.com" android:scheme="https" />
+                <data android:host="gitlab.com" android:scheme="http" />
+            </intent-filter>
+        </activity>
+
+        <service android:name=".worker.NotificationHandlingService" />
+
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
+        <provider
+            android:name=".db.BookmarksProvider"
+            android:authorities="${applicationId}"
+            android:exported="false" />
+
+        <provider
+            android:name=".db.SuggestionsProvider"
+            android:authorities="${applicationId}.SuggestionsProvider"
+            android:exported="false" />
+
+        <meta-data android:name="android.webkit.WebView.MetricsOptOut" android:value="true" />
+    </application>
+</manifest>

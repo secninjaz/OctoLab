@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.tabs.TabLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/tabs"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@android:color/transparent"
+    app:tabGravity="fill"
+    app:tabIndicatorColor="@color/tab_indicator_color"
+    app:tabMaxWidth="-1dp"
+    app:tabMode="scrollable"
+    app:tabSelectedTextColor="@color/tab_indicator_color"
+    app:tabTextColor="@color/tab_text_color" />

@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:scrollbars="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- header -->
+        <androidx.cardview.widget.CardView
+            style="?attr/cardViewTheme">
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="16dp">
+
+                <com.gl4a.widget.FixedSizeImageView
+                    android:id="@+id/iv_gravatar"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_centerVertical="true"
+                    android:layout_marginRight="16dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    tools:src="@drawable/default_avatar" />
+
+                <com.gl4a.widget.LinkHandlingTextView
+                    android:id="@+id/tv_releaseinfo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_toRightOf="@id/iv_gravatar"
+                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    tools:text="Released by username yesterday" />
+
+                <com.gl4a.widget.LinkHandlingTextView
+                    android:id="@+id/tv_releasetype"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@id/tv_releaseinfo"
+                    android:layout_marginTop="@dimen/overview_header_spacing"
+                    android:layout_toRightOf="@id/iv_gravatar"
+                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    tools:text="Release type" />
+
+                <com.gl4a.widget.LinkHandlingTextView
+                    android:id="@+id/tv_releasetag"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@id/tv_releasetype"
+                    android:layout_marginTop="@dimen/overview_header_spacing"
+                    android:layout_toRightOf="@id/iv_gravatar"
+                    android:background="?attr/selectableItemBackground"
+                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textColor="?attr/colorAccent"
+                    tools:text="On tag v3.23.2" />
+
+            </RelativeLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- release notes section -->
+        <androidx.cardview.widget.CardView
+            style="?attr/cardViewTheme">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/overview_header_spacing"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/release_notes_title"
+                    style="@style/HeaderLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/release_notes" />
+
+                <com.gl4a.widget.LinkHandlingTextView
+                    android:id="@+id/tv_release_notes"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="@dimen/overview_item_spacing"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:textIsSelectable="true"
+                    app:needsLinkHandling="true"
+                    tools:text="Release notes text" />
+
+                <com.gl4a.widget.ReactionBar
+                    android:id="@+id/reactions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="8dp"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- downloads section -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/downloads"
+            style="?attr/cardViewTheme">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/overview_header_spacing"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/downloads_title"
+                    style="@style/HeaderLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/downloads" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/download_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+    </LinearLayout>
+
+</androidx.core.widget.NestedScrollView>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Scale to 75% and centre within the adaptive icon safe zone.
+         The arms reach y≈26 in the raw asset; scaling to 75% + offset of 13.5
+         keeps them within the 66dp guaranteed-visible area. -->
+    <group
+        android:translateX="13.5"
+        android:translateY="13.5"
+        android:scaleX="0.75"
+        android:scaleY="0.75">
+        <path android:pathData="M20.75,40.89 Q19.68,44.64 23.58,44.64 L34.50,44.64 Q38.40,44.64 36.47,41.25 L27.85,26.19 Q25.92,22.80 24.85,26.55 Z" android:fillColor="#E24329"/>
+        <path android:pathData="M71.53,41.25 Q69.60,44.64 73.50,44.64 L84.42,44.64 Q88.32,44.64 87.25,40.89 L83.15,26.55 Q82.08,22.80 80.15,26.19 Z" android:fillColor="#E24329"/>
+        <group>
+            <clip-path android:pathData="M32.21,48.03 Q27.48,39.96 36.84,39.96 L71.16,39.96 Q80.52,39.96 75.79,48.03 L58.73,77.13 Q54.00,85.20 49.27,77.13 Z"/>
+            <path android:pathData="M27.48,39.96 L54.00,39.96 L54.00,61.80 L54.00,85.20 Z" android:fillColor="#FC6D26"/>
+            <path android:pathData="M54.00,39.96 L80.52,39.96 L54.00,85.20 L54.00,61.80 Z" android:fillColor="#FCA326"/>
+        </group>
+    </group>
+</vector>

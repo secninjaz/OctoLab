@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/scrollView"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:scrollbars="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- user info section -->
+        <androidx.cardview.widget.CardView style="?attr/cardViewTheme">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/overview_header_spacing"
+                android:layout_marginBottom="@dimen/overview_header_spacing"
+                android:orientation="vertical"
+                android:paddingTop="@dimen/content_padding"
+                android:paddingBottom="@dimen/content_padding">
+
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/overview_item_spacing"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding">
+
+                    <com.gl4a.widget.FixedSizeImageView
+                        android:id="@+id/iv_gravatar"
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
+                        android:layout_marginRight="16dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        tools:src="@drawable/default_avatar" />
+
+                    <com.gl4a.widget.LinkHandlingTextView
+                        android:id="@+id/tv_name"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentTop="true"
+                        android:layout_toRightOf="@id/iv_gravatar"
+                        android:textAppearance="@style/TextAppearance.HeaderTitle"
+                        tools:text="Username" />
+
+                    <com.gl4a.widget.LinkHandlingTextView
+                        android:id="@+id/tv_email"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_below="@id/tv_name"
+                        android:layout_marginTop="2dp"
+                        android:layout_toRightOf="@id/iv_gravatar"
+                        android:autoLink="email"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:textColorLink="?android:attr/textColorLink"
+                        app:needsLinkHandling="true"
+                        tools:text='user@email.com' />
+
+                    <com.gl4a.widget.LinkHandlingTextView
+                        android:id="@+id/tv_website"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_below="@id/tv_email"
+                        android:layout_marginTop="2dp"
+                        android:layout_toRightOf="@id/iv_gravatar"
+                        android:autoLink="web"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:textColorLink="?android:attr/textColorLink"
+                        app:needsLinkHandling="true"
+                        tools:text="https://example.com" />
+
+                    <com.gl4a.widget.LinkHandlingTextView
+                        android:id="@+id/tv_company"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_below="@id/tv_website"
+                        android:layout_marginTop="2dp"
+                        android:layout_toRightOf="@id/iv_gravatar"
+                        android:autoLink="web"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        app:needsLinkHandling="true"
+                        tools:text="Company name" />
+
+                    <com.gl4a.widget.LinkHandlingTextView
+                        android:id="@+id/tv_location"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_below="@id/tv_company"
+                        android:layout_marginTop="2dp"
+                        android:layout_toRightOf="@id/iv_gravatar"
+                        android:autoLink="map"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        tools:text="Location" />
+                </RelativeLayout>
+
+                <com.gl4a.widget.LinkHandlingTextView
+                    android:id="@+id/tv_bio"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/overview_item_spacing"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:autoLink="web"
+                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    app:needsLinkHandling="true"
+                    tools:text="Bio of the user" />
+
+                <com.gl4a.widget.OverviewRow
+                    android:id="@+id/type_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone" />
+
+                <com.gl4a.widget.OverviewRow
+                    android:id="@+id/join_date_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:rowIcon="@drawable/icon_calendar"
+                    tools:rowText="Member since 09 February 2019" />
+
+                <com.gl4a.widget.OverviewRow
+                    android:id="@+id/members_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:rowIcon="@drawable/icon_members"
+                    tools:rowText="5 members" />
+
+                <com.gl4a.widget.OverviewRow
+                    android:id="@+id/followers_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:rowIcon="@drawable/icon_members"
+                    app:rowIconActionHintOff="@string/user_follow_action"
+                    app:rowIconActionHintOn="@string/user_unfollow_action"
+                    tools:rowText="Followed by 82 users" />
+
+                <com.gl4a.widget.OverviewRow
+                    android:id="@+id/following_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:rowIcon="@drawable/icon_following"
+                    tools:rowText="Following 33 users" />
+
+                <com.gl4a.widget.OverviewRow
+                    android:id="@+id/repos_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:rowIcon="@drawable/icon_repositories"
+                    tools:rowText="39 repositories" />
+
+                <com.gl4a.widget.OverviewRow
+                    android:id="@+id/gists_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:rowIcon="@drawable/icon_gists"
+                    tools:rowText="12 gists" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Repository section -->
+        <androidx.cardview.widget.CardView style="?attr/cardViewTheme">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/overview_header_spacing"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_pub_repos_label"
+                    style="@style/HeaderLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/user_pub_repos" />
+
+                <ProgressBar
+                    android:id="@+id/pb_top_repos"
+                    style="@style/LoadingProgress" />
+
+                <LinearLayout
+                    android:id="@+id/ll_top_repos"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/btn_repos"
+                    style="@style/MoreButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:text="@string/view_more"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Organizations section -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/ll_orgs"
+            style="?attr/cardViewTheme">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_orgs"
+                    style="@style/HeaderLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/user_organizations" />
+
+                <LinearLayout
+                    android:id="@+id/ll_org"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/overview_header_spacing"
+                    android:orientation="vertical" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

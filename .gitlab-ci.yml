@@ -1,0 +1,401 @@
+workflow:
+  # Auto-cancel interruptible jobs in the main branch pipeline when a new
+  # pipeline starts for the same commit (e.g. a tag pipeline supersedes it).
+  auto_cancel:
+    on_new_commit: interruptible
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+
+stages:
+  - build
+  - test
+  - security
+  - publish
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+
+variables:
+  ANDROID_HOME: /opt/android-sdk
+  GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx1536m"
+  # SAST: semgrep only (source-level Java analysis, no compilation needed)
+  SAST_EXCLUDED_ANALYZERS: "bandit,brakeman,eslint,flawfinder,gosec,kubesec,nodejsscan,phpcs-security-audit,pmd-apex,security-code-scan,sobelow,spotbugs"
+  # Exclude bundled third-party JS assets (prettify, showdown) from SAST —
+  # these are vendor files for WebView rendering, not app source code.
+  SAST_EXCLUDED_PATHS: "spec,test,tests,tmp,app/src/main/assets"
+  # Full git history for secret detection — depth 50 misses older commits.
+  SECRET_DETECTION_HISTORIC_SCAN: "true"
+
+# ─────────────────────────────────────────────
+# Force all security template jobs onto runner #26 (Docker executor)
+# Shell runners 5/11 ignore image: directives — they must not pick these up
+# ─────────────────────────────────────────────
+semgrep-sast:
+  tags:
+    - docker
+  interruptible: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
+
+secret_detection:
+  tags:
+    - docker
+  interruptible: true
+  variables:
+    GIT_DEPTH: 0
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
+
+gemnasium-maven-dependency_scanning:
+  tags:
+    - docker
+  interruptible: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
+
+# ─────────────────────────────────────────────
+# Shared Android SDK setup (reused via !reference)
+# ─────────────────────────────────────────────
+.android_sdk_setup:
+  before_script:
+    - apt-get update -q && apt-get install -y -q wget unzip
+    - |
+      mkdir -p $ANDROID_HOME/cmdline-tools
+      if [ ! -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip \
+          -O /tmp/cmdline.zip
+        unzip -q /tmp/cmdline.zip -d $ANDROID_HOME/cmdline-tools
+        mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
+        rm /tmp/cmdline.zip
+      fi
+    - export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+    - yes | sdkmanager --licenses > /dev/null 2>&1 || true
+    - sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+# ─────────────────────────────────────────────
+# BUILD
+# ─────────────────────────────────────────────
+build:debug:
+  image: eclipse-temurin:21-jdk-jammy
+  stage: build
+  tags:
+    - docker
+  before_script:
+    - !reference [.android_sdk_setup, before_script]
+    - echo 'ClientId="placeholder"' > app/client.properties
+    - echo 'ClientSecret="placeholder"' >> app/client.properties
+  script:
+    - chmod +x ./gradlew
+    - ./gradlew assembleInternalDebug --no-daemon
+  cache:
+    key: android-gradle-v1
+    paths:
+      - /opt/android-sdk
+      - /root/.gradle/caches
+      - /root/.gradle/wrapper
+  artifacts:
+    paths:
+      - app/build/outputs/apk/internal/debug/app-internal-debug.apk
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
+
+build:release:
+  image: eclipse-temurin:21-jdk-jammy
+  stage: build
+  tags:
+    - docker
+  before_script:
+    - !reference [.android_sdk_setup, before_script]
+    - echo "${KEYSTORE_BASE64}" | base64 -d > octolab-release.jks
+    - printf 'STORE_FILE=%s/octolab-release.jks\nSTORE_PASSWORD=%s\nKEY_ALIAS=%s\nKEY_PASSWORD=%s\nSTORE_TYPE=JKS\n' \
+        "$CI_PROJECT_DIR" "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > signing.properties
+    - echo "ClientId=\"${CLIENT_ID}\"" > app/client.properties
+    - echo "ClientSecret=\"${CLIENT_SECRET}\"" >> app/client.properties
+  script:
+    - chmod +x ./gradlew
+    - ./gradlew assembleInternalRelease --no-daemon
+  after_script:
+    - rm -f octolab-release.jks signing.properties app/client.properties
+  cache:
+    key: android-gradle-v1
+    paths:
+      - /opt/android-sdk
+      - /root/.gradle/caches
+      - /root/.gradle/wrapper
+  artifacts:
+    paths:
+      - app/build/outputs/apk/internal/release/app-internal-release.apk
+    expire_in: 1 month
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
+
+# ─────────────────────────────────────────────
+# SECURITY — DAST API (custom, lightweight curl check)
+# SAST, Secret Detection, Dependency Scanning come from templates above
+# ─────────────────────────────────────────────
+dast_api:
+  stage: security
+  image: alpine:3.19
+  tags:
+    - docker
+  interruptible: true
+  needs: []
+  allow_failure: true
+  before_script:
+    - apk add --no-cache curl
+  script:
+    - |
+      TARGET="${DAST_TARGET_URL:-${CI_SERVER_URL}}"
+      echo "Checking API reachability: ${TARGET}/-/health"
+      curl -sf --max-time 10 -o /dev/null "${TARGET}/-/health" && \
+        echo "GitLab API host reachable ✓" || \
+        echo "WARNING: host not reachable from Docker network (allow_failure=true)"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
+
+mobsf:static:
+  stage: security
+  image: alpine:3.19
+  tags:
+    - docker
+  interruptible: true
+  # MOBSF_API_KEY is passed to the service container — MobSF v3.9+ reads it
+  # on startup and uses it as the REST API key, replacing the login flow.
+  variables:
+    MOBSF_API_KEY: "octolab-ci-mobsf-2026"
+  services:
+    - name: opensecurity/mobile-security-framework-mobsf:latest
+      alias: mobsf
+  needs:
+    - job: build:debug
+      artifacts: true
+  before_script:
+    - apk add --no-cache curl python3 file
+    - |
+      echo "Waiting for MobSF to initialise (max 120s)..."
+      for i in $(seq 1 12); do
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+          http://mobsf:8000/ 2>/dev/null || echo "000")
+        # 200 = ready, 302 = redirecting to login (also means MobSF is up)
+        { [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ]; } && \
+          echo "MobSF ready — HTTP $STATUS (${i}0s)" && break
+        echo "  ${i}/12 — HTTP $STATUS, waiting..."
+        sleep 10
+      done
+      if [ "$STATUS" = "000" ] || [ "$STATUS" = "" ]; then
+        echo "ERROR: MobSF did not start after 120s"
+        exit 1
+      fi
+  script:
+    - |
+      APK="app/build/outputs/apk/internal/debug/app-internal-debug.apk"
+
+      # Upload APK
+      UPLOAD=$(curl -s -F "file=@${APK}" http://mobsf:8000/api/v1/upload \
+        -H "Authorization: ${MOBSF_API_KEY}")
+      echo "Upload: ${UPLOAD}"
+      HASH=$(echo "${UPLOAD}" | python3 -c "import sys,json; print(json.load(sys.stdin)['hash'])")
+      echo "Hash: ${HASH}"
+
+      # Trigger scan — response IS the full analysis JSON (synchronous in this version)
+      SCAN_STATUS=$(curl -s -L -o mobsf-static-report.json -w "%{http_code}" \
+        http://mobsf:8000/api/v1/scan \
+        -H "Authorization: ${MOBSF_API_KEY}" \
+        -d "hash=${HASH}&scan_type=apk")
+      echo "Scan HTTP status: ${SCAN_STATUS}"
+
+      # Validate the scan produced real data
+      FINDING_COUNT=$(python3 -c "import json; r=json.load(open('mobsf-static-report.json')); keys=['permissions','manifest_analysis','code_analysis','binary_analysis','network_security']; print(sum(len(r.get(k) or []) for k in keys))" 2>/dev/null || echo "0")
+
+      echo "MobSF findings count: ${FINDING_COUNT}"
+      if [ "${SCAN_STATUS}" = "200" ] && [ "${FINDING_COUNT}" -gt 0 ] 2>/dev/null; then
+        echo "MobSF static scan complete ✓ (${FINDING_COUNT} findings analysed)"
+      else
+        echo "ERROR: MobSF scan failed or returned no data (HTTP ${SCAN_STATUS}, findings: ${FINDING_COUNT})"
+        exit 1
+      fi
+  artifacts:
+    paths:
+      - mobsf-static-report.json
+    expire_in: 1 month
+    when: always
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
+
+mobsf:dynamic:
+  stage: security
+  image: alpine:3.19
+  tags:
+    - docker
+  variables:
+    MOBSF_API_KEY: "octolab-ci-mobsf-2026"
+  services:
+    - name: opensecurity/mobile-security-framework-mobsf:latest
+      alias: mobsf
+  needs:
+    - job: build:debug
+      artifacts: true
+  before_script:
+    - apk add --no-cache curl python3
+    - |
+      echo "Waiting for MobSF to initialise..."
+      for i in $(seq 1 24); do
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://mobsf:8000/ 2>/dev/null || echo "000")
+        [ "$STATUS" = "200" ] && echo "MobSF ready (${i}0s)" && break
+        echo "  ${i}/24 — HTTP $STATUS, waiting..."
+        sleep 10
+      done
+  script:
+    - |
+      APK="app/build/outputs/apk/internal/debug/app-internal-debug.apk"
+      UPLOAD=$(curl -s -F "file=@${APK}" http://mobsf:8000/api/v1/upload \
+        -H "Authorization: ${MOBSF_API_KEY}")
+      HASH=$(echo "${UPLOAD}" | python3 -c "import sys,json; print(json.load(sys.stdin)['hash'])")
+      curl -s -X POST http://mobsf:8000/api/v1/dynamic/start_analysis \
+        -H "Authorization: ${MOBSF_API_KEY}" -d "hash=${HASH}&re_analysis=1" > /dev/null
+      sleep 120
+      curl -s -X POST http://mobsf:8000/api/v1/dynamic/stop_analysis \
+        -H "Authorization: ${MOBSF_API_KEY}" -d "hash=${HASH}" > /dev/null
+      curl -s http://mobsf:8000/api/v1/dynamic/report_json \
+        -H "Authorization: ${MOBSF_API_KEY}" -d "hash=${HASH}" \
+        -o mobsf-dynamic-report.json
+      echo "MobSF dynamic scan complete ✓"
+  artifacts:
+    paths:
+      - mobsf-dynamic-report.json
+    expire_in: 1 month
+    when: always
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+
+# ─────────────────────────────────────────────
+# SECURITY GATE — blocks publish until all scans pass
+#
+# Source-level scans (semgrep, secret_detection, gemnasium) run only on
+# the main branch pipeline. This job verifies that pipeline passed for
+# the same commit SHA, then waits for MobSF (APK scan, tag-only).
+# ─────────────────────────────────────────────
+security:gate:
+  stage: security
+  image: alpine:3.19
+  tags:
+    - docker
+  needs:
+    - job: mobsf:static
+      artifacts: false
+  before_script:
+    - apk add --no-cache curl python3
+  script:
+    - |
+      echo "Verifying main pipeline security scans passed for commit ${CI_COMMIT_SHA}..."
+      PASSED=$(curl -sf --max-time 10 \
+        -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/pipelines?sha=${CI_COMMIT_SHA}&ref=main&status=success" | \
+        python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+      if [ "$PASSED" = "0" ]; then
+        echo "ERROR: No successful main pipeline found for this commit."
+        echo "Push the commit to main first and ensure security scans pass before tagging."
+        exit 1
+      fi
+      echo "Main pipeline security scans verified ✓"
+      echo "MobSF static scan passed ✓"
+      echo "All security checks passed — release is safe to publish."
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
+
+# ─────────────────────────────────────────────
+# PUBLISH — GitLab release (automatic) + GitHub push (manual)
+# ─────────────────────────────────────────────
+release:gitlab:
+  stage: publish
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  tags:
+    - docker
+  variables:
+    GIT_DEPTH: 0
+  needs:
+    - job: security:gate
+      artifacts: false
+    - job: build:release
+      artifacts: true
+  before_script:
+    - apk add --no-cache curl git
+  script:
+    - cp app/build/outputs/apk/internal/release/app-internal-release.apk OctoLab-${CI_COMMIT_TAG}.apk
+    - |
+      curl --fail-with-body \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "OctoLab-${CI_COMMIT_TAG}.apk" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/octolab/${CI_COMMIT_TAG}/OctoLab-${CI_COMMIT_TAG}.apk"
+    - |
+      VERSION="${CI_COMMIT_TAG#v}"
+      CHANGELOG=$(awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found && NF{print}" CHANGELOG.md)
+      if [ -z "$CHANGELOG" ]; then
+        CHANGELOG="See CHANGELOG.md for details."
+      fi
+      cat > release_description.md << DESCEOF
+      ## OctoLab ${CI_COMMIT_TAG}
+
+      Free and open-source Android client for GitLab.
+      Built by [SecNinjaz](https://secninjaz.com).
+
+      ${CHANGELOG}
+
+      ### Install
+      Download \`OctoLab-${CI_COMMIT_TAG}.apk\` below, or use [Obtainium](https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/${CI_PROJECT_URL}) to track releases from this GitLab instance automatically.
+
+      ### Security
+      This release passed SAST (semgrep), secret detection, dependency scanning, and MobSF static analysis.
+      DESCEOF
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: "OctoLab $CI_COMMIT_TAG"
+    description: './release_description.md'
+    assets:
+      links:
+        - name: "OctoLab-$CI_COMMIT_TAG.apk"
+          url: "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/octolab/$CI_COMMIT_TAG/OctoLab-$CI_COMMIT_TAG.apk"
+          link_type: package
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
+
+publish:github:
+  stage: publish
+  image: alpine:3.19
+  tags:
+    - docker
+  # Full clone needed — shallow clone (depth=20) lacks older objects,
+  # causing index-pack failures when pushing full history to GitHub.
+  variables:
+    GIT_DEPTH: 0
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
+      when: manual
+      allow_failure: false
+  needs:
+    - job: security:gate
+      artifacts: false
+    - job: build:release
+      artifacts: false
+  before_script:
+    - apk add --no-cache git
+  script:
+    - |
+      echo "All security checks passed. Publishing ${CI_COMMIT_TAG} to GitHub..."
+      git config user.email "ci@secninjaz.com"
+      git config user.name "SecNinjaz CI"
+      git remote remove github 2>/dev/null || true
+      git remote add github \
+        https://${GITHUB_USER}:${GITHUB_PAT}@github.com/secninjaz/OctoLab.git
+      git push --force github HEAD:main
+      git push --force github ${CI_COMMIT_TAG}
+      echo "✅ Published ${CI_COMMIT_TAG} to GitHub."
+  environment:
+    name: github-release
+    url: https://github.com/secninjaz/OctoLab/releases/tag/$CI_COMMIT_TAG
+

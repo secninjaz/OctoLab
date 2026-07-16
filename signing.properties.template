@@ -1,0 +1,7 @@
+# Copy to signing.properties and fill in values (never commit signing.properties)
+# In CI, these values come from environment variables / CI secrets
+
+STORE_FILE=/path/to/octolab-release.jks
+STORE_PASSWORD=${KEYSTORE_PASSWORD}
+KEY_ALIAS=${KEY_ALIAS}
+KEY_PASSWORD=${KEY_PASSWORD}

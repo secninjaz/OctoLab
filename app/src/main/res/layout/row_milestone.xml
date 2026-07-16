@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:gravity="center_vertical"
+    android:minHeight="?attr/listPreferredItemHeight"
+    android:orientation="horizontal"
+    android:padding="@dimen/content_padding">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tv_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.ItemTitle"
+            tools:text="Milestone title" />
+
+        <TextView
+            android:id="@+id/tv_desc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            tools:text="Description" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_marginLeft="8dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tv_open"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.VerySmall"
+            android:textColor="?attr/colorCommitAddition"
+            tools:text="3 open" />
+
+        <TextView
+            android:id="@+id/tv_closed"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.VerySmall"
+            android:textColor="?attr/colorCommitDeletion"
+            tools:text="3 closed" />
+
+        <TextView
+            android:id="@+id/tv_due"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:drawableLeft="@drawable/due_small"
+            android:drawablePadding="4dp"
+            android:textAppearance="@style/TextAppearance.VerySmall"
+            tools:text="in 2 days" />
+
+    </LinearLayout>
+
+</LinearLayout>

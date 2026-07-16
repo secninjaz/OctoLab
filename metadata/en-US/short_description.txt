@@ -1,0 +1,1 @@
+Provides access to GitHub and lets you stay connected with your network

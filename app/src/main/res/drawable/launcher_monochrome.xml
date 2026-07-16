@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OctoLab THEMED (monochrome) icon for Android 13+. System tints it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M20.75,40.89 Q19.68,44.64 23.58,44.64 L34.50,44.64 Q38.40,44.64 36.47,41.25 L27.85,26.19 Q25.92,22.80 24.85,26.55 Z" android:fillColor="#FFFFFF"/>
+    <path android:pathData="M71.53,41.25 Q69.60,44.64 73.50,44.64 L84.42,44.64 Q88.32,44.64 87.25,40.89 L83.15,26.55 Q82.08,22.80 80.15,26.19 Z" android:fillColor="#FFFFFF"/>
+    <path android:pathData="M32.21,48.03 Q27.48,39.96 36.84,39.96 L71.16,39.96 Q80.52,39.96 75.79,48.03 L58.73,77.13 Q54.00,85.20 49.27,77.13 Z" android:fillColor="#FFFFFF"/>
+</vector>

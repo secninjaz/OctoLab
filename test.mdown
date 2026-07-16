@@ -1,0 +1,67 @@
+GitLab Flavored Markdown
+========================
+
+This file tests GitLab Flavored Markdown (GFM) rendering in OctoLab.
+
+## Text Formatting
+
+**Bold text** and _italic text_ and ~~strikethrough~~.
+
+Inline `code` and a [link](https://gitlab.com).
+
+## Lists
+
+Unordered:
+
+- Item one
+- Item two
+- Item three
+
+Ordered:
+
+1. First item
+2. Second item
+3. Third item
+
+## Task Lists (GFM)
+
+- [x] Completed task
+- [ ] Pending task
+- [x] Another done item
+
+## Blockquote
+
+> GitLab is a complete DevOps platform.
+> Delivered as a single application.
+
+## Code Blocks
+
+```python
+def hello():
+    print("Hello from OctoLab")
+```
+
+```bash
+curl -H "PRIVATE-TOKEN: <token>" https://gitlab.example.com/api/v4/projects
+```
+
+## Table (GFM)
+
+| Feature          | GitHub | GitLab |
+|------------------|--------|--------|
+| Issues           | ✓      | ✓      |
+| Merge Requests   | ✓ (PR) | ✓      |
+| CI/CD            | Actions| Pipelines |
+| Snippets         | Gists  | Snippets |
+| Wiki             | ✓      | ✓      |
+
+## Horizontal Rule
+
+---
+
+## Heading Levels
+
+### H3
+#### H4
+##### H5
+###### H6

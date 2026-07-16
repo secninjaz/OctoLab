@@ -1,0 +1,94 @@
+package com.gl4a.activities;
+
+import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import android.view.Menu;
+import android.view.MenuItem;
+
+import com.gl4a.R;
+import com.gl4a.fragment.ReviewFragment;
+import com.gl4a.gitlab.model.GitLabReview;
+import com.gl4a.utils.IntentUtils;
+
+public class ReviewActivity extends FragmentContainerActivity {
+
+    private String mTitle;
+
+    public static Intent makeIntent(Context context, String repoOwner, String repoName,
+            int issueNumber, GitLabReview review, IntentUtils.InitialCommentMarker initialComment) {
+        return new Intent(context, ReviewActivity.class)
+                .putExtra("repo_owner", repoOwner)
+                .putExtra("repo_name", repoName)
+                .putExtra("issue_number", issueNumber)
+                .putExtra("review", review)
+                .putExtra("initial_comment", initialComment);
+    }
+
+    private String mRepoOwner;
+    private String mRepoName;
+    private int mIssueNumber;
+    private GitLabReview mReview;
+    private IntentUtils.InitialCommentMarker mInitialComment;
+
+    @Nullable
+    @Override
+    protected String getActionBarTitle() {
+        mTitle = getString(R.string.review_title_format, mIssueNumber);
+        return mTitle;
+    }
+
+    @Nullable
+    @Override
+    protected String getActionBarSubtitle() {
+        return mRepoOwner + "/" + mRepoName;
+    }
+
+    @Override
+    protected void onInitExtras(Bundle extras) {
+        super.onInitExtras(extras);
+        mRepoOwner = extras.getString("repo_owner");
+        mRepoName = extras.getString("repo_name");
+        mIssueNumber = extras.getInt("issue_number");
+        mReview = extras.getParcelable("review");
+        mInitialComment = extras.getParcelable("initial_comment");
+        extras.remove("initial_comment");
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.review_menu, menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.share:
+                IntentUtils.share(this, mTitle, Uri.parse(mReview.htmlUrl()));
+                return true;
+
+            case R.id.browser:
+                IntentUtils.launchBrowser(this, Uri.parse(mReview.htmlUrl()));
+                return true;
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected Fragment onCreateFragment() {
+        return ReviewFragment.newInstance(mRepoOwner, mRepoName, mIssueNumber, mReview,
+                mInitialComment);
+    }
+
+    @Override
+    protected Intent navigateUp() {
+        return PullRequestActivity.makeIntent(this, mRepoOwner, mRepoName, mIssueNumber,
+                PullRequestActivity.PAGE_CONVERSATION,
+                new IntentUtils.InitialCommentMarker(mReview.id()));
+    }
+}

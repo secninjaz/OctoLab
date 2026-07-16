@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:minHeight="?attr/listPreferredItemHeight"
+    android:padding="@dimen/content_padding">
+
+    <com.gl4a.widget.FixedSizeImageView
+        android:id="@+id/iv_gravatar"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginRight="16dp"
+        android:layout_marginTop="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        tools:src="@drawable/default_avatar" />
+
+    <TextView
+        android:id="@+id/tv_extra"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_marginRight="16dp"
+        android:layout_toEndOf="@+id/iv_gravatar"
+        android:layout_toRightOf="@+id/iv_gravatar"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:textColor="?android:attr/textColorPrimary"
+        tools:text="username" />
+
+    <TextView
+        android:id="@+id/tv_timestamp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@id/tv_extra"
+        android:layout_toRightOf="@id/tv_extra"
+        android:textAppearance="@style/TextAppearance.VerySmall"
+        tools:text="yesterday" />
+
+    <TextView
+        android:id="@+id/tv_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tv_timestamp"
+        android:layout_toRightOf="@id/iv_gravatar"
+        android:textAppearance="@style/TextAppearance.ItemTitle"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        tools:text="Feed item title" />
+
+    <TextView
+        android:id="@+id/tv_desc"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tv_title"
+        android:layout_toRightOf="@id/iv_gravatar"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        tools:text="Feed item description" />
+
+</RelativeLayout>

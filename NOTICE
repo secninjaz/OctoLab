@@ -1,0 +1,36 @@
+OctoLab
+Copyright 2026 SecNinjaz
+
+This product is based on Octodroid (https://github.com/slapperwan/gh4a),
+a GitHub Android client originally created by slapperwan and contributors.
+
+Octodroid Copyright 2011–2024 Azwan Adli Abdullah, maniac103, kageiit,
+Tunous, and the Octodroid contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+---
+
+This software includes components from the following open-source projects:
+
+- Octodroid (Apache 2.0) — https://github.com/slapperwan/gh4a
+- AndroidX libraries (Apache 2.0) — https://github.com/androidx/androidx
+- OkHttp (Apache 2.0) — https://github.com/square/okhttp
+- Retrofit (Apache 2.0) — https://github.com/square/retrofit
+- Moshi (Apache 2.0) — https://github.com/square/moshi
+- RxJava (Apache 2.0) — https://github.com/ReactiveX/RxJava
+- RxAndroid (Apache 2.0) — https://github.com/ReactiveX/RxAndroid
+- Markwon (Apache 2.0) — https://github.com/noties/Markwon
+- PrettyTime (Apache 2.0) — https://github.com/ocpsoft/prettytime
+- AndroidSVG (Apache 2.0) — https://github.com/BigBadaboom/androidsvg
+- android-gif-drawable (MIT) — https://github.com/koral--/android-gif-drawable

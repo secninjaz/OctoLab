@@ -1,0 +1,13 @@
+@import "prettify-light.css";
+
+pre.prettyprint.linenums {
+    box-shadow: none;
+}
+
+li:nth-child(even) {
+    background: none;
+}
+
+li.highlighted {
+    background: none;
+}

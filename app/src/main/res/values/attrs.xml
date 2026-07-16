@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <attr name="headerTheme" format="reference" />
+    <attr name="cardViewTheme" format="reference" />
+    <attr name="inlineButtonStyle" format="reference" />
+    <attr name="drawerBackground" format="reference" />
+    <attr name="colorIssueOpen" format="color" />
+    <attr name="colorIssueClosed" format="color" />
+    <attr name="colorPullRequestMerged" format="color" />
+    <attr name="colorPullRequestDraft" format="color" />
+    <attr name="colorIssueOpenDark" format="color" />
+    <attr name="colorIssueClosedDark" format="color" />
+    <attr name="colorPullRequestMergedDark" format="color" />
+    <attr name="colorPullRequestDraftDark" format="color" />
+    <attr name="colorIssueEditFab" format="reference" />
+    <attr name="colorCommitAddition" format="color" />
+    <attr name="colorCommitDeletion" format="color" />
+    <attr name="colorFab" format="color" />
+    <attr name="colorBreadcrumbBackground" format="color" />
+    <attr name="colorScrollbarThumb" format="color" />
+    <attr name="colorDiffAddBackground" format="color" />
+    <attr name="colorDiffRemoveBackground" format="color" />
+    <attr name="colorDiffAddLineNumberBackground" format="color" />
+    <attr name="colorDiffRemoveLineNumberBackground" format="color" />
+    <attr name="colorCodeBackground" format="color" />
+    <attr name="colorIconForeground" format="color" />
+
+    <attr name="maxHeight" format="dimension" />
+
+    <declare-styleable name="LabelBadgeView">
+        <attr name="badgeSize" format="dimension" />
+        <attr name="badgeSpacing" format="dimension" />
+    </declare-styleable>
+
+    <declare-styleable name="LinkHandlingTextView">
+        <attr name="needsLinkHandling" format="boolean" />
+    </declare-styleable>
+
+    <declare-styleable name="IssueStateTrackingFloatingActionButton">
+        <attr name="state_closed" format="boolean" />
+        <attr name="state_merged" format="boolean" />
+        <attr name="state_draft" format="boolean" />
+    </declare-styleable>
+
+    <declare-styleable name="HeightLimitedLinearLayout">
+        <attr name="maxHeight" />
+    </declare-styleable>
+
+    <declare-styleable name="HeightLimitedNestedScrollView">
+        <attr name="maxHeight" />
+    </declare-styleable>
+
+    <declare-styleable name="EditorBottomSheet">
+        <attr name="collapsible" format="boolean" />
+        <attr name="allowEmpty" format="boolean" />
+    </declare-styleable>
+
+    <item name="EdgeColorHelper" type="id" />
+    <item name="FloatingActionButtonScrollEnabled" type="id" />
+
+    <declare-styleable name="OverviewRow">
+        <attr name="overviewRowStyle" format="reference" />
+        <attr name="rowText" format="string" />
+        <attr name="rowIcon" format="color|reference" />
+        <attr name="rowIconActionHintOn" format="string" />
+        <attr name="rowIconActionHintOff" format="string" />
+        <attr name="displayRedirectArrowWhenClickable" format="boolean" />
+    </declare-styleable>
+</resources>

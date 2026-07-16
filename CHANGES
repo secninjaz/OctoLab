@@ -1,0 +1,134 @@
+v3.6 - Fix 2fa for first time login
+
+v3.5
+- 2 factor authentication
+- bug fixes
+
+v3.4 (Mar 10, 2014)
+- Search users
+- Merge pull requests
+- Fixed trending repos
+- Releases info
+
+v3.3 (Nov 25, 2012)
+- Download package files and branch/tag archive
+- View file commit history
+- View file at specific commit
+- Starred and watched repos
+
+v3.2 (Sep 2, 2012)
+- Edit and delete comment on issue/pull request
+- bug fixes
+
+v3.1 (Aug 24, 2012)
+- share function on:
+  - user
+  - repo
+  - commit
+  - diff
+  - file
+  - issue
+- bug fixes
+
+v3.0 (Aug 16, 2012)
+- rebranding on the app, now known as OctoDroid
+- major UI overhaul
+- new features added:
+- light/dark theme
+- comment on pull request
+- comment on commit
+
+v2.2 (Jun 21, 2012)
+- Show organization private repositories
+- Handle Download and PullRequestReviewComment event.
+
+v2.1 (Jun 20, 2012)
+- Issue assignee feature
+- Sort issues by Submitted, Updated or Comments
+- Various bug fixes
+
+v2.0 (Jun 18, 2012)
+- New Github API v3.
+- OAuth2 support
+- Milestone support
+
+v1.3.8 (Oct 10, 2011)
+- Add support for pull request URL as an option to view with Gh4a.
+
+v1.3.7 (Aug 5, 2011)
+- Open specific issue/pull request for IssueCommentEvent in activity feeds 
+- Open Recent Wiki Updates page when event is GollumEvent in the activity feeds
+- Remove donate menu
+- Add Admob (ONLY at activity feeds, no ads at other places)
+- Remove GitHub Discussions, seems like the url http://support.github.com no longer exist
+
+v1.3.6
+- File viewer now be able to view all type of languages
+
+v1.3.5 (Jun 13, 2011)
+- Simple bookmark function.  Pages available for bookmark:
+  * User
+  * Repository
+  * Repository branches
+  * Repository tags
+  * Issue listing
+  * Issue details
+  * Create issue page
+  
+v1.3.4 (Jun 11, 2011)
+- Show private organizations
+
+v1.3.3 (Jun 01, 2011)
+- New JSON response format for CreateEvent
+- New JSON response format for MemberEvent
+- Revert application icon.  Need to follow guidelines https://github.com/github/media#readme
+
+v1.3.2 (May 10, 2011)
+- Option to open gh4a while browsing github.com using browser
+- New application icon
+- Minor bug fixes 
+
+v1.3.1 (Apr 16, 2011)
+- GitHub Jobs
+- Option to view blog and wiki in the browser
+- Indicator if issue has a pull request attached
+- Minor UI tweaks
+
+v1.3 (Apr 05, 2011)
+- More explore features:
+  * Public timeline
+  * Trending repos (today, week, month, forever)
+  * GitHub blog
+  * Public discussion (view only)
+- Recent wiki update at repository
+- Prevent user login using email, use username instead.
+
+v1.2.4 (Mar 28, 2011)
+- Fixed create issue layout when in landscape mode.
+- Fixed encoding in gist, file and diff viewer.
+- Show issue number in issue and pull request listing
+ 
+v1.2.3 (Mar 25, 2011)
+- Show pushable repos
+- Encode url for issue label and gits filename
+- More verbose message when login error
+
+v1.2.2 (Mar 23, 2011)
+- Fixed classpath problem in some HTC devices (known model is HTC Desire HD). Refer to http://code.google.com/p/google-gson/issues/detail?id=255
+
+v1.2 (Mar 20, 2011)
+- Gist support (note: current Github API for gist is limited and only support public gist)
+- Fixed FC when add/delete label
+- When click on item MemberEvent, go to repo
+- Support move to sdcard
+
+v1.1.1 (Mar 17, 2011)
+- Fixed FC in honeycomb when loading Organizations
+- Minor bug fixes
+
+v1.1 (Mar 16, 2011)
+- Handle orientation changed properly 
+- New feature to download source code at file viewer
+
+v1.0 (Mar 15, 2011)
+- Initial release

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/search"
+        android:icon="@drawable/menu_search"
+        android:title="@string/search"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/browser"
+        android:icon="@drawable/menu_web"
+        android:title="@string/open_in_browser"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/share"
+        android:icon="@drawable/menu_share"
+        android:title="@string/share"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/download"
+        android:icon="@drawable/menu_download"
+        android:title="@string/download"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/wrap"
+        android:checkable="true"
+        android:title="@string/wrap_lines"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/view_raw"
+        android:checkable="true"
+        android:title="@string/raw"
+        android:visible="false"
+        app:showAsAction="never" />
+</menu>
