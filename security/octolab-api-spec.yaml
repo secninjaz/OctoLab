@@ -1,0 +1,614 @@
+openapi: "3.0.3"
+info:
+  title: GitLab API — OctoLab endpoints
+  description: |
+    Targeted OpenAPI spec covering the GitLab REST API endpoints called by OctoLab.
+    Used by GitLab DAST API scanner to fuzz only the relevant attack surface.
+  version: "4"
+
+servers:
+  - url: https://dev.taskmiles.com/api/v4
+    description: Self-hosted GitLab instance
+
+security:
+  - privateToken: []
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    privateToken:
+      type: apiKey
+      in: header
+      name: PRIVATE-TOKEN
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  parameters:
+    projectId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+    issueIid:
+      name: iid
+      in: path
+      required: true
+      schema: { type: integer }
+    mrIid:
+      name: iid
+      in: path
+      required: true
+      schema: { type: integer }
+    noteId:
+      name: noteId
+      in: path
+      required: true
+      schema: { type: integer }
+    page:
+      name: page
+      in: query
+      schema: { type: integer, default: 1 }
+    perPage:
+      name: per_page
+      in: query
+      schema: { type: integer, default: 20, maximum: 100 }
+
+paths:
+  # ── Auth ──────────────────────────────────
+  /oauth/token:
+    post:
+      summary: OAuth2 token exchange
+      tags: [Auth]
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                grant_type: { type: string }
+                code: { type: string }
+                redirect_uri: { type: string }
+                client_id: { type: string }
+                client_secret: { type: string }
+      responses:
+        "200": { description: Token issued }
+        "401": { description: Unauthorized }
+
+  # ── Current user ──────────────────────────
+  /user:
+    get:
+      summary: Get authenticated user
+      tags: [User]
+      responses:
+        "200": { description: User object }
+        "401": { description: Unauthorized }
+
+  /users/{userId}/events:
+    get:
+      summary: Get user events
+      tags: [User]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of events }
+
+  # ── Events ────────────────────────────────
+  /events:
+    get:
+      summary: Get authenticated user events
+      tags: [Events]
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of events }
+
+  /projects/{id}/events:
+    get:
+      summary: Get project events
+      tags: [Events]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of events }
+        "404": { description: Not found }
+
+  # ── Todos ─────────────────────────────────
+  /todos:
+    get:
+      summary: List todos
+      tags: [Todos]
+      parameters:
+        - name: state
+          in: query
+          schema: { type: string, enum: [pending, done] }
+        - name: action
+          in: query
+          schema: { type: string, enum: [assigned, mentioned, build_failed, marked, approval_required, unmergeable, directly_addressed, merge_train_removed, review_requested] }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of todos }
+    post:
+      summary: Mark all todos as done
+      tags: [Todos]
+      responses:
+        "204": { description: All done }
+
+  /todos/{id}/mark_as_done:
+    post:
+      summary: Mark todo as done
+      tags: [Todos]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: Todo marked done }
+        "404": { description: Not found }
+
+  /todos/{id}:
+    delete:
+      summary: Delete a todo
+      tags: [Todos]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204": { description: Deleted }
+
+  # ── Markdown ──────────────────────────────
+  /markdown:
+    post:
+      summary: Render markdown
+      tags: [Misc]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text: { type: string }
+                gfm: { type: boolean }
+                project: { type: string }
+      responses:
+        "200": { description: Rendered HTML }
+
+  # ── Projects ──────────────────────────────
+  /projects:
+    get:
+      summary: List projects
+      tags: [Projects]
+      parameters:
+        - name: membership
+          in: query
+          schema: { type: boolean }
+        - name: starred
+          in: query
+          schema: { type: boolean }
+        - name: order_by
+          in: query
+          schema: { type: string }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [asc, desc] }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of projects }
+
+  /projects/{id}:
+    get:
+      summary: Get a project
+      tags: [Projects]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      responses:
+        "200": { description: Project object }
+        "404": { description: Not found }
+
+  /projects/{id}/star:
+    post:
+      summary: Star a project
+      tags: [Projects]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      responses:
+        "201": { description: Starred }
+        "304": { description: Already starred }
+
+  /projects/{id}/unstar:
+    post:
+      summary: Unstar a project
+      tags: [Projects]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      responses:
+        "200": { description: Unstarred }
+
+  # ── Issues ────────────────────────────────
+  /issues:
+    get:
+      summary: List user issues
+      tags: [Issues]
+      parameters:
+        - name: scope
+          in: query
+          schema: { type: string, enum: [created_by_me, assigned_to_me, all] }
+        - name: state
+          in: query
+          schema: { type: string, enum: [opened, closed, all] }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of issues }
+
+  /projects/{id}/issues:
+    get:
+      summary: List project issues
+      tags: [Issues]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - name: state
+          in: query
+          schema: { type: string, enum: [opened, closed, all] }
+        - name: labels
+          in: query
+          schema: { type: string }
+        - name: milestone
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of issues }
+    post:
+      summary: Create an issue
+      tags: [Issues]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                description: { type: string }
+                assignee_ids: { type: array, items: { type: integer } }
+                milestone_id: { type: integer }
+                labels: { type: string }
+      responses:
+        "201": { description: Issue created }
+
+  /projects/{id}/issues/{iid}:
+    get:
+      summary: Get an issue
+      tags: [Issues]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/issueIid'
+      responses:
+        "200": { description: Issue object }
+        "404": { description: Not found }
+    put:
+      summary: Edit an issue
+      tags: [Issues]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/issueIid'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                description: { type: string }
+                state_event: { type: string, enum: [close, reopen] }
+                labels: { type: string }
+      responses:
+        "200": { description: Updated issue }
+
+  /projects/{id}/issues/{iid}/notes:
+    get:
+      summary: List issue comments
+      tags: [Issues]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/issueIid'
+        - name: sort
+          in: query
+          schema: { type: string, enum: [asc, desc] }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of notes }
+    post:
+      summary: Create issue comment
+      tags: [Issues]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/issueIid'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string }
+      responses:
+        "201": { description: Note created }
+
+  /projects/{id}/issues/{iid}/notes/{noteId}:
+    put:
+      summary: Edit issue comment
+      tags: [Issues]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/issueIid'
+        - $ref: '#/components/parameters/noteId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string }
+      responses:
+        "200": { description: Updated note }
+    delete:
+      summary: Delete issue comment
+      tags: [Issues]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/issueIid'
+        - $ref: '#/components/parameters/noteId'
+      responses:
+        "204": { description: Deleted }
+
+  # ── Merge Requests ────────────────────────
+  /merge_requests:
+    get:
+      summary: List user merge requests
+      tags: [MergeRequests]
+      parameters:
+        - name: scope
+          in: query
+          schema: { type: string }
+        - name: state
+          in: query
+          schema: { type: string, enum: [opened, closed, merged, all] }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of MRs }
+
+  /projects/{id}/merge_requests:
+    get:
+      summary: List project merge requests
+      tags: [MergeRequests]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - name: state
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of MRs }
+
+  /projects/{id}/merge_requests/{iid}:
+    get:
+      summary: Get a merge request
+      tags: [MergeRequests]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/mrIid'
+      responses:
+        "200": { description: MR object }
+        "404": { description: Not found }
+
+  /projects/{id}/merge_requests/{iid}/notes:
+    get:
+      summary: List MR comments
+      tags: [MergeRequests]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/mrIid'
+        - name: sort
+          in: query
+          schema: { type: string, enum: [asc, desc] }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of notes }
+    post:
+      summary: Create MR comment
+      tags: [MergeRequests]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/mrIid'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string }
+      responses:
+        "201": { description: Note created }
+
+  /projects/{id}/merge_requests/{iid}/merge:
+    put:
+      summary: Merge a merge request
+      tags: [MergeRequests]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/mrIid'
+      responses:
+        "200": { description: MR merged }
+        "405": { description: Not allowed }
+
+  # ── Repository ────────────────────────────
+  /projects/{id}/repository/files/{filePath}/raw:
+    get:
+      summary: Get raw file content
+      tags: [Repository]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - name: filePath
+          in: path
+          required: true
+          schema: { type: string }
+        - name: ref
+          in: query
+          schema: { type: string }
+      responses:
+        "200": { description: Raw file content }
+        "404": { description: Not found }
+
+  /projects/{id}/repository/tree:
+    get:
+      summary: List repository tree
+      tags: [Repository]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - name: path
+          in: query
+          schema: { type: string }
+        - name: ref
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: Tree entries }
+
+  /projects/{id}/repository/commits:
+    get:
+      summary: List commits
+      tags: [Repository]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - name: ref_name
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of commits }
+
+  /projects/{id}/repository/branches:
+    get:
+      summary: List branches
+      tags: [Repository]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of branches }
+
+  /projects/{id}/repository/tags:
+    get:
+      summary: List tags
+      tags: [Repository]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of tags }
+
+  # ── Releases ──────────────────────────────
+  /projects/{id}/releases:
+    get:
+      summary: List releases
+      tags: [Releases]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of releases }
+
+  /projects/{id}/releases/{tagName}:
+    get:
+      summary: Get a release
+      tags: [Releases]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - name: tagName
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Release object }
+        "404": { description: Not found }
+
+  # ── Labels ────────────────────────────────
+  /projects/{id}/labels:
+    get:
+      summary: List labels
+      tags: [Labels]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of labels }
+
+  # ── Milestones ────────────────────────────
+  /projects/{id}/milestones:
+    get:
+      summary: List milestones
+      tags: [Milestones]
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - name: state
+          in: query
+          schema: { type: string, enum: [active, closed, all] }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of milestones }
+
+  # ── Groups ────────────────────────────────
+  /groups:
+    get:
+      summary: List groups
+      tags: [Groups]
+      parameters:
+        - name: membership
+          in: query
+          schema: { type: boolean }
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of groups }
+
+  # ── Snippets ──────────────────────────────
+  /snippets:
+    get:
+      summary: List user snippets
+      tags: [Snippets]
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        "200": { description: List of snippets }

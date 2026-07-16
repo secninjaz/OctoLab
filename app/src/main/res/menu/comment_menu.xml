@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/share"
+        android:title="@string/share"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/react"
+        android:title="@string/add_reaction">
+        <menu />
+    </item>
+
+    <item
+        android:id="@+id/edit"
+        android:title="@string/edit"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/delete"
+        android:title="@string/delete"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/view_in_file"
+        android:title="@string/view_in_file"
+        android:visible="false"
+        app:showAsAction="never" />
+</menu>

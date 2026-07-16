@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:minHeight="?android:attr/listPreferredItemHeight"
+    android:padding="@dimen/content_padding">
+
+    <com.gl4a.widget.FixedSizeImageView
+        android:id="@+id/iv_gravatar"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_centerVertical="true"
+        android:layout_marginRight="16dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        tools:src="@drawable/default_avatar" />
+
+    <TextView
+        android:id="@+id/tv_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_toRightOf="@id/iv_gravatar"
+        android:textAppearance="@style/TextAppearance.ItemTitle"
+        android:textStyle="bold"
+        tools:text="Username" />
+
+    <TextView
+        android:id="@+id/tv_extra"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tv_title"
+        android:layout_toRightOf="@id/iv_gravatar"
+        android:textAppearance="@style/TextAppearance.VerySmall"
+        android:textStyle="italic"
+        tools:text="Extra text" />
+
+</RelativeLayout>

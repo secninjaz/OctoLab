@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:padding="@dimen/content_padding">
+
+    <LinearLayout
+        android:id="@+id/collapsed"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        tools:visibility="gone">
+
+        <View
+            android:id="@+id/view_color"
+            android:layout_width="32dp"
+            android:layout_height="32dp" />
+
+        <TextView
+            android:id="@+id/tv_title"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginLeft="16dp"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:textAppearance="@style/TextAppearance.ItemTitle" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/expanded"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <EditText
+            android:id="@+id/et_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text" />
+
+        <LinearLayout
+            android:id="@+id/colors"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginRight="6dp"
+                android:layout_weight="1"
+                android:background="#dddddd"
+                android:foreground="?attr/selectableItemBackground"
+                android:tag="dddddd" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginRight="6dp"
+                android:layout_weight="1"
+                android:background="#444444"
+                android:foreground="?attr/selectableItemBackground"
+                android:tag="444444" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginRight="6dp"
+                android:layout_weight="1"
+                android:background="#e10c02"
+                android:foreground="?attr/selectableItemBackground"
+                android:tag="e10c02" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginRight="6dp"
+                android:layout_weight="1"
+                android:background="#d7e102"
+                android:foreground="?attr/selectableItemBackground"
+                android:tag="d7e102" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginRight="6dp"
+                android:layout_weight="1"
+                android:background="#02e10c"
+                android:foreground="?attr/selectableItemBackground"
+                android:tag="02e10c" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginRight="6dp"
+                android:layout_weight="1"
+                android:background="#02d7e1"
+                android:foreground="?attr/selectableItemBackground"
+                android:tag="02d7e1" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginRight="6dp"
+                android:layout_weight="1"
+                android:background="#0b02e1"
+                android:foreground="?attr/selectableItemBackground"
+                android:tag="0b02e1" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginRight="6dp"
+                android:layout_weight="1"
+                android:background="#e102d8"
+                android:foreground="?attr/selectableItemBackground"
+                android:tag="e102d8" />
+
+            <com.gl4a.widget.LinkHandlingTextView
+                android:id="@+id/custom"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:foreground="?attr/selectableItemBackground"
+                android:gravity="center"
+                android:text="@string/ellipse" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</FrameLayout>

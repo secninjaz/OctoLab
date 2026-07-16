@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.gl4a.widget.HeightLimitedLinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/advanced_editor"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:maxHeight="@dimen/comment_bottom_sheet_height"
+    android:background="?android:colorBackground">
+
+    <androidx.viewpager.widget.ViewPager
+        android:id="@+id/view_pager"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <include
+            android:id="@+id/comment_container"
+            layout="@layout/editor_with_markdown_buttons" />
+
+        <com.gl4a.widget.MarkdownPreviewWebView
+            android:id="@+id/preview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </androidx.viewpager.widget.ViewPager>
+
+</com.gl4a.widget.HeightLimitedLinearLayout>

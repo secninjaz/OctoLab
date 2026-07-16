@@ -1,0 +1,23 @@
+# Gradle stuff
+build
+.gradle
+
+# Android Studio stuff
+.idea
+client.properties
+local.properties
+signing.properties
+*.iml
+
+# Crashlytics generated files
+assets/crashlytics-build.properties
+res/values/com_crashlytics_export_strings.xml
+releases/
+*.jks
+KEYSTORE_SECRETS.txt
+
+# Claude Code settings — contains project-level AI assistant configuration.
+# settings.local.json has bypassPermissions for this controlled environment.
+# Not committed to avoid exposing internal workflow tooling assumptions.
+.claude/settings.json
+.claude/settings.local.json

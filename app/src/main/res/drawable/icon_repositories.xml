@@ -1,0 +1,13 @@
+<!-- Icon from https://materialdesignicons.com/icon/source-repository -->
+
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportHeight="24.0"
+    android:viewportWidth="24.0">
+
+    <path
+        android:fillColor="#000000"
+        android:pathData="M3,3H5V21H3V3M7,3H9V21H7V3M11,3H13V21H11V3M15.5,3H17.5V10.25L21,7V17L17.5,13.75V21H15.5V3Z" />
+
+</vector>

@@ -1,0 +1,73 @@
+@import "prettify-light.css";
+
+.pln {
+    color: #F1F2F3;
+}
+
+.str {
+    color: #EC7600;
+}
+
+.kwd {
+    color: #93C763;
+}
+
+.com {
+    color: #808080;
+}
+
+.typ {
+    color: #678CB1;
+}
+
+.lit {
+    color: #FACD22;
+}
+
+.clo,.opn,.pun {
+    color: #F1F2F3;
+}
+
+.tag {
+    color: #8AC763;
+}
+
+.atn {
+    color: #E0E2E4;
+}
+
+.atv {
+    color: #EC7600;
+}
+
+.dec {
+    color: purple;
+}
+
+.var {
+    color: #ff9da4;
+}
+
+.fun {
+    color: #bbdaff;
+}
+
+pre.prettyprint.linenums {
+    box-shadow: 40px 0 0 #151515 inset,41px 0 0 #1d1d1d inset;
+}
+
+ol.linenums li {
+    color: #7285b7;
+}
+
+li.L0,li.L1,li.L2,li.L3,li.L4,li.L5,li.L6,li.L7,li.L8,li.L9 {
+    color: #555;
+}
+
+li:nth-child(even) {
+    background: #1e1e1e;
+}
+
+li.highlighted {
+    background: #48480F;
+}

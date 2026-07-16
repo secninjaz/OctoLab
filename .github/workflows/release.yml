@@ -1,0 +1,101 @@
+name: Release
+
+# Triggered when a version tag is pushed from GitLab via the manual publish job.
+# By this point all SAST/DAST/security checks have already passed in GitLab CI.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-signed-apk:
+    name: Build signed APK and create release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Create client.properties
+        run: |
+          echo "ClientId=\"${{ secrets.GITLAB_OAUTH_CLIENT_ID }}\"" > app/client.properties
+          echo "ClientSecret=\"${{ secrets.GITLAB_OAUTH_CLIENT_SECRET }}\"" >> app/client.properties
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > octolab-release.jks
+
+      - name: Create signing.properties
+        run: |
+          echo "STORE_FILE=${{ github.workspace }}/octolab-release.jks" > signing.properties
+          echo "STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> signing.properties
+          echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> signing.properties
+          echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> signing.properties
+          echo "STORE_TYPE=JKS" >> signing.properties
+
+      - name: Grant Gradle execute permission
+        run: chmod +x gradlew
+
+      - name: Build signed release APK
+        run: ./gradlew assembleCommunityRelease --no-daemon
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Rename APK
+        run: |
+          mv app/build/outputs/apk/community/release/app-community-release.apk \
+             OctoLab-${{ steps.version.outputs.VERSION }}-release.apk
+
+      - name: Write release notes file
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          VNUM="${VERSION#v}"
+          CHANGELOG=$(awk "/^## \[${VNUM}\]/{found=1; next} found && /^## \[/{exit} found && NF{print}" CHANGELOG.md)
+          [ -z "$CHANGELOG" ] && CHANGELOG="See CHANGELOG.md for details."
+          # Write to a file — avoids backtick/glob interpretation when passing inline to gh
+          printf '%s\n' \
+            "## OctoLab ${VERSION}" \
+            "" \
+            "A free and open-source Android client for GitLab — supports self-hosted instances and gitlab.com." \
+            "" \
+            "${CHANGELOG}" \
+            "" \
+            "### Install" \
+            "Download \`OctoLab-${VERSION}-release.apk\` below, or use [Obtainium](https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/secninjaz/OctoLab) for automatic updates." \
+            "" \
+            "> Requires Android 6.0 (API 23) or higher" \
+            "" \
+            "### Notes" \
+            "- This release has passed all SAST, DAST, and security scans" \
+            "- Source code: [GitLab → GitHub mirror](https://github.com/secninjaz/OctoLab)" \
+            > release-notes.md
+
+      - name: Create GitHub Release
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          PRERELEASE=""
+          echo "$VERSION" | grep -qE "beta|alpha|rc" && PRERELEASE="--prerelease"
+          gh release delete "$VERSION" --yes 2>/dev/null || true
+          gh release create "$VERSION" \
+            --title "OctoLab $VERSION" \
+            --notes-file release-notes.md \
+            $PRERELEASE \
+            "OctoLab-$VERSION-release.apk"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up sensitive files
+        if: always()
+        run: rm -f octolab-release.jks signing.properties app/client.properties

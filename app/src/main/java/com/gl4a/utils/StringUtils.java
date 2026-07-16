@@ -1,0 +1,248 @@
+/*
+ * Copyright 2011 Azwan Adli Abdullah
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.gl4a.utils;
+import com.gl4a.gitlab.model.GitLabLabel;
+import com.gl4a.gitlab.model.GitLabUser;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.graphics.Typeface;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import android.text.SpannableStringBuilder;
+import android.text.format.DateUtils;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
+import android.text.style.StyleSpan;
+import android.util.Base64;
+import android.widget.TextView;
+
+import com.gl4a.Gl4Application;
+import com.gl4a.widget.IssueLabelSpan;
+import com.vdurmont.emoji.EmojiParser;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
+import java.util.TimeZone;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * The Class StringUtils.
+ */
+public class StringUtils {
+    private static final Pattern HUNK_START_PATTERN =
+            Pattern.compile("@@ -(\\d+),\\d+ \\+(\\d+),\\d+.*");
+
+    /**
+     * Checks if is blank.
+     *
+     * @param val the val
+     * @return true, if is blank
+     */
+    public static boolean isBlank(String val) {
+        return val == null || val.trim().isEmpty();
+    }
+
+    public static String getFirstLine(String input) {
+        if (input == null) {
+            return null;
+        }
+        int pos = input.indexOf('\n');
+        if (pos < 0) {
+            return input;
+        }
+        return input.substring(0, pos);
+    }
+
+    /**
+     * Format name.
+     *
+     * @param userLogin the user login
+     * @param name the name
+     * @return the string
+     */
+    public static String formatName(String userLogin, String name) {
+        if (StringUtils.isBlank(userLogin)) {
+            return name;
+        }
+
+        return userLogin + (!StringUtils.isBlank(name) ? " - " + name : "");
+    }
+
+    public static CharSequence formatRelativeTime(Context context, Date date, boolean showDateIfLongAgo) {
+        if (date == null) {
+            return null;
+        }
+        long now = System.currentTimeMillis();
+        long time = date.getTime();
+        long duration = Math.abs(now - time);
+
+        if (showDateIfLongAgo && duration >= DateUtils.WEEK_IN_MILLIS) {
+            return DateUtils.getRelativeTimeSpanString(context, time, true);
+        }
+        return Gl4Application.get().getPrettyTimeInstance().format(date);
+    }
+
+    /**
+     * Parses an ISO 8601 date string (as returned by the GitLab API) and delegates to
+     * {@link #formatRelativeTime(Context, Date, boolean)}. Returns null if the string is null
+     * or cannot be parsed.
+     */
+    public static CharSequence formatRelativeTime(Context context, String isoDate,
+            boolean showDateIfLongAgo) {
+        if (isoDate == null) {
+            return null;
+        }
+        // Try common GitLab ISO-8601 formats
+        String[] formats = {
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            "yyyy-MM-dd'T'HH:mm:ssXXX",
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            "yyyy-MM-dd"
+        };
+        for (String fmt : formats) {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat(fmt, Locale.US);
+                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+                Date date = sdf.parse(isoDate);
+                if (date != null) {
+                    return formatRelativeTime(context, date, showDateIfLongAgo);
+                }
+            } catch (ParseException ignored) {
+                // try next format
+            }
+        }
+        return isoDate; // fallback: return raw string
+    }
+
+    public static CharSequence formatExactTime(Context context, Date date) {
+        return DateUtils.formatDateTime(context, date.getTime(), DateUtils.FORMAT_SHOW_DATE
+                | DateUtils.FORMAT_SHOW_TIME
+                | DateUtils.FORMAT_SHOW_YEAR);
+    }
+
+    public static void applyBoldTagsAndSetText(TextView view, String input) {
+        SpannableStringBuilder text = applyBoldTags(input);
+        view.setText(text);
+    }
+
+    public static SpannableStringBuilder applyBoldTags(String input) {
+        SpannableStringBuilder ssb = new SpannableStringBuilder();
+        int pos = 0;
+
+        while (pos >= 0) {
+            int start = input.indexOf("[b]", pos);
+            int end = input.indexOf("[/b]", pos);
+            if (start >= 0 && end >= 0) {
+                int tokenLength = end - start - 3 /* length of [b] */;
+                ssb.append(input.substring(pos, start));
+                ssb.append(input.substring(start + 3, end));
+
+                Object span = new StyleSpan(Typeface.BOLD);
+                ssb.setSpan(span, ssb.length() - tokenLength, ssb.length(), 0);
+
+                pos = end + 4;
+            } else {
+                ssb.append(input.substring(pos));
+                pos = -1;
+            }
+        }
+        return ssb;
+    }
+
+    public static void replaceLabelPlaceholder(Context context, SpannableStringBuilder text,
+                                               GitLabLabel label) {
+        int pos = text.toString().indexOf("[label]");
+        if (label != null && pos >= 0) {
+            String labelName = EmojiParser.parseToUnicode(label.name());
+            int length = labelName.length();
+            text.replace(pos, pos + 7, labelName);
+            text.setSpan(new IssueLabelSpan(context, label, false), pos, pos + length, 0);
+        }
+    }
+
+    public static void addUserTypeSpan(Context context, SpannableStringBuilder builder,
+                                       int pos, String userType) {
+        builder.insert(pos, " (" + userType + ")");
+        int typeLength = userType.length() + 3;
+        builder.setSpan(new RelativeSizeSpan(0.85f), pos, pos + typeLength, 0);
+        int color = UiUtils.resolveColor(context, android.R.attr.textColorSecondary);
+        builder.setSpan(new ForegroundColorSpan(color), pos, pos + typeLength, 0);
+    }
+
+    @Nullable
+    public static int[] findMatchingLines(String input, String match) {
+        int pos = input.indexOf(match);
+        if (pos < 0) {
+            return null;
+        }
+
+        int start = input.substring(0, pos).split("\n").length;
+        int end = start + match.split("\n").length - 1;
+        return new int[] { start, end };
+    }
+
+    public static int[] extractDiffHunkLineNumbers(@NonNull String diffHunk) {
+        if (!diffHunk.startsWith("@@")) {
+            return null;
+        }
+
+        Matcher matcher = HUNK_START_PATTERN.matcher(diffHunk);
+        if (matcher.matches()) {
+            int leftLine = Integer.parseInt(matcher.group(1)) - 1;
+            int rightLine = Integer.parseInt(matcher.group(2)) - 1;
+            return new int[] { leftLine, rightLine };
+        }
+
+        return null;
+    }
+
+    public static CharSequence formatMention(Context context, GitLabUser user) {
+        String userLogin = ApiHelpers.getUserLogin(context, user);
+        return "@" + userLogin + " ";
+    }
+
+    public static String toBase64(String data) {
+        return Base64.encodeToString(data.getBytes(), Base64.NO_WRAP);
+    }
+
+    public static String fromBase64(String encoded) {
+        return new String(Base64.decode(encoded, Base64.DEFAULT));
+    }
+
+    public static Set<String> getEditableStringSetFromPrefs(SharedPreferences prefs, String key) {
+        final Set<String> value = prefs.getStringSet(key, null);
+        return value != null ? new HashSet<>(value) : new HashSet<>();
+    }
+
+    public static String unescapeCommonHtmlEntities(String sourceText) {
+        return sourceText.replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&amp;", "&")
+                .replaceAll("&(lsquo|#8216);", "‘")
+                .replaceAll("&(rsquo|#8217);", "’")
+                .replaceAll("&(ldquo|#8220);", "“")
+                .replaceAll("&(rdquo|#8221);", "”")
+                .replaceAll("&(ndash|#8211);", "–")
+                .replaceAll("&(mdash|#8212);", "—");
+    }
+}

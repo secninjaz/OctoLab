@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+      xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/mark_all_as_read"
+        android:icon="@drawable/menu_mark_read_all"
+        android:title="@string/mark_all_as_read"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/notifications_type"
+        android:icon="@drawable/filter"
+        android:title="@string/issue_filter"
+        app:showAsAction="ifRoom">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item android:id="@+id/todo_filter_unread" android:checked="true" android:title="@string/todo_filter_pending" />
+                <item android:id="@+id/todo_filter_all" android:title="@string/todo_action_all" />
+                <item android:id="@+id/todo_action_assigned" android:title="@string/todo_action_assigned" />
+                <item android:id="@+id/todo_action_mentioned" android:title="@string/todo_action_mentioned" />
+                <item android:id="@+id/todo_action_review_requested" android:title="@string/todo_action_review_requested" />
+                <item android:id="@+id/todo_action_unmergeable" android:title="@string/todo_action_unmergeable" />
+                <item android:id="@+id/todo_action_build_failed" android:title="@string/todo_action_build_failed" />
+            </group>
+        </menu>
+    </item>
+</menu>

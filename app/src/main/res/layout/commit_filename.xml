@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    style="@style/SelectableItem"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingBottom="4dp"
+    android:paddingLeft="@dimen/content_padding"
+    android:paddingRight="@dimen/content_padding"
+    android:paddingTop="4dp">
+
+    <TextView
+        android:id="@+id/comments"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentRight="true"
+        android:layout_centerVertical="true"
+        android:layout_marginLeft="4dp"
+        android:drawableLeft="@drawable/comments"
+        android:drawablePadding="4dp"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:visibility="gone"
+        tools:text="10"
+        tools:visibility="visible" />
+
+    <TextView
+        android:id="@+id/filename"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignWithParentIfMissing="true"
+        android:layout_toLeftOf="@id/comments"
+        tools:text="some/file/in/directories.txt" />
+
+    <TextView
+        android:id="@+id/stats"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/filename"
+        android:textAppearance="@style/TextAppearance.VerySmall"
+        tools:text="+3 -34" />
+
+</RelativeLayout>

@@ -1,0 +1,21 @@
+@import "markdown-light.css";
+
+body {
+    color: #f0f0f0;
+}
+
+blockquote {
+    color: #999;
+}
+
+table tr:nth-child(2n) {
+    background-color: #2A2A2A;
+}
+
+code,tt {
+    background-color: rgba(255, 255, 255, 0.19);
+}
+
+.highlight pre,pre {
+    background-color: rgba(255, 255, 255, 0.19);
+}

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark theme: desaturated GitLab orange -->
+    <color name="primary">#9b3c10</color>
+    <color name="primary_dark">#7a2e0c</color>
+    <color name="accent">#d97b1a</color>
+
+    <color name="link_text">@color/accent</color>
+
+    <color name="label_fg">@color/label_fg_light</color>
+
+    <color name="issue_open">#B84A1E</color>
+    <color name="issue_closed">#7a1a0b</color>
+    <color name="pr_merged">#3d2570</color>
+    <color name="pr_draft">#363940</color>
+    <color name="issue_open_dark">#8F3A15</color>
+    <color name="issue_closed_dark">#601509</color>
+    <color name="pr_merged_dark">#2e1e55</color>
+    <color name="pr_draft_dark">#27292e</color>
+    <color name="issue_open_button">#1e7e40</color>
+    <color name="issue_closed_button">#b03525</color>
+    <color name="pr_merged_button">#6045a8</color>
+    <color name="pr_draft_button">#606673</color>
+
+    <color name="fab">#c55520</color>
+
+    <color name="scrollbar_thumb">#5dffffff</color>
+
+    <color name="diff_add">#0d2e18</color>
+    <color name="diff_remove">#2e100d</color>
+    <color name="diff_add_line_number">#1a4428</color>
+    <color name="diff_remove_line_number">#441a15</color>
+
+    <color name="commit_addition">#4aab6e</color>
+    <color name="commit_deletion">#e0674e</color>
+    <color name="code_background">#30ffffff</color>
+
+    <color name="drawer_background">@color/background_floating_material_dark</color>
+    <color name="list_background">@android:color/transparent</color>
+    <color name="icon_foreground">#ccffffff</color>
+    <color name="breadcrumb_background">#7a2e0c</color>
+</resources>

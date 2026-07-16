@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="issue">
+        <item quantity="one">1 issue</item>
+        <item quantity="other">%d issues</item>
+    </plurals>
+
+    <plurals name="pull_request">
+        <item quantity="one">1 merge request</item>
+        <item quantity="other">%d merge requests</item>
+    </plurals>
+
+    <plurals name="star">
+        <item quantity="one">1 star</item>
+        <item quantity="other">%d stars</item>
+    </plurals>
+
+    <plurals name="fork">
+        <item quantity="one">1 fork</item>
+        <item quantity="other">%d forks</item>
+    </plurals>
+
+    <plurals name="follower">
+        <item quantity="one">Followed by 1 user</item>
+        <item quantity="other">Followed by %d users</item>
+    </plurals>
+
+    <plurals name="follower_and_self">
+        <item quantity="one">Followed by you and 1 other user</item>
+        <item quantity="other">Followed by you and %d other users</item>
+    </plurals>
+
+    <plurals name="following">
+        <item quantity="one">Following 1 user</item>
+        <item quantity="other">Following %d users</item>
+    </plurals>
+
+    <plurals name="gist">
+        <item quantity="one">1 gist</item>
+        <item quantity="other">%d gists</item>
+    </plurals>
+
+    <plurals name="member">
+        <item quantity="one">1 member</item>
+        <item quantity="other">%d members</item>
+    </plurals>
+
+    <plurals name="repository">
+        <item quantity="one">1 repository</item>
+        <item quantity="other">%d repositories</item>
+    </plurals>
+
+    <plurals name="watcher">
+        <item quantity="one">1 watcher</item>
+        <item quantity="other">%d watchers</item>
+    </plurals>
+
+    <plurals name="page">
+        <item quantity="one">a page</item>
+        <item quantity="other">%d pages</item>
+    </plurals>
+
+    <plurals name="contributor_extra_data">
+        <item quantity="one">%1$d contribution</item>
+        <item quantity="other">%1$d contributions</item>
+    </plurals>
+</resources>

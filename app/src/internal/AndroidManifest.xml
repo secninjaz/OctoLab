@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Merged into the manifest only for internalBuild flavor (GitLab CI builds).
+    Adds dev.taskmiles.com as a deep link host so developers can tap GitLab
+    links on the internal instance and have them open in OctoLab directly.
+    This host is intentionally absent from the publicRelease flavor.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity android:name=".resolver.BrowseFilter">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:host="dev.taskmiles.com" android:scheme="https" />
+                <data android:host="dev.taskmiles.com" android:scheme="http" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

@@ -1,0 +1,19 @@
+body {
+    background-color: #303030;
+    color: #ffffff;
+    font-size: 14px;
+    padding-top: 20px;
+    word-wrap: break-word;
+}
+
+a {
+    color: #559639;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: #ffffff;
+}
+
+blockquote {
+    color: #ffffff;
+}

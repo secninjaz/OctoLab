@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+      xmlns:app="http://schemas.android.com/apk/res-auto">
+    <group
+        android:id="@+id/my_items"
+        android:checkableBehavior="single">
+        <item
+            android:id="@+id/news_feed"
+            android:title="@string/user_news_feed"
+            android:icon="@drawable/icon_news_feed"
+            android:checked="true" />
+        <item
+            android:id="@+id/notifications"
+            android:icon="@drawable/icon_notifications"
+            android:title="@string/notifications"
+            app:actionLayout="@layout/notifications_indicator" />
+        <item
+            android:id="@+id/my_repos"
+            android:title="@string/my_repositories"
+            android:icon="@drawable/icon_repositories"/>
+        <item
+            android:id="@+id/my_issues"
+            android:title="@string/my_issues"
+            android:icon="@drawable/icon_issues"/>
+        <item
+            android:id="@+id/my_prs"
+            android:title="@string/my_pull_requests"
+            android:icon="@drawable/icon_pull_request"/>
+        <item
+            android:id="@+id/my_gists"
+            android:title="@string/my_gists"
+            android:icon="@drawable/icon_gists"/>
+    </group>
+    <group
+        android:id="@+id/navigation"
+        android:checkableBehavior="single">
+        <item
+            android:id="@+id/search"
+            android:title="@string/search"
+            android:icon="@drawable/icon_search"/>
+        <item
+            android:id="@+id/bookmarks"
+            android:title="@string/bookmarks_and_stars"
+            android:icon="@drawable/icon_bookmark" />
+    </group>
+    <group
+        android:id="@+id/explore"
+        android:checkableBehavior="single">
+        <item
+            android:id="@+id/pub_timeline"
+            android:title="@string/pub_timeline"
+            android:icon="@drawable/icon_timeline" />
+        <item
+            android:id="@+id/trend"
+            android:title="@string/trend"
+            android:icon="@drawable/icon_trending"/>
+    </group>
+    <group android:id="@+id/settings">
+        <item
+            android:id="@+id/settings_item"
+            android:title="@string/settings"
+            android:icon="@drawable/icon_settings"/>
+    </group>
+    <group android:id="@+id/account"
+           android:checkableBehavior="none"
+           android:visible="false">
+        <item
+            android:id="@+id/profile"
+            android:title="@string/my_profile"
+            android:icon="@drawable/profile" />
+        <item
+            android:id="@+id/logout"
+            android:title="@string/logout"
+            android:icon="@drawable/logout" />
+    </group>
+    <group android:id="@+id/other_accounts"
+           android:checkableBehavior="none"
+           android:visible="false">
+        <item
+            android:id="@+id/add_account"
+            android:title="@string/add_account"
+            android:icon="@drawable/icon_add"
+            android:orderInCategory="9999" />
+    </group>
+</menu>

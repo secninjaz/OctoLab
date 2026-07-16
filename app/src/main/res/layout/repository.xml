@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@id/main_content"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:scrollbars="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- repo info section -->
+        <androidx.cardview.widget.CardView style="?attr/cardViewTheme">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingTop="@dimen/content_padding"
+                android:paddingBottom="@dimen/content_padding">
+
+                <com.gl4a.widget.LinkHandlingTextView
+                    android:id="@+id/tv_repo_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:textAppearance="@style/TextAppearance.HeaderTitle"
+                    app:needsLinkHandling="true"
+                    tools:text="Username/Repository" />
+
+                <com.gl4a.widget.LinkHandlingTextView
+                    android:id="@+id/tv_desc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:autoLink="web"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textIsSelectable="true"
+                    app:needsLinkHandling="true"
+                    tools:text="Repository description" />
+
+                <com.gl4a.widget.LinkHandlingTextView
+                    android:id="@+id/tv_url"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:autoLink="web"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textColorLink="?android:attr/textColorLink"
+                    app:needsLinkHandling="true"
+                    tools:text="https://example.com" />
+
+                <Space
+                    android:layout_width="match_parent"
+                    android:layout_height="16dp" />
+
+                <com.gl4a.widget.OverviewRow
+                    android:id="@+id/fork_parent_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:displayRedirectArrowWhenClickable="false"
+                    app:rowIcon="@drawable/icon_fork"
+                    app:rowText="Forked from other/repository" />
+
+                <com.gl4a.widget.OverviewRow
+                    android:id="@+id/private_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:rowIcon="@drawable/icon_private"
+                    app:rowText="@string/repo_type_private" />
+
+                <com.gl4a.widget.OverviewRow
+                    android:id="@+id/language_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:rowIcon="@drawable/icon_language"
+                    tools:rowText="Written in Java" />
+
+                <Space
+                    android:id="@+id/repository_overview_row_divider"
+                    android:layout_width="match_parent"
+                    android:layout_height="8dp" />
+
+                <com.gl4a.widget.OverviewRow
+                    android:id="@+id/issues_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:rowIcon="@drawable/icon_issues"
+                    tools:rowText="50 issues" />
+
+                <com.gl4a.widget.OverviewRow
+                    android:id="@+id/pulls_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:rowIcon="@drawable/icon_pull_request"
+                    tools:rowText="9 pull requests" />
+
+                <com.gl4a.widget.OverviewRow
+                    android:id="@+id/forks_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:rowIcon="@drawable/icon_fork"
+                    tools:rowText="12 forks" />
+
+                <com.gl4a.widget.OverviewRow
+                    android:id="@+id/stars_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:rowIcon="@drawable/icon_star"
+                    app:rowIconActionHintOff="@string/repo_star_action"
+                    app:rowIconActionHintOn="@string/repo_unstar_action"
+                    tools:rowText="5 stars" />
+
+                <com.gl4a.widget.OverviewRow
+                    android:id="@+id/watchers_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:rowIcon="@drawable/icon_watch"
+                    app:rowIconActionHintOff="@string/repo_watch_action"
+                    app:rowIconActionHintOn="@string/repo_unwatch_action"
+                    tools:rowText="54 Watchers" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- README section -->
+        <androidx.cardview.widget.CardView
+            style="?attr/cardViewTheme"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/readme_title"
+                    style="@style/HeaderLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?selectableItemBackground"
+                    android:drawableRight="@drawable/drop_down_arrow"
+                    android:text="@string/readme" />
+
+                <ProgressBar
+                    android:id="@+id/pb_readme"
+                    style="@style/LoadingProgress"
+                    android:layout_marginTop="@dimen/content_padding"
+                    android:layout_marginBottom="@dimen/content_padding"
+                    android:visibility="gone" />
+
+                <WebView
+                    android:id="@+id/readme"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- Other info section -->
+        <androidx.cardview.widget.CardView style="?attr/cardViewTheme">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/overview_header_spacing"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/other_info"
+                    style="@style/HeaderLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/other_info" />
+
+                <TextView
+                    android:id="@+id/tv_contributors_label"
+                    style="@style/SelectableLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:text="@string/repo_contributors" />
+
+                <TextView
+                    android:id="@+id/tv_collaborators_label"
+                    style="@style/SelectableLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:text="@string/repo_collaborators" />
+
+                <TextView
+                    android:id="@+id/tv_discussions_label"
+                    style="@style/SelectableLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:text="@string/repo_discussions" />
+
+                <TextView
+                    android:id="@+id/tv_wiki_label"
+                    style="@style/SelectableLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:text="@string/recent_wiki" />
+
+                <TextView
+                    android:id="@+id/tv_releases_label"
+                    style="@style/SelectableLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:text="@string/releases" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+    </LinearLayout>
+
+</androidx.core.widget.NestedScrollView>
