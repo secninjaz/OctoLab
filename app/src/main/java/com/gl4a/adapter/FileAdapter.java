@@ -29,10 +29,18 @@ import com.gl4a.R;
 import com.gl4a.utils.FileUtils;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
 public class FileAdapter extends RootAdapter<GitLabTreeItem, FileAdapter.ViewHolder> {
     private Set<String> mSubModuleNames = Collections.emptySet();
+    private Map<String, Long> mFileSizes = new HashMap<>();
+
+    public void updateFileSizes(Map<String, Long> sizes) {
+        mFileSizes = sizes;
+        notifyDataSetChanged();
+    }
 
     public FileAdapter(Context context) {
         super(context);
@@ -57,9 +65,11 @@ public class FileAdapter extends RootAdapter<GitLabTreeItem, FileAdapter.ViewHol
         holder.icon.setBackgroundResource(getIconId(content.type(), name));
         holder.fileName.setText(name);
 
-        if (!isSubModule && "blob".equals(content.type())) {
-            long sz = content.size() != null ? content.size() : 0L;
-            holder.fileSize.setText(Formatter.formatShortFileSize(mContext, sz));
+        // Sizes fetched via HEAD /repository/files/:path (X-Gitlab-Size header).
+        // The tree API has no size field — sizes arrive asynchronously via updateFileSizes().
+        Long size = mFileSizes.get(content.path());
+        if (!isSubModule && "blob".equals(content.type()) && size != null) {
+            holder.fileSize.setText(Formatter.formatShortFileSize(mContext, size));
             holder.fileSize.setVisibility(View.VISIBLE);
         } else {
             holder.fileSize.setVisibility(View.GONE);

@@ -66,7 +66,7 @@
         <item name="colorOnSurface">#ffffffff</item>
         <item name="android:spinnerStyle">@style/Widget.Spinner.ActionBar.Light</item>
         <!-- used by appcompat to tint the spinner background drawable -->
-        <item name="android:colorBackground">#ffffff</item>
+        <item name="android:colorBackground">#F8F8F8</item>
     </style>
 
     <style name="PreferenceTheme" parent="PreferenceThemeOverlay.v14.Material" />

@@ -9,6 +9,7 @@ import java.util.List;
 import io.reactivex.Single;
 import retrofit2.Response;
 import retrofit2.http.GET;
+import retrofit2.http.HEAD;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
 
@@ -37,6 +38,15 @@ public interface GitLabRepositoryService {
     // filePath must be URL-encoded by the caller
     @GET("projects/{id}/repository/files/{filePath}")
     Single<Response<GitLabFile>> getFile(
+            @Path("id") long projectId,
+            @Path(value = "filePath", encoded = true) String filePath,
+            @Query("ref") String ref
+    );
+
+    // HEAD request — returns X-Gitlab-Size header without downloading content.
+    // Use this to get file sizes efficiently in the repository browser.
+    @HEAD("projects/{id}/repository/files/{filePath}")
+    Single<Response<Void>> getFileHead(
             @Path("id") long projectId,
             @Path(value = "filePath", encoded = true) String filePath,
             @Query("ref") String ref

@@ -46,10 +46,10 @@ public class PublicEventListFragment extends EventListFragment {
                         return Response.<GitLabPage<GitLabEvent>>error(
                                 response.errorBody(), response.raw());
                     }
-                    List<GitLabEvent> items = response.body();
-                    GitLabPage<GitLabEvent> glPage = new GitLabPage<>(
-                            items, page, 0, 1, items.size());
-                    return Response.success(glPage);
+                    // Use toPage() to read X-Next-Page header — enables infinite scroll.
+                    // The previous manual construction hardcoded nextPage=0 which
+                    // prevented any page beyond the first from loading.
+                    return Response.success(com.gl4a.utils.ApiHelpers.toPage(response));
                 });
     }
 }
