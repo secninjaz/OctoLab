@@ -347,7 +347,7 @@ release:gitlab:
       ${CHANGELOG}
 
       ### Install
-      Download \`OctoLab-${CI_COMMIT_TAG}.apk\` below, or use [Obtainium](https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/${CI_PROJECT_URL}) to track releases from this GitLab instance automatically.
+      Download \`OctoLab-${CI_COMMIT_TAG}.apk\` below, or tap **[Get it on Obtainium](https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://app/eyJ1cmwiOiJodHRwczovL2Rldi50YXNrbWlsZXMuY29tL3Rlc3RnL29jdG9sYWIiLCJzb3VyY2UiOiJHaXRMYWIifQ==)** to track releases from this GitLab instance automatically (source pre-configured as GitLab).
 
       ### Security
       This release passed SAST (semgrep), secret detection, dependency scanning, and MobSF static analysis.
