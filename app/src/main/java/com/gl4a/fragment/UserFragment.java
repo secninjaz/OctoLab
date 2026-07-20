@@ -128,15 +128,20 @@ public class UserFragment extends LoadingFragmentBase implements
         // Show members row for all users; GitLab groups are handled in the group section
         membersRow.setVisibility(View.GONE);
 
-        // GitLab snippets instead of GitHub gists
+        // GitLab has no API to list another user's snippets; only show for self.
         OverviewRow gistsRow = mContentView.findViewById(R.id.gists_row);
-        gistsRow.setVisibility(View.VISIBLE);
-        gistsRow.setText(getString(R.string.my_gists));
-        gistsRow.setClickIntent(GistListActivity.makeIntent(getActivity(), mUser.login()));
+        if (mIsSelf) {
+            gistsRow.setVisibility(View.VISIBLE);
+            gistsRow.setText(getString(R.string.my_gists));
+            gistsRow.setClickIntent(GistListActivity.makeIntent(getActivity(), mUser.login(), -1L));
+        } else {
+            gistsRow.setVisibility(View.GONE);
+        }
 
+        // publicRepos() maps to public_projects_count which GitLab only returns for self.
+        // Leave count as 0 initially — fillTopRepos() will update it once projects load.
         OverviewRow reposRow = mContentView.findViewById(R.id.repos_row);
-        int repoCount = orZero(mUser.publicRepos());
-        reposRow.setText(getResources().getQuantityString(R.plurals.repository, repoCount, repoCount));
+        reposRow.setText(getResources().getQuantityString(R.plurals.repository, 0, 0));
         reposRow.setClickIntent(RepositoryListActivity.makeIntent(getActivity(), mUser.login(), false));
 
         // GitLab does not expose a "type" field with bot/org distinction on the user model
@@ -244,6 +249,13 @@ public class UserFragment extends LoadingFragmentBase implements
 
         ll.setVisibility(View.VISIBLE);
         progress.setVisibility(View.GONE);
+
+        // Update repo count in the overview row from actual data (publicRepos() returns 0 for others)
+        if (topRepos != null) {
+            OverviewRow reposRow = mContentView.findViewById(R.id.repos_row);
+            int count = topRepos.size();
+            reposRow.setText(getResources().getQuantityString(R.plurals.repository, count, count));
+        }
     }
 
     private void fillGroups(List<GitLabGroup> groups) {
@@ -302,7 +314,11 @@ public class UserFragment extends LoadingFragmentBase implements
                     mContentView.findViewById(R.id.pb_top_repos).setVisibility(View.VISIBLE);
                     mContentView.findViewById(R.id.ll_top_repos).setVisibility(View.GONE);
                 })
-                .subscribe(this::fillTopRepos, this::handleLoadFailure);
+                .subscribe(this::fillTopRepos, e -> {
+                    // Non-fatal: hide the repos section if the API is restricted on this instance
+                    mContentView.findViewById(R.id.pb_top_repos).setVisibility(View.GONE);
+                    mContentView.findViewById(R.id.ll_top_repos).setVisibility(View.GONE);
+                });
     }
 
     private void loadGroupsIfUser(boolean force) {
@@ -314,6 +330,10 @@ public class UserFragment extends LoadingFragmentBase implements
                 : service.getUserGroups(mUser.id, 1, 10);
         request.map(ApiHelpers::throwOnFailure)
                 .compose(makeLoaderSingle(ID_LOADER_ORG_LIST, force))
-                .subscribe(this::fillGroups, this::handleLoadFailure);
+                .subscribe(this::fillGroups, e -> {
+                    // Non-fatal: hide the groups section if the API is restricted on this instance
+                    ViewGroup llOrgs = mContentView.findViewById(R.id.ll_orgs);
+                    if (llOrgs != null) llOrgs.setVisibility(android.view.View.GONE);
+                });
     }
 }

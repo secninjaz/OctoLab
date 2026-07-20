@@ -25,8 +25,15 @@ import com.gl4a.utils.StringUtils;
 
 public class UserActivity extends BaseFragmentPagerActivity {
     public static Intent makeIntent(Context context, GitLabUser user) {
-        // Use the login from the user object; full profile will be reloaded
-        return makeIntent(context, user != null ? user.login() : null);
+        if (user == null) return null;
+        Intent intent = new Intent(context, UserActivity.class)
+                .putExtra("login", user.login());
+        // Pass the user ID when available so we can skip the username search,
+        // which fails on some GitLab instances due to permission restrictions.
+        if (user.id() > 0) {
+            intent.putExtra("user_id", user.id());
+        }
+        return intent;
     }
 
     public static Intent makeIntent(Context context, String login) {
@@ -38,6 +45,7 @@ public class UserActivity extends BaseFragmentPagerActivity {
     }
 
     private String mUserLogin;
+    private long mUserId = -1L;
     private GitLabUser mUser;
     private UserFragment mUserFragment;
 
@@ -68,6 +76,7 @@ public class UserActivity extends BaseFragmentPagerActivity {
     protected void onInitExtras(Bundle extras) {
         super.onInitExtras(extras);
         mUserLogin = extras.getString("login");
+        mUserId = extras.getLong("user_id", -1L);
     }
 
     @Override
@@ -170,22 +179,40 @@ public class UserActivity extends BaseFragmentPagerActivity {
 
     private void loadUser(boolean force) {
         GitLabUserService service = ServiceFactory.get(GitLabUserService.class, force);
-        // GitLab: GET /users?username=X performs an exact-match search.
-        // GitLabUser.login() must map to the 'username' JSON key — confirmed in GitLabUser model.
-        service.searchUsers(mUserLogin, 1, 1)
-                .map(ApiHelpers::throwOnFailure)
-                .flatMap(users -> {
-                    if (users.isEmpty()) {
-                        // Show a user-friendly error rather than crashing with RuntimeException.
-                        return io.reactivex.Single.error(
-                                new RuntimeException("User not found: " + mUserLogin));
-                    }
-                    return service.getUser(users.get(0).id)
-                            .map(ApiHelpers::throwOnFailure);
-                })
+        io.reactivex.Single<GitLabUser> userSingle;
+
+        if (mUserId > 0) {
+            // Try by ID first (fastest). On restricted self-hosted instances GET /users/{id}
+            // may return 404 for non-admin users — fall back to username search in that case.
+            userSingle = service.getUser(mUserId)
+                    .map(ApiHelpers::throwOnFailure)
+                    .onErrorResumeNext(err -> {
+                        if (mUserLogin == null) return io.reactivex.Single.error(err);
+                        return service.searchUsers(mUserLogin, 1, 1)
+                                .map(ApiHelpers::throwOnFailure)
+                                .flatMap(users -> users.isEmpty()
+                                        ? io.reactivex.Single.error(err)
+                                        : service.getUser(users.get(0).id)
+                                                .map(ApiHelpers::throwOnFailure));
+                    });
+        } else {
+            userSingle = service.searchUsers(mUserLogin, 1, 1)
+                    .map(ApiHelpers::throwOnFailure)
+                    .flatMap(users -> {
+                        if (users.isEmpty()) {
+                            return io.reactivex.Single.error(
+                                    new RuntimeException("User not found: " + mUserLogin));
+                        }
+                        return service.getUser(users.get(0).id)
+                                .map(ApiHelpers::throwOnFailure);
+                    });
+        }
+
+        userSingle
                 .compose(makeLoaderSingle(ID_LOADER_USER, force))
                 .subscribe(result -> {
                     mUser = result;
+                    mUserId = result.id();
                     invalidateTabs();
                     setContentShown(true);
                     invalidateOptionsMenu();

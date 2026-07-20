@@ -52,10 +52,15 @@ import com.gl4a.widget.ContextMenuAwareRecyclerView;
 import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import io.reactivex.Single;
+import io.reactivex.schedulers.Schedulers;
+import io.reactivex.android.schedulers.AndroidSchedulers;
 
 public class ContentListFragment extends ListDataBaseFragment<GitLabTreeItem> implements
         RootAdapter.OnItemClickListener<GitLabTreeItem> {
@@ -216,6 +221,42 @@ public class ContentListFragment extends ListDataBaseFragment<GitLabTreeItem> im
     protected void onAddData(RootAdapter<GitLabTreeItem, ?> adapter, List<GitLabTreeItem> data) {
         super.onAddData(adapter, data);
         mCallback.onContentsLoaded(this, data);
+        fetchFileSizes(data);
+    }
+
+    private void fetchFileSizes(List<GitLabTreeItem> items) {
+        List<GitLabTreeItem> blobs = new ArrayList<>();
+        for (GitLabTreeItem item : items) {
+            if ("blob".equals(item.type())) blobs.add(item);
+        }
+        if (blobs.isEmpty()) return;
+
+        GitLabRepositoryService service = ServiceFactory.get(GitLabRepositoryService.class, false);
+        long projectId = mRepository.id();
+        String ref = mRef != null ? mRef : mRepository.defaultBranch();
+        Map<String, Long> sizes = new HashMap<>();
+        AtomicInteger remaining = new AtomicInteger(blobs.size());
+
+        for (GitLabTreeItem blob : blobs) {
+            String encodedPath = blob.path().replace("/", "%2F");
+            service.getFileHead(projectId, encodedPath, ref)
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(response -> {
+                        String sizeHeader = response.headers().get("X-Gitlab-Size");
+                        if (sizeHeader != null) {
+                            try { sizes.put(blob.path(), Long.parseLong(sizeHeader)); }
+                            catch (NumberFormatException ignored) {}
+                        }
+                        if (remaining.decrementAndGet() == 0 && mAdapter != null) {
+                            mAdapter.updateFileSizes(sizes);
+                        }
+                    }, e -> {
+                        if (remaining.decrementAndGet() == 0 && mAdapter != null) {
+                            mAdapter.updateFileSizes(sizes);
+                        }
+                    });
+        }
     }
 
     @Override

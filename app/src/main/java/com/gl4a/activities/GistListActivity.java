@@ -26,11 +26,17 @@ import com.gl4a.fragment.GistListFragment;
 
 public class GistListActivity extends FragmentContainerActivity {
     public static Intent makeIntent(Context context, String user) {
+        return makeIntent(context, user, -1L);
+    }
+
+    public static Intent makeIntent(Context context, String user, long userId) {
         return new Intent(context, GistListActivity.class)
-                .putExtra("user", user);
+                .putExtra("user", user)
+                .putExtra("user_id", userId);
     }
 
     private String mUserLogin;
+    private long mUserId;
 
     @Nullable
     @Override
@@ -48,11 +54,12 @@ public class GistListActivity extends FragmentContainerActivity {
     protected void onInitExtras(Bundle extras) {
         super.onInitExtras(extras);
         mUserLogin = extras.getString("user");
+        mUserId = extras.getLong("user_id", -1L);
     }
 
     @Override
     protected Fragment onCreateFragment() {
-        return GistListFragment.newInstance(mUserLogin);
+        return GistListFragment.newInstance(mUserLogin, mUserId);
     }
 
     @Override

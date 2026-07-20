@@ -48,6 +48,8 @@ public class AvatarHandler {
     private static class Request {
         long id;
         String url;
+        String email;        // used to call /api/v4/avatar?email= if primary URL fails
+        String fallbackUrl;  // Gravatar URL, tried if Avatar API also fails
         ArrayList<ViewDelegate> views;
     }
     private static final LongSparseArray<Request> sRequests = new LongSparseArray<>();
@@ -93,20 +95,21 @@ public class AvatarHandler {
 
     public static void assignAvatar(ImageView view, GitLabUser user) {
         if (user == null || user.id() == 0L) {
-            assignAvatar(view, null, 0, null);
+            assignAvatarInternal(new ImageViewDelegate(view), null, 0, null, null);
             return;
         }
-
-        assignAvatar(view, user.login(), user.id(), user.avatarUrl());
+        // Pass email so we can fall back to Gravatar if the instance avatar fails.
+        assignAvatarInternal(new ImageViewDelegate(view), user.login(), user.id(),
+                user.avatarUrl(), user.email);
     }
 
     public static void assignAvatar(ImageView view, String userName, long userId, String url) {
-        assignAvatarInternal(new ImageViewDelegate(view), userName, userId, url);
+        assignAvatarInternal(new ImageViewDelegate(view), userName, userId, url, null);
     }
 
     public static void assignAvatar(Context context, MenuItem item,
             String userName, long userId) {
-        assignAvatarInternal(new MenuItemDelegate(context, item), userName, userId, null);
+        assignAvatarInternal(new MenuItemDelegate(context, item), userName, userId, null, null);
     }
 
     public static Bitmap loadUserAvatarSynchronously(Context context, GitLabUser user) {
@@ -142,7 +145,7 @@ public class AvatarHandler {
     }
 
     private static void assignAvatarInternal(ViewDelegate view,
-            String userName, long userId, String url) {
+            String userName, long userId, String url, String email) {
         removeOldRequest(view);
 
         Bitmap bitmap = loadBitmapFromCache(view.getContext(), userId);
@@ -163,15 +166,22 @@ public class AvatarHandler {
         }
 
         String resolvedUrl = makeUrl(url, userId);
-        if (resolvedUrl == null) {
-            // No URL available — leave the DefaultAvatarDrawable in place.
+        // Gravatar fallback: used when the primary URL is unavailable or auth-restricted.
+        String gravatarFallback = buildGravatarUrl(email);
+        if (resolvedUrl == null && gravatarFallback == null) {
             return;
+        }
+        if (resolvedUrl == null) {
+            resolvedUrl = gravatarFallback;
+            gravatarFallback = null; // primary is already Gravatar, no further fallback needed
         }
 
         int requestId = sNextRequestId++;
         request = new Request();
         request.id = userId;
         request.url = resolvedUrl;
+        request.email = (email != null && !email.trim().isEmpty()) ? email.trim() : null;
+        request.fallbackUrl = gravatarFallback;
         request.views = new ArrayList<>();
         request.views.add(view);
         sRequests.put(requestId, request);
@@ -209,18 +219,68 @@ public class AvatarHandler {
         sMaxImageSizePx = Math.round(res.getDisplayMetrics().density * MAX_CACHED_IMAGE_SIZE);
     }
 
-    private static String makeUrl(String url, long userId) {
-        if (url == null) {
-            // No avatar URL available: return null so DefaultAvatarDrawable is used.
+    /**
+     * Calls GET /api/v4/avatar?email=EMAIL&size=N (authenticated via sImageHttpClient interceptor).
+     * Returns the avatar_url from the JSON response, which is always an accessible URL
+     * (Gravatar or GitLab-CDN), bypassing /uploads/ auth restrictions.
+     */
+    private static String fetchAvatarUrlFromApi(String email) throws IOException {
+        com.gl4a.Gl4Application app = com.gl4a.Gl4Application.get();
+        String apiUrl = app.getApiBaseUrl() + "avatar?email="
+                + android.net.Uri.encode(email) + "&size=" + sMaxImageSizePx;
+
+        OkHttpClient client = ServiceFactory.getImageHttpClient();
+        okhttp3.Request request = new okhttp3.Request.Builder().url(apiUrl).build();
+
+        try (okhttp3.Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("Avatar API HTTP " + response.code());
+            }
+            okhttp3.ResponseBody body = response.body();
+            if (body == null) throw new IOException("Empty Avatar API body");
+            String json = body.string();
+            // Parse "avatar_url":"VALUE" from JSON without adding a dependency
+            int keyIdx = json.indexOf("\"avatar_url\":\"");
+            if (keyIdx < 0) return null;
+            int start = keyIdx + 14;
+            int end = json.indexOf("\"", start);
+            if (end <= start) return null;
+            // Unescape JSON unicode escapes in the URL (e.g. & → &)
+            return json.substring(start, end)
+                    .replace("\\u0026", "&")
+                    .replace("\\/", "/");
+        }
+    }
+
+    private static String buildGravatarUrl(String email) {
+        if (email == null || email.trim().isEmpty()) return null;
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
+            byte[] hash = md.digest(email.trim().toLowerCase().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : hash) hex.append(String.format("%02x", b));
+            // d=404 means return 404 (not a placeholder) if no Gravatar exists for this email.
+            return "https://www.gravatar.com/avatar/" + hex + "?s=" + sMaxImageSizePx + "&d=404";
+        } catch (java.security.NoSuchAlgorithmException e) {
             return null;
         }
-        // If the URL is relative (e.g. starts with "/uploads/"), prepend the instance base URL.
+    }
+
+    private static String makeUrl(String url, long userId) {
+        if (url == null) {
+            return null;
+        }
+        // If the URL is relative, prepend the instance base URL.
         if (url.startsWith("/")) {
             url = com.gl4a.Gl4Application.get().getInstanceUrl() + url;
         }
-        return Uri.parse(url).buildUpon()
-                .appendQueryParameter("s", String.valueOf(sMaxImageSizePx))
-                .toString();
+        Uri.Builder builder = Uri.parse(url).buildUpon()
+                .appendQueryParameter("s", String.valueOf(sMaxImageSizePx));
+        // Auth for instance avatars is handled by the sImageHttpClient interceptor in
+        // ServiceFactory which adds PRIVATE-TOKEN header for all requests to the instance host.
+        // We do NOT add ?private_token to the URL — tokens in URLs appear in server logs.
+        // Restricted instances (header auth also rejected) are handled by Gravatar fallback.
+        return builder.toString();
     }
 
     private static void applyAvatarToView(ViewDelegate view, Bitmap avatar) {
@@ -277,41 +337,28 @@ public class AvatarHandler {
 
         try (okhttp3.Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
-                throw new IOException("HTTP failure code " + response.code());
+                throw new IOException("HTTP " + response.code() + " for " + url);
             }
-            data = response.body().bytes();
+            okhttp3.ResponseBody body = response.body();
+            if (body == null) {
+                throw new IOException("Empty response body for " + url);
+            }
+            data = body.bytes();
         }
 
-        BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inJustDecodeBounds = true;
-
-        BitmapFactory.decodeByteArray(data, 0, data.length, options);
-
-        options.inJustDecodeBounds = false;
-
-        final int widthRatio = options.outWidth / sMaxImageSizePx;
-        final int heightRatio = options.outHeight / sMaxImageSizePx;
-        options.inSampleSize = Math.min(heightRatio, widthRatio);
-
-        Bitmap unscaled = BitmapFactory.decodeByteArray(data, 0, data.length, options);
-        if (unscaled == null) {
-            return null;
+        if (data.length == 0) {
+            throw new IOException("Zero-length image data for " + url);
         }
 
-        // We'll scale the image to the desired density
-        unscaled.setDensity(0);
-
-        float widthScale = (float) sMaxImageSizePx / (float) unscaled.getWidth();
-        float heightScale = (float) sMaxImageSizePx / (float) unscaled.getHeight();
-        float scaleFactor = Math.min(1, Math.min(widthScale, heightScale));
-
-        Bitmap scaled = Bitmap.createScaledBitmap(unscaled,
-                (int) (scaleFactor * unscaled.getWidth()),
-                (int) (scaleFactor * unscaled.getHeight()), true);
-        if (scaled != unscaled) {
-            unscaled.recycle();
+        // Avatar images are small (60–180px requested via ?s=). Simple decode is sufficient —
+        // the previous two-pass inSampleSize approach returned null when image dimensions were
+        // smaller than sMaxImageSizePx (ratio = 0 in integer division).
+        Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
+        if (bitmap == null) {
+            throw new IOException("BitmapFactory could not decode image from " + url);
         }
-        return scaled;
+        bitmap.setDensity(0);
+        return bitmap;
     }
 
     private static void shutdownWorker() {
@@ -332,13 +379,37 @@ public class AvatarHandler {
             switch (msg.what) {
                 case MSG_LOAD:
                     String url = (String) msg.obj;
+                    int requestId = msg.arg1;
                     Bitmap bitmap = null;
                     try {
                         bitmap = fetchBitmap(url);
                     } catch (IOException e) {
-                        Log.e(TAG, "Couldn't fetch gravatar from URL " + url, e);
+                        Request req = sRequests.get(requestId);
+                        // Tier 2: GitLab Avatar API — GET /api/v4/avatar?email=EMAIL&size=N
+                        // Works on instances where /uploads/ rejects token auth.
+                        if (bitmap == null && req != null && req.email != null) {
+                            try {
+                                String apiUrl = fetchAvatarUrlFromApi(req.email);
+                                if (apiUrl != null && !apiUrl.equals(url)) {
+                                    bitmap = fetchBitmap(apiUrl);
+                                }
+                            } catch (IOException e2) {
+                                Log.d(TAG, "Avatar API fallback failed for " + req.email);
+                            }
+                        }
+                        // Tier 3: Gravatar by email hash
+                        if (bitmap == null && req != null && req.fallbackUrl != null) {
+                            try {
+                                bitmap = fetchBitmap(req.fallbackUrl);
+                            } catch (IOException e3) {
+                                Log.d(TAG, "Gravatar fallback also failed");
+                            }
+                        }
+                        if (bitmap == null) {
+                            Log.e(TAG, "All avatar sources failed for " + url, e);
+                        }
                     }
-                    sHandler.obtainMessage(MSG_LOADED, msg.arg1, 0, bitmap).sendToTarget();
+                    sHandler.obtainMessage(MSG_LOADED, requestId, 0, bitmap).sendToTarget();
                     break;
             }
         }

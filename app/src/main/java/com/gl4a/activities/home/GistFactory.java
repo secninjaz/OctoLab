@@ -31,6 +31,6 @@ public class GistFactory extends FragmentFactory {
 
     @Override
     protected Fragment makeFragment(int position) {
-        return GistListFragment.newInstance(mUserLogin);
+        return GistListFragment.newInstance(mUserLogin, -1L);
     }
 }
