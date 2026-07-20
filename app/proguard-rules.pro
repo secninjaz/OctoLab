@@ -2,6 +2,12 @@
 # https://stackoverflow.com/questions/9651703/using-proguard-with-android-without-obfuscation
 -optimizations !code/simplification/arithmetic,!field/*,!class/merging/*,!code/allocation/variable
 
+# Preserve Gl4Application and all its methods including SharedPreferences listener.
+# The multi-account switching logic (setActiveLogin, getInstanceUrl, onSharedPreferenceChanged)
+# must not be inlined or removed — it manages per-account instance URL state.
+-keep class com.gl4a.Gl4Application { *; }
+-keep class com.gl4a.ServiceFactory { *; }
+
 # Keep annotations for custom Moshi adapters in SDK
 -keep @interface com.meisolsson.githubsdk.core.*
 
