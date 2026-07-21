@@ -90,6 +90,8 @@ build:debug:
     - echo 'ClientSecret="placeholder"' >> app/client.properties
   script:
     - chmod +x ./gradlew
+    - BASE_VERSION=$(echo "${CI_COMMIT_TAG}" | sed 's/^v//' | sed 's/-.*//')
+    - sed -i "s/versionName \"[^\"]*\"/versionName \"${BASE_VERSION}\"/" app/build.gradle
     - ./gradlew assembleInternalDebug --no-daemon
   cache:
     key: android-gradle-v1
@@ -118,6 +120,8 @@ build:release:
     - echo "ClientSecret=\"${CLIENT_SECRET}\"" >> app/client.properties
   script:
     - chmod +x ./gradlew
+    - BASE_VERSION=$(echo "${CI_COMMIT_TAG}" | sed 's/^v//' | sed 's/-.*//')
+    - sed -i "s/versionName \"[^\"]*\"/versionName \"${BASE_VERSION}\"/" app/build.gradle
     - ./gradlew assembleInternalRelease --no-daemon
   after_script:
     - rm -f octolab-release.jks signing.properties app/client.properties
@@ -338,7 +342,7 @@ release:gitlab:
       if [ -z "$CHANGELOG" ]; then
         CHANGELOG="See CHANGELOG.md for details."
       fi
-      OBTAINIUM_RELEASE=$(python3 -c "import urllib.parse as u,json,os; s=json.dumps({'fallbackToOlderReleases':False,'trackOnly':False,'versionExtractionRegEx':'','matchGroupToUse':'','versionDetection':True,'releaseDateAsVersion':False,'useVersionCodeAsOSVersion':False,'apkFilterRegEx':'','invertAPKFilter':False,'autoApkFilterByArch':True,'appName':'','appAuthor':'','shizukuPretendToBeGooglePlay':False,'allowInsecure':False,'exemptFromBackgroundUpdates':False,'skipUpdateNotifications':False,'about':'','refreshBeforeDownload':False}); c={'id':'com.secninjaz.octolab.internal','url':os.environ['CI_PROJECT_URL'],'author':os.environ['CI_PROJECT_NAMESPACE'],'name':'OctoLab','preferredApkIndex':0,'additionalSettings':s,'overrideSource':'GitLab'}; print('https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/'+u.quote(json.dumps(c,separators=(',',':')),safe=''))")
+      OBTAINIUM_RELEASE=$(python3 -c "import urllib.parse as u,json,os; s=json.dumps({'fallbackToOlderReleases':False,'trackOnly':False,'versionExtractionRegEx':'','matchGroupToUse':'','versionDetection':True,'releaseDateAsVersion':False,'useVersionCodeAsOSVersion':False,'apkFilterRegEx':'^(?!.*debug)','invertAPKFilter':False,'autoApkFilterByArch':True,'appName':'','appAuthor':'','shizukuPretendToBeGooglePlay':False,'allowInsecure':False,'exemptFromBackgroundUpdates':False,'skipUpdateNotifications':False,'about':'','refreshBeforeDownload':False}); c={'id':'com.secninjaz.octolab.internal','url':os.environ['CI_PROJECT_URL'],'author':os.environ['CI_PROJECT_NAMESPACE'],'name':'OctoLab','preferredApkIndex':0,'additionalSettings':s,'overrideSource':'GitLab'}; print('https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/'+u.quote(json.dumps(c,separators=(',',':')),safe=''))")
       cat > release_description.md << DESCEOF
       ## OctoLab ${CI_COMMIT_TAG}
 
