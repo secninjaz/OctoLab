@@ -170,8 +170,31 @@ class CommentViewHolder
 
         ivMenu.setTag(item);
 
-        // GitLabReactions
+        // Show cached reactions immediately; fetch from API if not yet loaded
         reactions.setReactions(item.comment().reactions());
+        if (item.comment().reactions() == null) {
+            mCallback.loadReactionDetails(item, false)
+                    .subscribe(details -> {
+                        if (!details.isEmpty()) {
+                            java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+                            for (com.gl4a.gitlab.model.GitLabReaction r : details) {
+                                counts.merge(r.name, 1, Integer::sum);
+                            }
+                            com.gl4a.gitlab.model.GitLabReactions agg =
+                                    com.gl4a.gitlab.model.GitLabReactions.builder()
+                                    .plusOne(counts.getOrDefault("thumbsup", 0))
+                                    .minusOne(counts.getOrDefault("thumbsdown", 0))
+                                    .laugh(counts.getOrDefault("laughing", 0))
+                                    .hooray(counts.getOrDefault("tada", 0))
+                                    .heart(counts.getOrDefault("heart", 0))
+                                    .confused(counts.getOrDefault("confused", 0))
+                                    .rocket(counts.getOrDefault("rocket", 0))
+                                    .eyes(counts.getOrDefault("eyes", 0))
+                                    .build();
+                            updateReactions(agg);
+                        }
+                    }, error -> { /* non-fatal */ });
+        }
 
         String ourLogin = Gl4Application.get().getAuthLogin();
         boolean canEdit = ApiHelpers.loginEquals(user, ourLogin)

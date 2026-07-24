@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.7] - 2026-07-24
+
+### Fixed
+- Light theme: CardView and notification/to-do row backgrounds now match the warm-white tone (#FFFFF5) via theme_surface instead of hardcoded library white
+- Navigation drawer: Repositories icon now adapts correctly to light and dark themes (was two completely different icons with hardcoded fill colours)
+- Comment reactions: emoji counts now load automatically from the award emoji API when an issue/MR is opened, and are cached so they survive navigation back and RecyclerView rebinds
+- Debug APK signing: all CI debug builds now use the release keystore so Obtainium updates install without signature conflict
+
 ## [1.1.6] - 2026-07-24
 
 ### Fixed

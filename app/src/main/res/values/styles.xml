@@ -94,7 +94,7 @@
     </style>
 
     <style name="CardContainer">
-        <item name="android:background">@color/cardview_light_background</item>
+        <item name="android:background">@color/theme_surface</item>
     </style>
 
     <style name="Widget.ActionBar.TabView" parent="Widget.AppCompat.ActionBar.TabView">

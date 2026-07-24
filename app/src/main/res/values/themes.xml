@@ -82,6 +82,7 @@
         <item name="android:layout_marginTop">@dimen/card_top_bottom_margin</item>
         <item name="android:layout_marginBottom">@dimen/card_top_bottom_margin</item>
         <item name="android:foreground">?android:attr/selectableItemBackground</item>
+        <item name="cardBackgroundColor">@color/theme_surface</item>
     </style>
 
 </resources>

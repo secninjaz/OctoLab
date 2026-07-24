@@ -29,8 +29,8 @@ android {
     defaultConfig {
         minSdkVersion 23
         targetSdkVersion 33
-        versionCode 195
-        versionName "1.1.6"
+        versionCode 196
+        versionName "1.1.7"
         applicationId "com.secninjaz.octolab"
         resourceConfigurations += ['en']
 
@@ -146,6 +146,9 @@ if (props.containsKey('STORE_FILE')
     android.signingConfigs.release.keyAlias = props['KEY_ALIAS']
     android.signingConfigs.release.keyPassword = props['KEY_PASSWORD']
     android.signingConfigs.release.storeType = props.getProperty('STORE_TYPE', 'PKCS12')
+    // Sign debug builds with the same key so CI debug APKs can update each other
+    // without signature mismatch (each container generates a fresh debug keystore otherwise)
+    android.buildTypes.debug.signingConfig = android.signingConfigs.release
 } else {
     println 'signing.properties not found or incomplete'
     android.buildTypes.release.signingConfig = null

@@ -86,6 +86,9 @@ build:debug:
     - docker
   before_script:
     - !reference [.android_sdk_setup, before_script]
+    - echo "${KEYSTORE_BASE64}" | base64 -d > octolab-release.jks
+    - printf 'STORE_FILE=%s/octolab-release.jks\nSTORE_PASSWORD=%s\nKEY_ALIAS=%s\nKEY_PASSWORD=%s\nSTORE_TYPE=JKS\n' \
+        "$CI_PROJECT_DIR" "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > signing.properties
     - echo 'ClientId="placeholder"' > app/client.properties
     - echo 'ClientSecret="placeholder"' >> app/client.properties
   script:
@@ -94,6 +97,8 @@ build:debug:
     - sed -i "s/versionName \"[^\"]*\"/versionName \"${BASE_VERSION}\"/" app/build.gradle
     - sed -i "s/versionCode [0-9]*/versionCode ${CI_PIPELINE_ID}/" app/build.gradle
     - ./gradlew assembleInternalDebug --no-daemon
+  after_script:
+    - rm -f octolab-release.jks signing.properties app/client.properties
   cache:
     key: android-gradle-v1
     paths:
