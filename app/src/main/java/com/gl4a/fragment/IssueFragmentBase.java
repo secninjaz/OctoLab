@@ -20,6 +20,7 @@ import com.gl4a.gitlab.model.GitLabReaction;
 import com.gl4a.gitlab.model.GitLabAwardEmoji;
 import com.gl4a.gitlab.service.GitLabAwardEmojiService;
 import java.util.HashMap;
+import java.util.Map;
 import com.gl4a.gitlab.model.GitLabReactions;
 import com.gl4a.gitlab.model.GitLabComment;
 import com.gl4a.gitlab.model.GitLabUser;
@@ -453,10 +454,38 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         ReactionBar reactions = mListHeaderView.findViewById(R.id.reactions);
         reactions.setCallback(this, this);
         reactions.setDetailsCache(mReactionDetailsCache);
-        reactions.setReactions(mIssue.reactions());
+        // GitLabIssue.reactions() always returns null — fetch award emojis from API instead
+        loadIssueBodyReactions(reactions);
 
         assignHighlightColor();
         bindSpecialViews(mListHeaderView);
+    }
+
+    private void loadIssueBodyReactions(ReactionBar bar) {
+        GitLabAwardEmojiService service = ServiceFactory.get(GitLabAwardEmojiService.class, false);
+        boolean isMR = mIssue.pullRequest() != null;
+        Single<Response<List<GitLabAwardEmoji>>> request = isMR
+                ? service.getMergeRequestAwardEmojis(mIssue.projectId, mIssue.iid, 1, 100)
+                : service.getIssueAwardEmojis(mIssue.projectId, mIssue.iid, 1, 100);
+        request.map(ApiHelpers::throwOnFailure)
+                .compose(RxUtils::doInBackground)
+                .subscribe(emojis -> {
+                    Map<String, Integer> counts = new HashMap<>();
+                    for (GitLabAwardEmoji e : emojis) {
+                        counts.merge(e.name, 1, Integer::sum);
+                    }
+                    GitLabReactions r = GitLabReactions.builder()
+                            .plusOne(counts.getOrDefault("thumbsup", 0))
+                            .minusOne(counts.getOrDefault("thumbsdown", 0))
+                            .laugh(counts.getOrDefault("laughing", 0))
+                            .hooray(counts.getOrDefault("tada", 0))
+                            .heart(counts.getOrDefault("heart", 0))
+                            .confused(counts.getOrDefault("confused", 0))
+                            .rocket(counts.getOrDefault("rocket", 0))
+                            .eyes(counts.getOrDefault("eyes", 0))
+                            .build();
+                    bar.setReactions(r);
+                }, error -> { /* non-fatal — leave bar hidden */ });
     }
 
     private void fillLabels(List<GitLabLabel> labels) {
@@ -477,7 +506,23 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
 
     @Override
     public Single<List<GitLabReaction>> loadReactionDetails(ReactionBar.Item item, boolean bypassCache) {
-        return Single.just(new java.util.ArrayList<>());
+        // Load award emojis for the issue/MR body itself (shown in the reaction popup)
+        GitLabAwardEmojiService service = ServiceFactory.get(GitLabAwardEmojiService.class, bypassCache);
+        boolean isMR = mIssue.pullRequest() != null;
+        Single<Response<List<GitLabAwardEmoji>>> request = isMR
+                ? service.getMergeRequestAwardEmojis(mIssue.projectId, mIssue.iid, 1, 100)
+                : service.getIssueAwardEmojis(mIssue.projectId, mIssue.iid, 1, 100);
+        return request.map(response -> {
+            List<GitLabReaction> result = new java.util.ArrayList<>();
+            if (response.isSuccessful() && response.body() != null) {
+                for (GitLabAwardEmoji e : response.body()) {
+                    GitLabReaction r = new GitLabReaction();
+                    r.id = e.id; r.name = e.name; r.user = e.user;
+                    result.add(r);
+                }
+            }
+            return result;
+        }).compose(RxUtils::doInBackground);
     }
 
     @Override

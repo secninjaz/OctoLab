@@ -73,9 +73,10 @@ public class GitLabComment implements Parcelable {
     /** Set the MR web URL so that makeDiffIntent() can open the correct diff view. */
     public void setMrWebUrl(String url) { this.mrWebUrl = url != null ? url : ""; }
 
-    // Stub methods for GitHub SDK features not in GitLab
-    public GitLabReactions reactions() { return null; }
-    public GitLabComment withReactions(GitLabReactions r) { return this; }
+    // Transient reaction cache — populated asynchronously from the award emoji API
+    private transient GitLabReactions mCachedReactions;
+    public GitLabReactions reactions() { return mCachedReactions; }
+    public GitLabComment withReactions(GitLabReactions r) { mCachedReactions = r; return this; }
     public String htmlUrl() { return ""; }
     public String pullRequestUrl() { return mrWebUrl; }
     public String commitId() { return ""; }
