@@ -43,6 +43,9 @@
         <item name="colorBreadcrumbBackground">@color/breadcrumb_background</item>
         <item name="colorIconForeground">@color/icon_foreground</item>
         <item name="drawerBackground">@color/drawer_background</item>
+        <item name="android:colorBackground">@color/theme_surface</item>
+        <item name="colorSurface">@color/theme_surface</item>
+        <item name="android:textColorPrimary">@color/theme_text_primary</item>
     </style>
 
     <style name="TransparentTheme" parent="AppTheme">
@@ -59,14 +62,14 @@
     </style>
 
     <style name="HeaderTheme" parent="Theme.MaterialComponents">
-        <item name="colorPrimary">#ffffff</item>
-        <item name="colorSecondary">#ffffff</item>
-        <item name="colorControlActivated">#ffffff</item>
+        <item name="colorPrimary">#FFFFF5</item>
+        <item name="colorSecondary">#FFFFF5</item>
+        <item name="colorControlActivated">#FFFFF5</item>
         <item name="colorSurface">@android:color/transparent</item>
-        <item name="colorOnSurface">#ffffffff</item>
+        <item name="colorOnSurface">#FFFFF5</item>
         <item name="android:spinnerStyle">@style/Widget.Spinner.ActionBar.Light</item>
         <!-- used by appcompat to tint the spinner background drawable -->
-        <item name="android:colorBackground">#F8F8F8</item>
+        <item name="android:colorBackground">#FFFFF5</item>
     </style>
 
     <style name="PreferenceTheme" parent="PreferenceThemeOverlay.v14.Material" />

@@ -5,6 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-07-24
+
+### Fixed
+- Light/Day theme: warm-white tone (#FFFFF5) applied globally to window background, card surfaces, and toolbar controls; primary text changed from pure black to soft dark (#222222)
+- Dark/Night theme: surfaces and drawer remained dark; previous attempt leaked light values into night mode causing a crash on launch
+- To-do list: repository section headers now display names in their actual capitalisation instead of ALL CAPS
+
+### Changed
+- Signed internal release APK now named `OctoLab-vX.X.X-internal-release.apk` for clarity
+- Debug APK versionCode uses CI pipeline ID to guarantee chronological installs across builds
+- Both Obtainium tracking links (internal-release and debug) now appear in every release description
+
+## [1.1.5] - 2026-07-21
+
+### Fixed
+- Obtainium links in GitLab releases: replaced broken base64 format with correct URL-encoded JSON config including GitLab source override and architecture auto-detection
+- Obtainium version tracking: stable release link uses `versionExtractionRegEx` matching only stable tags; debug link matches only test tags — each now tracks its own release type independently
+
+### Changed
+- CI: Test tags (`v*.*.*-*`) now automatically upload the debug APK and create a GitLab release without any manual steps
+- CI: `security:gate` and `publish:github` now only trigger on stable tags (`v*.*.*`), no longer failing on test tags
+- CI: `versionName` in `build.gradle` is stamped from the tag before building so the installed app version always matches the release tag
+
 ## [1.1.4] - 2026-07-20
 
 ### Fixed

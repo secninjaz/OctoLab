@@ -41,6 +41,7 @@
                 android:layout_weight="1"
                 android:paddingBottom="8dp"
                 android:paddingTop="8dp"
+                android:textAllCaps="false"
                 tools:text="owner/repository" />
 
             <com.gl4a.widget.FixedSizeImageView
