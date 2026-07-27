@@ -33,6 +33,17 @@ public interface GitLabTodoService {
             @Query("per_page") int perPage
     );
 
+    // Convenience overload for issue/MR mention and participation lists.
+    // state="pending" | "done" — must be called twice and results merged to get all todos.
+    @GET("todos")
+    Single<Response<List<GitLabTodo>>> listTodos(
+            @androidx.annotation.Nullable @Query("type") String type,
+            @androidx.annotation.Nullable @Query("action") String action,
+            @Query("state") String state,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
     // Convenience overload for simple state-only filtering
     @GET("todos")
     Single<Response<List<GitLabTodo>>> listTodosByState(

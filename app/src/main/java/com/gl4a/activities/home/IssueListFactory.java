@@ -16,7 +16,7 @@ public class IssueListFactory extends FragmentFactory {
     private static final String STATE_KEY_SHOWING_CLOSED = "issue:showing_closed";
 
     private static final int[] TAB_TITLES = new int[] {
-            R.string.created, R.string.assigned, R.string.all, R.string.participating
+            R.string.created, R.string.assigned, R.string.mentioned, R.string.participating
     };
 
     private boolean mShowingClosed;
@@ -62,7 +62,7 @@ public class IssueListFactory extends FragmentFactory {
     }
 
     private static final String[] GITLAB_SCOPES =
-            { "created_by_me", "assigned_to_me", "all", "all" };
+            { "created_by_me", "assigned_to_me", "mentioned", "participating" };
 
     @Override
     protected Fragment makeFragment(int position) {
