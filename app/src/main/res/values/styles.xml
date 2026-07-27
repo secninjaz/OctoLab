@@ -93,6 +93,13 @@
         <item name="android:paddingRight">@dimen/content_padding</item>
     </style>
 
+    <!-- TextInputLayout override: force hint colour through hintTextColor (the attribute
+         Material actually reads) rather than android:textColorHint which it ignores. -->
+    <style name="OctoLab.TextInputLayout" parent="Widget.MaterialComponents.TextInputLayout.FilledBox">
+        <item name="hintTextColor">@color/theme_hint</item>
+        <item name="android:textColorHint">@color/theme_hint</item>
+    </style>
+
     <style name="CardContainer">
         <item name="android:background">@color/theme_surface</item>
     </style>
