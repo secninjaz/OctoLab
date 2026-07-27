@@ -1,6 +1,12 @@
 repositories {
     mavenCentral()
-    maven { url "https://jitpack.io" }
+    maven {
+        url "https://jitpack.io"
+        // Only use jitpack.io for com.github.* packages — prevents Gradle from
+        // querying jitpack for Maven Central deps, which times out when jitpack
+        // is unreachable and stalls the entire build.
+        content { includeGroupByRegex "com\\.github\\..*" }
+    }
     google()
 }
 
