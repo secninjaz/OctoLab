@@ -48,6 +48,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:layout_toLeftOf="@id/iv_action"
+                android:layout_toRightOf="@id/iv_icon"
                 android:textAppearance="@style/TextAppearance.VerySmall"
                 tools:text="yesterday" />
 

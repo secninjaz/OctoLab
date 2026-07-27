@@ -114,7 +114,10 @@ public class ApiHelpers {
 
     public static String formatRepoName(Context context, GitLabProject project) {
         if (project == null) return context.getString(R.string.deleted);
-        // Prefer pathWithNamespace (e.g. "group/repo"), then name, then path
+        // Prefer nameWithNamespace (e.g. "TestG / OctoLab" → "TestG/OctoLab") for proper
+        // capitalisation; fall back to pathWithNamespace (lowercase), then name, then path.
+        if (!TextUtils.isEmpty(project.nameWithNamespace))
+            return project.nameWithNamespace.replace(" / ", "/").replace(" /", "/").replace("/ ", "/");
         if (!TextUtils.isEmpty(project.pathWithNamespace)) return project.pathWithNamespace;
         if (!TextUtils.isEmpty(project.name)) return project.name;
         if (!TextUtils.isEmpty(project.path)) return project.path;

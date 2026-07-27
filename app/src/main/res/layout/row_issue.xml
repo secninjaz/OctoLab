@@ -63,14 +63,13 @@
 
     <LinearLayout
         android:id="@+id/username_and_date"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_toLeftOf="@id/info"
         android:layout_toRightOf="@id/iv_gravatar">
 
         <TextView
             android:id="@+id/tv_creator"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:maxLines="2"
