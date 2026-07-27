@@ -8,6 +8,7 @@ Built and maintained by [SecNinjaz](https://secninjaz.com).
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![F-Droid](https://img.shields.io/f-droid/v/com.secninjaz.octolab)](https://f-droid.org/packages/com.secninjaz.octolab)
+[![Privacy Policy](https://img.shields.io/badge/Privacy-Policy-informational)](PRIVACY.md)
 
 ---
 
@@ -108,6 +109,14 @@ All code changes — including those suggested by AI — are reviewed, tested, a
 ## Security
 
 See [SECURITY.md](SECURITY.md) for how to report vulnerabilities.
+
+---
+
+## Privacy
+
+OctoLab has no backend servers of its own. All communication happens directly between your device and the GitLab instance(s) you configure — no data passes through any SecNinjaz infrastructure.
+
+See [PRIVACY.md](PRIVACY.md) for the full privacy policy.
 
 ---
 

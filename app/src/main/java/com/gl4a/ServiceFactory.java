@@ -153,6 +153,7 @@ public class ServiceFactory {
                     return chain.proceed(rb.build());
                 });
         if (BuildConfig.DEBUG) cb.addInterceptor(LOGGING_INTERCEPTOR);
+        cb.addInterceptor(new com.gl4a.utils.DebugLoggingInterceptor());
         if (bypassCache) cb.addInterceptor(CACHE_BYPASS_INTERCEPTOR);
         return new Retrofit.Builder()
                 .baseUrl(Gl4Application.get().getApiBaseUrl())

@@ -663,4 +663,14 @@
     <string name="activity_filter_your_activity">Your Activity</string>
     <string name="activity_filter_your_projects">Your Projects</string>
     <string name="activity_filter_starred">Starred</string>
+
+    <!-- Debug logging -->
+    <string name="debug_category">Debug</string>
+    <string name="debug_logging_title">Enable debug logging</string>
+    <string name="debug_logging_summary">Records API calls and errors in memory for bug reports</string>
+    <string name="debug_share_logs">Share logs</string>
+    <string name="debug_share_logs_summary">Send the current log buffer to a bug report</string>
+    <string name="debug_clear_logs">Clear logs</string>
+    <string name="debug_no_logs">No log entries — enable logging and reproduce the issue first</string>
+    <string name="debug_logs_cleared">Logs cleared</string>
 </resources>

@@ -63,6 +63,7 @@ public class Gl4Application extends Application implements
         if (BuildConfig.DEBUG) Traceur.enableLogging();
 
         mPt = new PrettyTime();
+        com.gl4a.utils.DebugLogger.get().init(this);
         ServiceFactory.initClient(this);
         updateNotificationWorker(prefs);
     }

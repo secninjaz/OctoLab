@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.8] - 2026-07-27
+
+### Added
+- Settings → Debug: in-app log collector. Captures API calls (URLs with tokens stripped) and errors in a 500-entry ring buffer. Share via Android share sheet or clear at any time. Disabled by default.
+
+### Fixed
+- My Issues → Mentioned tab: now fetches both `mentioned` and `directly_addressed` todo actions; properly paginated and sorted by most recent notification date
+- My Issues → Participating tab: fetches all todo action types; properly paginated and deduplicated by issue id
+- Placeholder/hint text colour now follows the theme (Material `TextInputLayout` hint colour fixed via `colorOnSurface`)
+- My Repositories: default sort order changed to most recently pushed first
+- Notification/To-do row timestamp now always right-aligned; issue row username+timestamp row fills full width
+
+### Changed
+- `PRIVACY.md` (renamed from `Privacy.md`): clarifies that OctoLab has no backend servers and all communication is directly device-to-GitLab
+- README: added Privacy section and badge
+
 ## [1.1.7] - 2026-07-24
 
 ### Fixed

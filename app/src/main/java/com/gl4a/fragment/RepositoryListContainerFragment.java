@@ -53,7 +53,7 @@ public class RepositoryListContainerFragment extends Fragment implements
     private boolean mIsOrg;
     private String mFilterType;
     private String mSortOrder = "last_activity_at";
-    private String mSortDirection = "asc";
+    private String mSortDirection = "desc";
     private boolean mSearchVisible;
 
     private PagedDataBaseFragment<GitLabProject> mMainFragment;
@@ -180,7 +180,7 @@ public class RepositoryListContainerFragment extends Fragment implements
                     && !TextUtils.equals(mSortOrder, "created")
                     && !TextUtils.equals(mSortOrder, "last_activity_at")) {
                 mSortOrder = "last_activity_at";
-                mSortDirection = "asc";
+                mSortDirection = "desc";
             }
         }
     }
