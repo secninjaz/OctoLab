@@ -166,8 +166,14 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
 
     @Override
     public void onItemClick(GitLabIssue issue) {
-        Intent intent = IssueActivity.makeIntent(getActivity(), issue, issue.projectId);
-        mIssueLauncher.launch(intent);
+        if (mIsMR && issue.webUrl != null && !issue.webUrl.isEmpty()) {
+            // Route MR items through IntentUtils → LinkParser which handles
+            // /-/merge_requests/{iid} and opens PullRequestActivity correctly.
+            com.gl4a.utils.IntentUtils.openLinkInternallyOrExternally(
+                    getActivity(), android.net.Uri.parse(issue.webUrl));
+        } else {
+            mIssueLauncher.launch(IssueActivity.makeIntent(getActivity(), issue, issue.projectId));
+        }
     }
 
     @Override
@@ -294,7 +300,10 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
                 for (com.gl4a.gitlab.model.GitLabTodo todo : allTodos) {
                     GitLabIssue issue = todo.targetIssue();
                     if (issue == null) continue;
-                    if (issue.state != null && !filterState.equals(issue.state)) continue;
+                    // For MRs: treat "merged" as "closed" so merged MRs appear in the closed view
+                    String issueState = issue.state;
+                    if ("merged".equals(issueState)) issueState = "closed";
+                    if (issueState != null && !filterState.equals(issueState)) continue;
                     String d = todo.createdAt != null ? todo.createdAt : "";
                     String prev = latestDate.get(issue.id);
                     if (prev == null || d.compareTo(prev) > 0) latestDate.put(issue.id, d);
