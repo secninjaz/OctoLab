@@ -46,6 +46,8 @@
         <item name="android:colorBackground">@color/theme_surface</item>
         <item name="colorSurface">@color/theme_surface</item>
         <item name="android:textColorPrimary">@color/theme_text_primary</item>
+        <item name="android:textColorHint">@color/theme_hint</item>
+        <item name="colorOnSurface">@color/theme_text_primary</item>
     </style>
 
     <style name="TransparentTheme" parent="AppTheme">

@@ -26,8 +26,13 @@ import android.widget.TextView;
 import com.gl4a.Gl4Application;
 import com.gl4a.R;
 import android.net.Uri;
+import android.widget.Toast;
+import androidx.core.content.FileProvider;
+import androidx.preference.SwitchPreference;
+import com.gl4a.utils.DebugLogger;
 import com.gl4a.worker.NotificationsWorker;
 import com.gl4a.widget.IntegerListPreference;
+import java.io.File;
 
 public class SettingsFragment extends PreferenceFragmentCompat implements
         Preference.OnPreferenceClickListener, Preference.OnPreferenceChangeListener {
@@ -46,6 +51,9 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
     public static final String KEY_NOTIFICATION_INTERVAL = "notification_interval";
     private static final String KEY_ABOUT = "about";
     private static final String KEY_OPEN_SOURCE_COMPONENTS = "open_source_components";
+    private static final String KEY_DEBUG_LOGGING = DebugLogger.PREF_KEY_ENABLED;
+    private static final String KEY_DEBUG_SHARE = "debug_share_logs";
+    private static final String KEY_DEBUG_CLEAR = "debug_clear_logs";
 
     private OnStateChangeListener mListener;
     private IntegerListPreference mThemePref;
@@ -53,6 +61,9 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
     private Preference mOpenSourcePref;
     private TwoStatePreference mNotificationsPref;
     private IntegerListPreference mNotificationIntervalPref;
+    private SwitchPreference mDebugLoggingPref;
+    private Preference mDebugSharePref;
+    private Preference mDebugClearPref;
 
     @Override
     public void onAttach(Context context) {
@@ -83,6 +94,15 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
 
         mNotificationIntervalPref = findPreference(KEY_NOTIFICATION_INTERVAL);
         mNotificationIntervalPref.setOnPreferenceChangeListener(this);
+
+        mDebugLoggingPref = findPreference(KEY_DEBUG_LOGGING);
+        mDebugLoggingPref.setOnPreferenceChangeListener(this);
+
+        mDebugSharePref = findPreference(KEY_DEBUG_SHARE);
+        mDebugSharePref.setOnPreferenceClickListener(this);
+
+        mDebugClearPref = findPreference(KEY_DEBUG_CLEAR);
+        mDebugClearPref.setOnPreferenceClickListener(this);
     }
 
     @Override
@@ -112,6 +132,10 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
             }
             return true;
         }
+        if (pref == mDebugLoggingPref) {
+            DebugLogger.get().setEnabled((boolean) newValue);
+            return true;
+        }
         return false;
     }
 
@@ -126,8 +150,38 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
             new OpenSourceComponentListDialogFragment()
                     .show(getChildFragmentManager(), "opensource");
             return true;
+        } else if (pref == mDebugSharePref) {
+            shareLogs();
+            return true;
+        } else if (pref == mDebugClearPref) {
+            DebugLogger.get().clear();
+            Toast.makeText(getContext(), R.string.debug_logs_cleared, Toast.LENGTH_SHORT).show();
+            return true;
         }
         return false;
+    }
+
+    private void shareLogs() {
+        DebugLogger logger = DebugLogger.get();
+        if (logger.size() == 0) {
+            Toast.makeText(getContext(), R.string.debug_no_logs, Toast.LENGTH_LONG).show();
+            return;
+        }
+        File logFile = logger.writeToFile(requireContext());
+        if (logFile == null) {
+            Toast.makeText(getContext(), R.string.debug_no_logs, Toast.LENGTH_LONG).show();
+            return;
+        }
+        Uri uri = FileProvider.getUriForFile(
+                requireContext(),
+                requireContext().getPackageName() + ".fileprovider",
+                logFile);
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        shareIntent.setType("text/plain");
+        shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "OctoLab debug log");
+        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(Intent.createChooser(shareIntent, getString(R.string.debug_share_logs)));
     }
 
     private String getAppName() {

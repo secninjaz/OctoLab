@@ -63,6 +63,32 @@
         android:summary="%s"
         android:title="@string/notification_interval" />
 
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        android:title="@string/debug_category">
+
+        <SwitchPreference
+            app:iconSpaceReserved="false"
+            android:defaultValue="false"
+            android:key="debug_logging_enabled"
+            android:title="@string/debug_logging_title"
+            android:summary="@string/debug_logging_summary" />
+
+        <Preference
+            app:iconSpaceReserved="false"
+            android:key="debug_share_logs"
+            android:title="@string/debug_share_logs"
+            android:summary="@string/debug_share_logs_summary"
+            android:dependency="debug_logging_enabled" />
+
+        <Preference
+            app:iconSpaceReserved="false"
+            android:key="debug_clear_logs"
+            android:title="@string/debug_clear_logs"
+            android:dependency="debug_logging_enabled" />
+
+    </PreferenceCategory>
+
     <Preference
         app:iconSpaceReserved="false"
         android:key="about"

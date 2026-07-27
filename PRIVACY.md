@@ -10,9 +10,17 @@ OctoLab also stores any bookmarks you create, locally on the device.
 
 What do we use your information for?
 -------------------------------------
-The stored access token(s) are used solely for authenticating your requests to your
-configured GitLab instance (gitlab.com or self-hosted). Bookmarks are only used to
-populate the bookmarks list within the app.
+The access token(s) stored locally on your device are used solely for authenticating
+your requests to your configured GitLab instance (gitlab.com or self-hosted). They
+never leave your device except as authentication headers sent directly to your
+configured GitLab instance.
+
+**OctoLab has no servers or backend of its own.** All communication happens directly
+between your device and the GitLab instance(s) you have configured. No data passes
+through any SecNinjaz or third-party infrastructure. Your data never leaves the
+path between your device and your GitLab instance.
+
+Bookmarks are stored only on your device and are never transmitted anywhere.
 
 How do we protect your information?
 -------------------------------------
