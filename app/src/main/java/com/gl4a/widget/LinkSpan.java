@@ -1,6 +1,7 @@
 package com.gl4a.widget;
 
 import android.net.Uri;
+import android.text.TextPaint;
 import android.text.style.ClickableSpan;
 import android.view.View;
 
@@ -21,5 +22,11 @@ public class LinkSpan extends ClickableSpan {
         Uri clickedUri = Uri.parse(mUrl);
         var activity = (FragmentActivity) widget.getContext();
         IntentUtils.openLinkInternallyOrExternally(activity, clickedUri);
+    }
+
+    @Override
+    public void updateDrawState(@NonNull TextPaint ds) {
+        ds.setColor(ds.linkColor);
+        ds.setUnderlineText(false);
     }
 }

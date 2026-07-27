@@ -48,6 +48,7 @@
         <item name="android:textColorPrimary">@color/theme_text_primary</item>
         <item name="android:textColorHint">@color/theme_hint</item>
         <item name="colorOnSurface">@color/theme_text_primary</item>
+        <item name="textInputStyle">@style/OctoLab.TextInputLayout</item>
     </style>
 
     <style name="TransparentTheme" parent="AppTheme">
