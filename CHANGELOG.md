@@ -7,18 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [1.1.9] - 2026-07-27
 
-### Added
-- My MRs: Created / Assigned / Reviews / Mentioned tabs (Grok-confirmed GitLab API endpoints with proper pagination)
-- Reviews tab — MR-specific `scope=reviews_for_me` scope for MRs assigned to you as reviewer
-- Mentioned tab for MRs — Todos API `type=MergeRequest` (pending+done, deduplicated, sorted by notification date)
-- MR items now open correctly via `IntentUtils → LinkParser` routing; no more crash
-- MR items display `!` prefix (e.g. `!32`) instead of `#` prefix
-
 ### Fixed
 - TextInputLayout hint/placeholder colour: added `OctoLab.TextInputLayout` style with explicit `hintTextColor` so Material reads the correct colour
-- Merged MRs now appear in the Closed MRs view (state=merged treated as closed)
-- Repository names in notification/todo headers now use proper capitalisation (`nameWithNamespace` field)
-- Markdown link underlines removed globally (both `LinkSpan` and Markwon plugin)
+- Repository names in notification/to-do headers now use proper capitalisation (`nameWithNamespace` field)
+- Markdown link underlines removed globally
+
+### Changed
+- Markdown links no longer show underlines app-wide
 
 ## [1.1.8] - 2026-07-27
 
