@@ -15,8 +15,13 @@ import com.gl4a.utils.ApiHelpers;
 public class IssueListFactory extends FragmentFactory {
     private static final String STATE_KEY_SHOWING_CLOSED = "issue:showing_closed";
 
-    private static final int[] TAB_TITLES = new int[] {
+    // Issues: Created / Assigned / Mentioned / Participating
+    private static final int[] ISSUE_TAB_TITLES = new int[] {
             R.string.created, R.string.assigned, R.string.mentioned, R.string.participating
+    };
+    // MRs: Created / Assigned / Reviews / Mentioned  (Reviews = scope=reviews_for_me)
+    private static final int[] MR_TAB_TITLES = new int[] {
+            R.string.created, R.string.assigned, R.string.reviews, R.string.mentioned
     };
 
     private boolean mShowingClosed;
@@ -53,7 +58,7 @@ public class IssueListFactory extends FragmentFactory {
 
     @Override
     protected int[] getTabTitleResIds() {
-        return TAB_TITLES;
+        return mIsPullRequest ? MR_TAB_TITLES : ISSUE_TAB_TITLES;
     }
 
     @Override
@@ -61,13 +66,17 @@ public class IssueListFactory extends FragmentFactory {
         return mHeaderColorAttrs;
     }
 
-    private static final String[] GITLAB_SCOPES =
+    // Issue scopes: Created / Assigned / Mentioned / Participating
+    private static final String[] ISSUE_SCOPES =
             { "created_by_me", "assigned_to_me", "mentioned", "participating" };
+    // MR scopes:   Created / Assigned / Reviews / Mentioned
+    private static final String[] MR_SCOPES =
+            { "created_by_me", "assigned_to_me", "reviews_for_me", "mentioned" };
 
     @Override
     protected Fragment makeFragment(int position) {
-        // Tab 0=created_by_me, 1=assigned_to_me, 2=all, 3=mentioned
-        String scope = (position < GITLAB_SCOPES.length) ? GITLAB_SCOPES[position] : "assigned_to_me";
+        String[] scopes = mIsPullRequest ? MR_SCOPES : ISSUE_SCOPES;
+        String scope = (position < scopes.length) ? scopes[position] : "assigned_to_me";
         String state = mShowingClosed ? ApiHelpers.IssueState.CLOSED : ApiHelpers.IssueState.OPEN;
         int emptyRes = mIsPullRequest ? R.string.no_pull_requests_found : R.string.no_issues_found;
 

@@ -130,6 +130,7 @@
     <string name="all">All</string>
     <string name="mentioned">Mentioned</string>
     <string name="participating">Participating</string>
+    <string name="reviews">Reviews</string>
     <string name="my_repositories">My repositories</string>
     <string name="my_issues">My issues</string>
     <string name="my_pull_requests">My merge requests</string>
