@@ -10,7 +10,11 @@ buildscript {
 
 allprojects {
     repositories {
-        maven { url 'https://jitpack.io' }
+        mavenCentral()
+        maven {
+            url 'https://jitpack.io'
+            content { includeGroupByRegex "com\\.github\\..*" }
+        }
         google()
     }
 }
