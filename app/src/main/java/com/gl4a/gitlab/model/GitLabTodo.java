@@ -9,7 +9,7 @@ public class GitLabTodo {
     @Json(name = "author") public GitLabUser author;
     @Json(name = "action_name") public String actionName;
     @Json(name = "target_type") public String targetType;
-    @Json(name = "target") public TodoTarget target;
+    @Json(name = "target") public GitLabIssue target;
     @Json(name = "target_url") public String targetUrl;
     @Json(name = "body") public String body;
     @Json(name = "state") public String state;
@@ -20,16 +20,11 @@ public class GitLabTodo {
         if (target != null && target.title != null) return target.title;
         return actionName;
     }
+    public GitLabIssue targetIssue() { return target; }
     public String url() { return targetUrl; }
     public String type() { return targetType; }
     public String reason() { return actionName; }
     public boolean isUnread() { return "pending".equals(state); }
     public GitLabProject repository() { return project; }
 
-    public static class TodoTarget {
-        @Json(name = "id") public long id;
-        @Json(name = "iid") public int iid;
-        @Json(name = "title") public String title;
-        @Json(name = "state") public String state;
-    }
 }

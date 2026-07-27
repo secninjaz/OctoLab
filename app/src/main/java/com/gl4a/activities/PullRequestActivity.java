@@ -77,7 +77,7 @@ public class PullRequestActivity extends BaseFragmentPagerActivity implements
         return makeIntent(context, repoOwner, repoName, number, -1, null);
     }
 
-    public static Intent makeIntent(Context context, String repoOwner, String repoName,
+public static Intent makeIntent(Context context, String repoOwner, String repoName,
             int number, int initialPage, IntentUtils.InitialCommentMarker initialComment) {
         return new Intent(context, PullRequestActivity.class)
                 .putExtra("owner", repoOwner)

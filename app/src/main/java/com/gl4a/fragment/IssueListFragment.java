@@ -208,7 +208,7 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
                             return Response.<GitLabPage<GitLabIssue>>error(response.errorBody(), response.raw());
                         });
             }
-        } else if (mIsMR) {
+        } else if (mIsMR && !"mentioned".equals(mScope) && !"participating".equals(mScope)) {
             // Merge Requests tab: GET /merge_requests?scope=assigned_to_me
             final GitLabMergeRequestService mrService =
                     ServiceFactory.get(GitLabMergeRequestService.class, bypassCache);
@@ -236,6 +236,80 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
                         return Response.success(ApiHelpers.toPage(
                                 retrofit2.Response.success(issues, response.headers())));
                     });
+        } else if ("mentioned".equals(mScope) || "participating".equals(mScope)) {
+            // Mentioned / Participating via GitLab Todos API.
+            // Strategy confirmed by Grok: standard offset pagination (page + per_page).
+            // Mentioned  = action=mentioned + action=directly_addressed (both pending and done)
+            // Participating = all action types (no action filter), both pending and done
+            com.gl4a.gitlab.service.GitLabTodoService todoService =
+                    ServiceFactory.get(com.gl4a.gitlab.service.GitLabTodoService.class, bypassCache);
+            final String todoType = mIsMR ? "MergeRequest" : "Issue";
+            final boolean isMentionedTab = "mentioned".equals(mScope);
+            final String filterState = mIssueState != null ? mIssueState : "opened";
+            final int PER_PAGE = 25;
+
+            // onePage: fetch one (action, state) slice for the current page number.
+            // Returns the response so we can inspect X-Next-Page for pagination.
+            java.util.function.BiFunction<String, String,
+                    Single<Response<java.util.List<com.gl4a.gitlab.model.GitLabTodo>>>>
+                    onePage = (action, state) ->
+                        todoService.listTodos(todoType, action, state, page, PER_PAGE)
+                                .onErrorReturn(e -> retrofit2.Response.success(new java.util.ArrayList<>()));
+
+            // Build the parallel call set:
+            //   Mentioned    → 4 calls: (mentioned|directly_addressed) × (pending|done)
+            //   Participating → 2 calls: (all actions) × (pending|done)
+            final Single<Response<java.util.List<com.gl4a.gitlab.model.GitLabTodo>>>
+                    s1, s2, s3, s4;
+            if (isMentionedTab) {
+                s1 = onePage.apply("mentioned",           "pending");
+                s2 = onePage.apply("mentioned",           "done");
+                s3 = onePage.apply("directly_addressed",  "pending");
+                s4 = onePage.apply("directly_addressed",  "done");
+            } else {
+                s1 = onePage.apply(null, "pending");
+                s2 = onePage.apply(null, "done");
+                s3 = Single.just(retrofit2.Response.success(new java.util.ArrayList<>()));
+                s4 = Single.just(retrofit2.Response.success(new java.util.ArrayList<>()));
+            }
+
+            return Single.zip(s1, s2, s3, s4,
+                    (Response<java.util.List<com.gl4a.gitlab.model.GitLabTodo>> r1,
+                     Response<java.util.List<com.gl4a.gitlab.model.GitLabTodo>> r2,
+                     Response<java.util.List<com.gl4a.gitlab.model.GitLabTodo>> r3,
+                     Response<java.util.List<com.gl4a.gitlab.model.GitLabTodo>> r4) -> {
+                // Collect all todos from every sub-call
+                java.util.List<com.gl4a.gitlab.model.GitLabTodo> allTodos = new java.util.ArrayList<>();
+                int maxPageSize = 0; // track largest sub-response for next-page detection
+                for (Response<java.util.List<com.gl4a.gitlab.model.GitLabTodo>> r
+                        : new Response[]{r1, r2, r3, r4}) {
+                    if (r.isSuccessful() && r.body() != null) {
+                        allTodos.addAll(r.body());
+                        maxPageSize = Math.max(maxPageSize, r.body().size());
+                    }
+                }
+                // Deduplicate by issue.id; track most recent todo.createdAt for sort key
+                java.util.Map<Long, String> latestDate = new java.util.HashMap<>();
+                java.util.Map<Long, GitLabIssue> byId = new java.util.LinkedHashMap<>();
+                for (com.gl4a.gitlab.model.GitLabTodo todo : allTodos) {
+                    GitLabIssue issue = todo.targetIssue();
+                    if (issue == null) continue;
+                    if (issue.state != null && !filterState.equals(issue.state)) continue;
+                    String d = todo.createdAt != null ? todo.createdAt : "";
+                    String prev = latestDate.get(issue.id);
+                    if (prev == null || d.compareTo(prev) > 0) latestDate.put(issue.id, d);
+                    byId.putIfAbsent(issue.id, issue);
+                }
+                java.util.List<GitLabIssue> issues = new java.util.ArrayList<>(byId.values());
+                // Sort most recently notified first
+                issues.sort((a, b) ->
+                        latestDate.getOrDefault(b.id, "").compareTo(latestDate.getOrDefault(a.id, "")));
+                // Pagination: if any sub-call returned a full page, assume there is a next page
+                boolean hasMore = maxPageSize >= PER_PAGE;
+                return Response.success(new GitLabPage<>(
+                        issues, page, hasMore ? page + 1 : 0,
+                        hasMore ? page + 2 : page, issues.size()));
+            });
         } else if (mScope != null && !mScope.isEmpty()) {
             // Personal issues: GET /issues?scope=assigned_to_me&state=opened
             final GitLabIssueService service = ServiceFactory.get(GitLabIssueService.class, bypassCache);
