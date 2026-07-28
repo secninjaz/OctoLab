@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-07-28
+
+### Fixed
+- Commits now open correctly — fixed `NullPointerException` in `CommitActivity` when SHA was missing from the intent (caused the activity to crash and return to the previous screen)
+- Commit link regex in Your Activity now correctly handles projects under nested groups (e.g. `group/subgroup/project`)
+- Commit list item tap now passes the project ID directly so the activity skips the redundant project-path API lookup
+- Commit list uses the URL-safe `path` field (not the display `name`) so project lookup works even when the project name contains capital letters
+
 ## [1.2.2] - 2026-07-28
 
 ### Fixed
