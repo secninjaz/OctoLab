@@ -82,11 +82,12 @@ public class CommitAdapter extends RootAdapter<GitLabCommit, CommitAdapter.ViewH
     public void onClick(View v) {
         if (v.getId() == R.id.iv_gravatar) {
             GitLabCommit commit = (GitLabCommit) v.getTag();
-            // commit.author() returns the resolved user when available, otherwise a synthetic
-            // user with username=email — UserActivity.searchUsers handles both cases.
-            Intent intent = UserActivity.makeIntent(mContext, commit.author());
-            if (intent != null) {
-                mContext.startActivity(intent);
+            GitLabUser user = commit.authorUser != null
+                    ? commit.authorUser
+                    : AvatarHandler.getCachedUserForEmail(commit.authorEmail);
+            if (user != null) {
+                Intent intent = UserActivity.makeIntent(mContext, user);
+                if (intent != null) mContext.startActivity(intent);
             }
         } else {
             super.onClick(v);

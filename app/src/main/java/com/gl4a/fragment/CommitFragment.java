@@ -124,10 +124,9 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
         final Gl4Application app = Gl4Application.get();
 
         ImageView ivGravatar = mContentView.findViewById(R.id.iv_gravatar);
-        GitLabUser author = mCommit.author();
-        AvatarHandler.assignAvatar(ivGravatar, author);
+        AvatarHandler.assignAvatar(ivGravatar, mCommit.author());
         ivGravatar.setOnClickListener(this);
-        ivGravatar.setTag(author);
+        ivGravatar.setTag(mCommit.authorEmail);
 
         TextView tvMessage = mContentView.findViewById(R.id.tv_message);
         TextView tvTitle = mContentView.findViewById(R.id.tv_title);
@@ -339,9 +338,12 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
     @Override
     public void onClick(View v) {
         if (v.getId() == R.id.iv_gravatar) {
-            Intent intent = UserActivity.makeIntent(getActivity(), (GitLabUser) v.getTag());
-            if (intent != null) {
-                startActivity(intent);
+            GitLabUser user = mCommit.authorUser != null
+                    ? mCommit.authorUser
+                    : AvatarHandler.getCachedUserForEmail((String) v.getTag());
+            if (user != null) {
+                Intent intent = UserActivity.makeIntent(getActivity(), user);
+                if (intent != null) startActivity(intent);
             }
         } else {
             GitLabDiff diff = (GitLabDiff) v.getTag();

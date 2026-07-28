@@ -56,6 +56,17 @@ public class AvatarHandler {
     private static final LongSparseArray<Request> sRequests = new LongSparseArray<>();
     private static int sMaxImageSizePx = -1;
 
+    // Resolved GitLab users keyed by commit author email — populated by fetchUserAvatarByEmail
+    // so avatar clicks can open the correct profile without re-fetching.
+    private static final java.util.Map<String, GitLabUser> sEmailUserCache =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Returns the resolved GitLabUser for a commit author email, or null if not yet loaded. */
+    public static GitLabUser getCachedUserForEmail(String email) {
+        if (email == null || email.isEmpty()) return null;
+        return sEmailUserCache.get(email.toLowerCase(java.util.Locale.ROOT).trim());
+    }
+
     private static final int MSG_LOAD = 1;
     private static final int MSG_LOADED = 2;
     private static final int MSG_DESTROY = 3;
@@ -300,17 +311,46 @@ public class AvatarHandler {
             okhttp3.ResponseBody body = response.body();
             if (body == null) throw new IOException("Empty Users API body");
             String json = body.string();
-            // Response is an array: [{"id":N,"avatar_url":"..."},...] or []
             if (json.trim().startsWith("[]") || !json.contains("avatar_url")) return null;
-            int keyIdx = json.indexOf("\"avatar_url\":\"");
-            if (keyIdx < 0) return null;
-            int start = keyIdx + 14;
-            int end = json.indexOf("\"", start);
-            if (end <= start) return null;
-            String avatarUrl = json.substring(start, end)
+
+            // Parse id
+            long userId = 0;
+            int idIdx = json.indexOf("\"id\":");
+            if (idIdx >= 0) {
+                int idStart = idIdx + 5;
+                int idEnd = json.indexOf(",", idStart);
+                if (idEnd > idStart) {
+                    try { userId = Long.parseLong(json.substring(idStart, idEnd).trim()); }
+                    catch (NumberFormatException ignored) {}
+                }
+            }
+            // Parse username
+            String username = null;
+            int unIdx = json.indexOf("\"username\":\"");
+            if (unIdx >= 0) {
+                int unStart = unIdx + 12;
+                int unEnd = json.indexOf("\"", unStart);
+                if (unEnd > unStart) username = json.substring(unStart, unEnd);
+            }
+            // Parse avatar_url
+            int avIdx = json.indexOf("\"avatar_url\":\"");
+            if (avIdx < 0) return null;
+            int avStart = avIdx + 14;
+            int avEnd = json.indexOf("\"", avStart);
+            if (avEnd <= avStart) return null;
+            String avatarUrl = json.substring(avStart, avEnd)
                     .replace("\\u0026", "&")
                     .replace("\\/", "/");
-            // Ignore Gravatar results — we'll use our own Gravatar fallback with correct sizing
+
+            // Cache the resolved user so avatar clicks can open the correct profile.
+            if (userId > 0 && username != null) {
+                GitLabUser resolved = new GitLabUser();
+                resolved.id = userId;
+                resolved.username = username;
+                resolved.avatarUrl = avatarUrl;
+                sEmailUserCache.put(email.toLowerCase(java.util.Locale.ROOT).trim(), resolved);
+            }
+
             return avatarUrl.contains("gravatar.com") ? null : avatarUrl;
         }
     }
