@@ -92,4 +92,31 @@ public interface GitLabAwardEmojiService {
             @Path("note_id") long noteId,
             @Path("award_id") long awardId
     );
+
+    // ---- Merge Request note (comment) award emoji ----
+
+    @GET("projects/{id}/merge_requests/{iid}/notes/{note_id}/award_emoji")
+    Single<Response<List<GitLabAwardEmoji>>> getMergeRequestNoteAwardEmojis(
+            @Path("id") long projectId,
+            @Path("iid") int iid,
+            @Path("note_id") long noteId,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
+    @POST("projects/{id}/merge_requests/{iid}/notes/{note_id}/award_emoji")
+    Single<Response<GitLabAwardEmoji>> addMergeRequestNoteAwardEmoji(
+            @Path("id") long projectId,
+            @Path("iid") int iid,
+            @Path("note_id") long noteId,
+            @Body Map<String, Object> body
+    );
+
+    @DELETE("projects/{id}/merge_requests/{iid}/notes/{note_id}/award_emoji/{award_id}")
+    Single<Response<Void>> deleteMergeRequestNoteAwardEmoji(
+            @Path("id") long projectId,
+            @Path("iid") int iid,
+            @Path("note_id") long noteId,
+            @Path("award_id") long awardId
+    );
 }
