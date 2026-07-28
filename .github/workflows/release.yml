@@ -62,7 +62,28 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
           VNUM="${VERSION#v}"
-          CHANGELOG=$(awk "/^## \[${VNUM}\]/{found=1; next} found && /^## \[/{exit} found && NF{print}" CHANGELOG.md)
+
+          # Find the last GitHub release tag so we can accumulate all CHANGELOG
+          # entries since then (handles cases where intermediate GitLab-only releases
+          # were never published to GitHub).
+          LAST_GH_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "")
+
+          if [ -z "$LAST_GH_TAG" ]; then
+            # No previous GitHub release — include only current version's entry
+            CHANGELOG=$(awk "/^## \[${VNUM}\]/{found=1; next} found && /^## \[/{exit} found && NF{print}" CHANGELOG.md)
+          else
+            LAST_VNUM="${LAST_GH_TAG#v}"
+            # Accumulate all entries from versions AFTER LAST_VNUM up to VNUM
+            # awk: collect sections between ## [VNUM] and ## [LAST_VNUM] (exclusive)
+            CHANGELOG=$(awk "
+              /^## \[${LAST_VNUM}\]/ { stop=1 }
+              stop { exit }
+              /^## \[/ && found { print \"\" }
+              /^## \[${VNUM}\]/ { found=1; next }
+              found && NF { print }
+            " CHANGELOG.md)
+          fi
+
           [ -z "$CHANGELOG" ] && CHANGELOG="See CHANGELOG.md for details."
           # Write to a file — avoids backtick/glob interpretation when passing inline to gh
           printf '%s\n' \
