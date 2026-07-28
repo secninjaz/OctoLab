@@ -56,7 +56,7 @@ public class CommitAdapter extends RootAdapter<GitLabCommit, CommitAdapter.ViewH
             GitLabCommit.GitLabGitUser commitAuthor = commit.commit().author();
             String userName = commitAuthor != null ? commitAuthor.name() : null;
             String email = commitAuthor != null ? commitAuthor.email() : null;
-            holder.ivGravatar.setImageDrawable(new AvatarHandler.DefaultAvatarDrawable(userName, email));
+            AvatarHandler.assignAvatarByEmail(holder.ivGravatar, userName, email);
         }
         holder.ivGravatar.setTag(commit);
 
