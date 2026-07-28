@@ -82,14 +82,11 @@ public class CommitAdapter extends RootAdapter<GitLabCommit, CommitAdapter.ViewH
     public void onClick(View v) {
         if (v.getId() == R.id.iv_gravatar) {
             GitLabCommit commit = (GitLabCommit) v.getTag();
-            // Only navigate to user profile when the commit has a resolved GitLab user account.
-            // When authorUser is null the author login is derived from the email address, which
-            // would produce a 404 or open the wrong profile.
-            if (commit.authorUser != null) {
-                Intent intent = UserActivity.makeIntent(mContext, commit.authorUser);
-                if (intent != null) {
-                    mContext.startActivity(intent);
-                }
+            // commit.author() returns the resolved user when available, otherwise a synthetic
+            // user with username=email — UserActivity.searchUsers handles both cases.
+            Intent intent = UserActivity.makeIntent(mContext, commit.author());
+            if (intent != null) {
+                mContext.startActivity(intent);
             }
         } else {
             super.onClick(v);
