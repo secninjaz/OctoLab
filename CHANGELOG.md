@@ -13,6 +13,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Commit list item tap now passes the project ID directly so the activity skips the redundant project-path API lookup
 - Commit list uses the URL-safe `path` field (not the display `name`) so project lookup works even when the project name contains capital letters
 - Fixed `NullPointerException` crash in `CommitFragment.fillStatsFromDiffs` when diffs loaded before the fragment view was created — deferred to `onViewCreated`
+- Commit author avatars now load correctly — GitLab commits API does not return a user object, so avatars are resolved by author email via `GET /users?search=email` (returns the actual uploaded profile picture) with Gravatar as fallback
+- `/api/v4/avatar?email=` replaced with users search API for email-based avatar lookups — the avatar endpoint on self-hosted instances ignores uploaded profile pictures and always returns Gravatar
+- Commit author avatar tap now opens the correct user profile — the resolved `GitLabUser` (id + username) is cached when the avatar loads; navigation uses the real user ID directly, avoiding the `searchUsers` crash that occurred when email was passed as username
+- Comment posted on a commit now appears immediately in the app without requiring a manual refresh
 
 ## [1.2.2] - 2026-07-28
 
