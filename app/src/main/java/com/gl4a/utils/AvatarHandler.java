@@ -50,6 +50,7 @@ public class AvatarHandler {
         String url;
         String email;        // used to call /api/v4/avatar?email= if primary URL fails
         String fallbackUrl;  // Gravatar URL, tried if Avatar API also fails
+        boolean apiFirst;    // true → try GitLab Avatar API before url (for email-only lookups)
         ArrayList<ViewDelegate> views;
     }
     private static final LongSparseArray<Request> sRequests = new LongSparseArray<>();
@@ -109,21 +110,54 @@ public class AvatarHandler {
 
     /**
      * Loads an avatar for a git author who has no GitLab user account (e.g. commit authors).
-     * Reuses the same 3-tier fallback as regular users: Gravatar (built from email) → GitLab
-     * Avatar API → initials. Falls back to initials immediately when email is absent.
+     * Order: GitLab Avatar API (/api/v4/avatar?email=) → Gravatar → initials.
+     * The API is tried first because it returns the actual instance profile picture; Gravatar
+     * is the fallback for authors who have no account on this instance.
      */
     public static void assignAvatarByEmail(ImageView view, String userName, String email) {
         if (email == null || email.trim().isEmpty()) {
             view.setImageDrawable(new DefaultAvatarDrawable(userName, null));
             return;
         }
-        // Derive a stable, always-positive cache key from the email hash so the
-        // assignAvatarInternal early-return guard (userId <= 0) is not triggered.
+        // Derive a stable, always-positive cache key so the userId <= 0 guard is bypassed.
         long cacheId = ((long) email.toLowerCase(java.util.Locale.ROOT).trim().hashCode()
                 & 0x7FFF_FFFFL) + 1L;
-        // Pass null URL + email: assignAvatarInternal builds the Gravatar URL from the email
-        // as the primary and stores the email for the GitLab Avatar API retry (Tier 2).
-        assignAvatarInternal(new ImageViewDelegate(view), userName, cacheId, null, email);
+
+        ImageViewDelegate delegate = new ImageViewDelegate(view);
+        removeOldRequest(delegate);
+
+        Bitmap cached = loadBitmapFromCache(view.getContext(), cacheId);
+        if (cached != null) {
+            applyAvatarToView(delegate, cached);
+            return;
+        }
+
+        view.setImageDrawable(new DefaultAvatarDrawable(userName, email));
+
+        Request existing = getRequestForId(cacheId);
+        if (existing != null) {
+            existing.views.add(delegate);
+            return;
+        }
+
+        int requestId = sNextRequestId++;
+        Request request = new Request();
+        request.id = cacheId;
+        request.url = buildGravatarUrl(email); // Gravatar as fallback when API fails
+        request.email = email;
+        request.apiFirst = true;
+        request.fallbackUrl = null;
+        request.views = new ArrayList<>();
+        request.views.add(delegate);
+        sRequests.put(requestId, request);
+
+        sHandler.removeMessages(MSG_DESTROY);
+        if (sWorkerThread == null) {
+            sWorkerThread = new HandlerThread("GravatarLoader");
+            sWorkerThread.start();
+            sWorkerHandler = new WorkerHandler(sWorkerThread.getLooper());
+        }
+        sWorkerHandler.obtainMessage(MSG_LOAD, requestId, 0, request.url).sendToTarget();
     }
 
     public static void assignAvatar(Context context, MenuItem item,
@@ -399,33 +433,51 @@ public class AvatarHandler {
                 case MSG_LOAD:
                     String url = (String) msg.obj;
                     int requestId = msg.arg1;
+                    Request req = sRequests.get(requestId);
                     Bitmap bitmap = null;
-                    try {
-                        bitmap = fetchBitmap(url);
-                    } catch (IOException e) {
-                        Request req = sRequests.get(requestId);
-                        // Tier 2: GitLab Avatar API — GET /api/v4/avatar?email=EMAIL&size=N
-                        // Works on instances where /uploads/ rejects token auth.
-                        if (bitmap == null && req != null && req.email != null) {
+                    if (req != null && req.apiFirst && req.email != null) {
+                        // Email-only path: GitLab Avatar API first (returns the real instance
+                        // profile picture), Gravatar (req.url) as fallback.
+                        try {
+                            String apiUrl = fetchAvatarUrlFromApi(req.email);
+                            if (apiUrl != null) bitmap = fetchBitmap(apiUrl);
+                        } catch (IOException e) {
+                            Log.d(TAG, "Avatar API failed for " + req.email + ", trying Gravatar");
+                        }
+                        if (bitmap == null && req.url != null) {
                             try {
-                                String apiUrl = fetchAvatarUrlFromApi(req.email);
-                                if (apiUrl != null && !apiUrl.equals(url)) {
-                                    bitmap = fetchBitmap(apiUrl);
-                                }
+                                bitmap = fetchBitmap(req.url);
                             } catch (IOException e2) {
-                                Log.d(TAG, "Avatar API fallback failed for " + req.email);
+                                Log.d(TAG, "Gravatar fallback also failed for " + req.email);
                             }
                         }
-                        // Tier 3: Gravatar by email hash
-                        if (bitmap == null && req != null && req.fallbackUrl != null) {
-                            try {
-                                bitmap = fetchBitmap(req.fallbackUrl);
-                            } catch (IOException e3) {
-                                Log.d(TAG, "Gravatar fallback also failed");
+                    } else {
+                        try {
+                            bitmap = fetchBitmap(url);
+                        } catch (IOException e) {
+                            // Tier 2: GitLab Avatar API — GET /api/v4/avatar?email=EMAIL&size=N
+                            // Works on instances where /uploads/ rejects token auth.
+                            if (req != null && req.email != null) {
+                                try {
+                                    String apiUrl = fetchAvatarUrlFromApi(req.email);
+                                    if (apiUrl != null && !apiUrl.equals(url)) {
+                                        bitmap = fetchBitmap(apiUrl);
+                                    }
+                                } catch (IOException e2) {
+                                    Log.d(TAG, "Avatar API fallback failed for " + req.email);
+                                }
                             }
-                        }
-                        if (bitmap == null) {
-                            Log.e(TAG, "All avatar sources failed for " + url, e);
+                            // Tier 3: Gravatar by email hash
+                            if (bitmap == null && req != null && req.fallbackUrl != null) {
+                                try {
+                                    bitmap = fetchBitmap(req.fallbackUrl);
+                                } catch (IOException e3) {
+                                    Log.d(TAG, "Gravatar fallback also failed");
+                                }
+                            }
+                            if (bitmap == null) {
+                                Log.e(TAG, "All avatar sources failed for " + url, e);
+                            }
                         }
                     }
                     sHandler.obtainMessage(MSG_LOADED, requestId, 0, bitmap).sendToTarget();
