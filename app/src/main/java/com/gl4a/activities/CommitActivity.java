@@ -114,6 +114,7 @@ public class CommitActivity extends BaseFragmentPagerActivity implements
     @Nullable
     @Override
     protected String getActionBarTitle() {
+        if (mObjectSha == null || mObjectSha.length() < 7) return getString(R.string.commit_title, "");
         return getString(R.string.commit_title, mObjectSha.substring(0, 7));
     }
 
@@ -138,6 +139,10 @@ public class CommitActivity extends BaseFragmentPagerActivity implements
         mPullRequestNumber = extras.getInt("mr_iid", -1);
         mInitialComment = extras.getParcelable("initial_comment");
         extras.remove("initial_comment");
+        // Guard: without a valid SHA the activity cannot load anything useful.
+        if (android.text.TextUtils.isEmpty(mObjectSha)) {
+            finish();
+        }
     }
 
     @Override

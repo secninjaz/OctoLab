@@ -77,7 +77,12 @@ public class CommitListFragment extends PagedDataBaseFragment<GitLabCommit> impl
     );
 
     public static CommitListFragment newInstance(GitLabProject repo, String ref) {
-        return newInstance(repo.owner().login(), repo.name(), repo.id(),
+        // Use path (URL-safe) not name() (display name) — path is what the API expects.
+        // pathWithNamespace handles nested groups (e.g. "group/sub/project" → owner="group/sub").
+        String ownerPath = repo.pathWithNamespace != null
+                ? repo.pathWithNamespace.substring(0, Math.max(0, repo.pathWithNamespace.lastIndexOf('/')))
+                : (repo.namespace != null ? repo.namespace.path : repo.owner().login());
+        return newInstance(ownerPath, repo.path, repo.id(),
                 StringUtils.isBlank(ref) ? repo.defaultBranch() : ref, null);
     }
 
@@ -170,8 +175,9 @@ public class CommitListFragment extends PagedDataBaseFragment<GitLabCommit> impl
 
     @Override
     public void onItemClick(GitLabCommit commit) {
+        // Pass mProjectId so CommitActivity can skip the project-path API lookup.
         Intent intent = CommitActivity.makeIntent(getActivity(),
-                mRepoOwner, mRepoName, commit.sha());
+                mRepoOwner, mRepoName, mProjectId, commit.sha());
         mCommitLauncher.launch(intent);
     }
 

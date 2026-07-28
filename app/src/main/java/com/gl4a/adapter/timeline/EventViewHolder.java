@@ -40,8 +40,10 @@ class EventViewHolder
         implements View.OnClickListener {
 
     // GitLab commit URLs: <instance>/<namespace>/<project>/-/commit/<sha>
+    // Captures the full namespace/project path before /-/commit.
+    // Using a single group + lastIndexOf split handles nested namespaces (group/sub/project).
     private static final Pattern COMMIT_URL_REPO_NAME_AND_OWNER_PATTERN =
-            Pattern.compile(".*?/([^/]+)/([^/]+)/-/commit");
+            Pattern.compile("https?://[^/]+/(.+)/-/commit");
 
     private final Context mContext;
     private final String mRepoOwner;
@@ -303,12 +305,16 @@ class EventViewHolder
         if (commitUrl != null) {
             Matcher matcher = COMMIT_URL_REPO_NAME_AND_OWNER_PATTERN.matcher(commitUrl);
             if (matcher.find()) {
-                commitRepoOwner = matcher.group(1);
-                commitRepoName = matcher.group(2);
+                String fullPath = matcher.group(1);
+                int lastSlash = fullPath != null ? fullPath.lastIndexOf('/') : -1;
+                if (lastSlash > 0) {
+                    commitRepoOwner = fullPath.substring(0, lastSlash);
+                    commitRepoName = fullPath.substring(lastSlash + 1);
+                }
             }
         }
         boolean isCommitInDifferentRepo = !mRepoOwner.equals(commitRepoOwner) || !mRepoName.equals(commitRepoName);
-        String shortCommitSha = commitId.substring(0, 7);
+        String shortCommitSha = commitId.length() >= 7 ? commitId.substring(0, 7) : commitId;
         String commitText = isCommitInDifferentRepo
                 ? commitRepoOwner + "/" + commitRepoName + "@" + shortCommitSha
                 : shortCommitSha;
