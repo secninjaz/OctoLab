@@ -124,18 +124,14 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
         final Gl4Application app = Gl4Application.get();
 
         ImageView ivGravatar = mContentView.findViewById(R.id.iv_gravatar);
-        GitLabUser author = mCommit.author();
-        if (author != null) {
-            AvatarHandler.assignAvatar(ivGravatar, author);
-        } else {
-            String email = mCommit.authorEmail;
-            ivGravatar.setImageDrawable(new AvatarHandler.DefaultAvatarDrawable(null, email));
-        }
-
-        String login = ApiHelpers.getAuthorLogin(mCommit);
-        if (login != null) {
+        if (mCommit.authorUser != null) {
+            AvatarHandler.assignAvatar(ivGravatar, mCommit.authorUser);
             ivGravatar.setOnClickListener(this);
-            ivGravatar.setTag(login);
+            ivGravatar.setTag(mCommit.authorUser);
+        } else {
+            ivGravatar.setImageDrawable(
+                    new AvatarHandler.DefaultAvatarDrawable(mCommit.authorName, mCommit.authorEmail));
+            ivGravatar.setOnClickListener(null);
         }
 
         TextView tvMessage = mContentView.findViewById(R.id.tv_message);
@@ -176,8 +172,8 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
             TextView commitExtra = mContentView.findViewById(R.id.tv_commit_extra);
 
             // GitLab doesn't provide a committer user object; use default avatar
-            ivGravatar.setImageDrawable(
-                    new AvatarHandler.DefaultAvatarDrawable(null, mCommit.committerEmail));
+            commitGravatar.setImageDrawable(
+                    new AvatarHandler.DefaultAvatarDrawable(mCommit.committerName, mCommit.committerEmail));
             String committerDate = (commitDetail != null && commitDetail.committer() != null)
                     ? commitDetail.committer().date() : null;
             String committerText = getString(R.string.commit_details,
@@ -348,7 +344,7 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
     @Override
     public void onClick(View v) {
         if (v.getId() == R.id.iv_gravatar) {
-            Intent intent = UserActivity.makeIntent(getActivity(), (String) v.getTag());
+            Intent intent = UserActivity.makeIntent(getActivity(), (GitLabUser) v.getTag());
             if (intent != null) {
                 startActivity(intent);
             }
