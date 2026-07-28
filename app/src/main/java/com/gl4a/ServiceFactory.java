@@ -68,6 +68,23 @@ public class ServiceFactory {
                     writer.value(value != null ? value : 0);
                 }
             })
+            // Treat JSON null for any primitive long field as 0 (e.g. noteable_id in activity events)
+            .add(long.class, new com.squareup.moshi.JsonAdapter<Long>() {
+                @androidx.annotation.NonNull @Override
+                public Long fromJson(@androidx.annotation.NonNull com.squareup.moshi.JsonReader reader)
+                        throws java.io.IOException {
+                    if (reader.peek() == com.squareup.moshi.JsonReader.Token.NULL) {
+                        reader.nextNull();
+                        return 0L;
+                    }
+                    return reader.nextLong();
+                }
+                @Override
+                public void toJson(@androidx.annotation.NonNull com.squareup.moshi.JsonWriter writer,
+                        Long value) throws java.io.IOException {
+                    writer.value(value != null ? value : 0L);
+                }
+            })
             .build();
 
     private static final HttpLoggingInterceptor LOGGING_INTERCEPTOR =
