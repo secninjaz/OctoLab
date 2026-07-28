@@ -184,19 +184,19 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, CommitComme
         holder.tvExtra.setText(login);
         holder.tvExtra.setTag(user);
 
-        holder.reactions.setReactions(item.reactions());
-        holder.mReactionMenuHelper.updateMenuItems();
+        // GitLab API has no award emoji endpoint for commit comments — hide reaction bar.
+        holder.reactions.setVisibility(View.GONE);
 
         String ourLogin = Gl4Application.get().getAuthLogin();
-        boolean canEdit = ApiHelpers.loginEquals(user, ourLogin)
-                || ApiHelpers.loginEquals(mRepoOwner, ourLogin);
         MenuItem editMenuItem = holder.mPopupMenu.getMenu().findItem(R.id.edit);
         MenuItem deleteMenuItem = holder.mPopupMenu.getMenu().findItem(R.id.delete);
         MenuItem reactMenuItem = holder.mPopupMenu.getMenu().findItem(R.id.react);
 
-        editMenuItem.setVisible(mActionCallback != null && canEdit);
-        deleteMenuItem.setVisible(mActionCallback != null && canEdit);
-        reactMenuItem.setVisible(mActionCallback != null && ourLogin != null);
+        // Commit comment API returns no note ID, so edit/delete/react are not supported.
+        editMenuItem.setVisible(false);
+        deleteMenuItem.setVisible(false);
+        reactMenuItem.setVisible(false);
+        holder.ivMenu.setVisibility(View.GONE);
     }
 
     @Override
@@ -279,7 +279,7 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, CommitComme
         private final TextView tvExtra;
         private final TextView tvTimestamp;
         private final TextView tvEditTimestamp;
-        private final ImageView ivMenu;
+        final ImageView ivMenu;
         private final ReactionBar reactions;
         private final PopupMenu mPopupMenu;
         private final Callback mCallback;
