@@ -50,9 +50,8 @@ public class CommitAdapter extends RootAdapter<GitLabCommit, CommitAdapter.ViewH
 
     @Override
     public void onBindViewHolder(ViewHolder holder, GitLabCommit commit) {
-        GitLabUser author = commit.author();
-        if (author != null && !TextUtils.isEmpty(author.login())) {
-            AvatarHandler.assignAvatar(holder.ivGravatar, author);
+        if (commit.authorUser != null) {
+            AvatarHandler.assignAvatar(holder.ivGravatar, commit.authorUser);
         } else {
             GitLabCommit.GitLabGitUser commitAuthor = commit.commit().author();
             String userName = commitAuthor != null ? commitAuthor.name() : null;

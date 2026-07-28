@@ -289,6 +289,9 @@ public class CommitCommentsFragment extends ListDataBaseFragment<GitLabComment> 
 
     @Override
     public void onEditorTextSent() {
+        // Reload this fragment's own list so the new comment appears immediately.
+        onRefresh();
+        // Also notify the activity so it keeps its mComments in sync.
         refreshComments();
     }
 
