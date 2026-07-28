@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-28
+
+### Added
+- My MRs: Created / Assigned / Reviews / Mentioned tabs with proper pagination
+- Reviews tab — `scope=reviews_for_me` for MRs where you are assigned as reviewer
+- Mentioned tab for MRs — Todos API (`type=MergeRequest`, pending + done)
+- MR items display `!` prefix (e.g. `!32`) in both home feed and My MRs lists
+
+### Fixed
+- MRs now open correctly — fixed `ClassCastException` (`PullRequestBranchInfoView` vs `MergeRequestBranchInfoView` in layout)
+- Fixed `Fragment already added` crash when `invalidateTabs()` was called twice during MR load
+- RxJava `UndeliverableException` no longer crashes the app when a network call completes after navigating away
+- Repository names in home feed now show correct capitalisation and `namespace/project` format
+
 ## [1.1.9] - 2026-07-27
 
 ### Fixed

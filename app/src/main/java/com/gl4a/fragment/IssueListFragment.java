@@ -166,9 +166,22 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
 
     @Override
     public void onItemClick(GitLabIssue issue) {
-        if (mIsMR && issue.webUrl != null && !issue.webUrl.isEmpty()) {
-            // Route MR items through IntentUtils → LinkParser which handles
-            // /-/merge_requests/{iid} and opens PullRequestActivity correctly.
+        if (mIsMR && issue.webUrl != null && issue.webUrl.contains("/-/merge_requests/")) {
+            // Parse webUrl: https://host/[ns.../]project/-/merge_requests/iid
+            try {
+                java.util.List<String> segs =
+                        android.net.Uri.parse(issue.webUrl).getPathSegments();
+                int dashIdx = segs.indexOf("-");
+                if (dashIdx >= 2) {
+                    // Everything before the last segment before "-" is the namespace
+                    String owner = android.text.TextUtils.join("/", segs.subList(0, dashIdx - 1));
+                    String repo  = segs.get(dashIdx - 1);
+                    startActivity(com.gl4a.activities.PullRequestActivity.makeIntent(
+                            getActivity(), owner, repo, issue.iid));
+                    return;
+                }
+            } catch (Exception ignored) {}
+            // Fallback: open in custom tab
             com.gl4a.utils.IntentUtils.openLinkInternallyOrExternally(
                     getActivity(), android.net.Uri.parse(issue.webUrl));
         } else {

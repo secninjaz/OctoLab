@@ -71,7 +71,7 @@
         android:paddingTop="@dimen/content_padding"
         android:visibility="gone" />
 
-    <com.gl4a.widget.PullRequestBranchInfoView
+    <com.gl4a.widget.MergeRequestBranchInfoView
         android:id="@+id/branch_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
