@@ -228,6 +228,120 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
         return commentsSingle;
     }
 
+    // ---- Override IssueFragmentBase API calls to use MR endpoints instead of Issue endpoints ----
+
+    @Override
+    public Single<?> onEditorDoSend(String comment) {
+        com.gl4a.gitlab.service.GitLabMergeRequestService service =
+                com.gl4a.ServiceFactory.get(com.gl4a.gitlab.service.GitLabMergeRequestService.class, false);
+        java.util.Map<String, Object> req = new java.util.HashMap<>();
+        req.put("body", comment);
+        return service.createComment(mMergeRequest.projectId, mMergeRequest.iid, req)
+                .map(com.gl4a.utils.ApiHelpers::throwOnFailure)
+                .compose(com.gl4a.utils.RxUtils::doInBackground);
+    }
+
+    @Override
+    public io.reactivex.Single<com.gl4a.gitlab.model.GitLabReaction> addReaction(
+            com.gl4a.widget.ReactionBar.Item item, String content) {
+        com.gl4a.gitlab.service.GitLabAwardEmojiService service =
+                com.gl4a.ServiceFactory.get(com.gl4a.gitlab.service.GitLabAwardEmojiService.class, false);
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("name", mapContentToEmojiName(content));
+        return service.addMergeRequestAwardEmoji(mMergeRequest.projectId, mMergeRequest.iid, body)
+                .map(r -> {
+                    if (!r.isSuccessful() || r.body() == null)
+                        throw new RuntimeException("Failed to add reaction: " + r.code());
+                    com.gl4a.gitlab.model.GitLabAwardEmoji e = r.body();
+                    com.gl4a.gitlab.model.GitLabReaction reaction = new com.gl4a.gitlab.model.GitLabReaction();
+                    reaction.id = e.id; reaction.name = e.name; reaction.user = e.user;
+                    return reaction;
+                })
+                .compose(com.gl4a.utils.RxUtils::doInBackground);
+    }
+
+    @Override
+    public io.reactivex.Single<Boolean> deleteReaction(
+            com.gl4a.widget.ReactionBar.Item item, long reactionId) {
+        com.gl4a.gitlab.service.GitLabAwardEmojiService service =
+                com.gl4a.ServiceFactory.get(com.gl4a.gitlab.service.GitLabAwardEmojiService.class, false);
+        return service.deleteMergeRequestAwardEmoji(mMergeRequest.projectId, mMergeRequest.iid, reactionId)
+                .map(r -> r.isSuccessful() || r.code() == 404)
+                .compose(com.gl4a.utils.RxUtils::doInBackground);
+    }
+
+    @Override
+    public io.reactivex.Single<java.util.List<com.gl4a.gitlab.model.GitLabReaction>> loadReactionDetails(
+            com.gl4a.widget.ReactionBar.Item item, boolean bypassCache) {
+        com.gl4a.gitlab.service.GitLabAwardEmojiService service =
+                com.gl4a.ServiceFactory.get(com.gl4a.gitlab.service.GitLabAwardEmojiService.class, bypassCache);
+        return service.getMergeRequestAwardEmojis(mMergeRequest.projectId, mMergeRequest.iid, 1, 100)
+                .map(response -> {
+                    java.util.List<com.gl4a.gitlab.model.GitLabReaction> result = new java.util.ArrayList<>();
+                    if (response.isSuccessful() && response.body() != null) {
+                        for (com.gl4a.gitlab.model.GitLabAwardEmoji e : response.body()) {
+                            com.gl4a.gitlab.model.GitLabReaction r = new com.gl4a.gitlab.model.GitLabReaction();
+                            r.id = e.id; r.name = e.name; r.user = e.user;
+                            result.add(r);
+                        }
+                    }
+                    return result;
+                })
+                .compose(com.gl4a.utils.RxUtils::doInBackground);
+    }
+
+    @Override
+    public io.reactivex.Single<java.util.List<com.gl4a.gitlab.model.GitLabReaction>> loadReactionDetails(
+            com.gl4a.gitlab.model.GitLabComment comment, boolean bypassCache) {
+        com.gl4a.gitlab.service.GitLabAwardEmojiService service =
+                com.gl4a.ServiceFactory.get(com.gl4a.gitlab.service.GitLabAwardEmojiService.class, bypassCache);
+        return service.getMergeRequestNoteAwardEmojis(
+                        mMergeRequest.projectId, mMergeRequest.iid, comment.id(), 1, 50)
+                .map(response -> {
+                    java.util.List<com.gl4a.gitlab.model.GitLabReaction> result = new java.util.ArrayList<>();
+                    if (response.isSuccessful() && response.body() != null) {
+                        for (com.gl4a.gitlab.model.GitLabAwardEmoji e : response.body()) {
+                            com.gl4a.gitlab.model.GitLabReaction r = new com.gl4a.gitlab.model.GitLabReaction();
+                            r.id = e.id; r.name = e.name; r.user = e.user;
+                            result.add(r);
+                        }
+                    }
+                    return result;
+                })
+                .compose(com.gl4a.utils.RxUtils::doInBackground);
+    }
+
+    @Override
+    public io.reactivex.Single<com.gl4a.gitlab.model.GitLabReaction> addReaction(
+            com.gl4a.gitlab.model.GitLabComment comment, String content) {
+        com.gl4a.gitlab.service.GitLabAwardEmojiService service =
+                com.gl4a.ServiceFactory.get(com.gl4a.gitlab.service.GitLabAwardEmojiService.class, false);
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("name", mapContentToEmojiName(content));
+        return service.addMergeRequestNoteAwardEmoji(
+                        mMergeRequest.projectId, mMergeRequest.iid, comment.id(), body)
+                .map(r -> {
+                    if (!r.isSuccessful() || r.body() == null)
+                        throw new RuntimeException("Failed to add reaction: " + r.code());
+                    com.gl4a.gitlab.model.GitLabAwardEmoji e = r.body();
+                    com.gl4a.gitlab.model.GitLabReaction reaction = new com.gl4a.gitlab.model.GitLabReaction();
+                    reaction.id = e.id; reaction.name = e.name; reaction.user = e.user;
+                    return reaction;
+                })
+                .compose(com.gl4a.utils.RxUtils::doInBackground);
+    }
+
+    @Override
+    public io.reactivex.Single<Boolean> deleteReaction(
+            com.gl4a.gitlab.model.GitLabComment comment, long reactionId) {
+        com.gl4a.gitlab.service.GitLabAwardEmojiService service =
+                com.gl4a.ServiceFactory.get(com.gl4a.gitlab.service.GitLabAwardEmojiService.class, false);
+        return service.deleteMergeRequestNoteAwardEmoji(
+                        mMergeRequest.projectId, mMergeRequest.iid, comment.id(), reactionId)
+                .map(r -> r.isSuccessful() || r.code() == 404)
+                .compose(com.gl4a.utils.RxUtils::doInBackground);
+    }
+
     @Override
     public void editComment(GitLabComment comment) {
         final @AttrRes int highlightColorAttr = mMergeRequest != null && mMergeRequest.isMerged()

@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-07-28
+
+### Fixed
+- MR Discussion: comments now post correctly via MR notes API (was using Issue notes API)
+- MR Discussion: emoji reactions on MR body and comments now use MR award emoji endpoints
+- My MRs → Show Closed: now includes merged MRs (state=merged) alongside rejected ones (state=closed) for Created, Assigned, and Reviews tabs
+
 ## [1.2.0] - 2026-07-28
 
 ### Added

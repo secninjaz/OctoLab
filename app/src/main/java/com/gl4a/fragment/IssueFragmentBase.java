@@ -607,7 +607,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
                 .compose(RxUtils::doInBackground);
     }
 
-    private static String mapContentToEmojiName(String content) {
+    protected static String mapContentToEmojiName(String content) {
         if (content == null) return "thumbsup";
         switch (content) {
             case "+1":      return "thumbsup";

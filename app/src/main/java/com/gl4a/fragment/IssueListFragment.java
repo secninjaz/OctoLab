@@ -164,6 +164,20 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
         }
     }
 
+    private static java.util.List<GitLabIssue> mrStubs(
+            java.util.List<com.gl4a.gitlab.model.GitLabMergeRequest> mrs) {
+        java.util.List<GitLabIssue> stubs = new java.util.ArrayList<>();
+        if (mrs == null) return stubs;
+        for (com.gl4a.gitlab.model.GitLabMergeRequest mr : mrs) {
+            GitLabIssue stub = new GitLabIssue();
+            stub.iid = mr.iid; stub.title = mr.title; stub.state = mr.state;
+            stub.author = mr.author; stub.createdAt = mr.createdAt; stub.updatedAt = mr.updatedAt;
+            stub.webUrl = mr.webUrl; stub.commentsCount = mr.commentsCount; stub.projectId = mr.projectId;
+            stubs.add(stub);
+        }
+        return stubs;
+    }
+
     @Override
     public void onItemClick(GitLabIssue issue) {
         if (mIsMR && issue.webUrl != null && issue.webUrl.contains("/-/merge_requests/")) {
@@ -228,33 +242,49 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
                         });
             }
         } else if (mIsMR && !"mentioned".equals(mScope) && !"participating".equals(mScope)) {
-            // Merge Requests tab: GET /merge_requests?scope=assigned_to_me
+            // Merge Requests REST tabs: created_by_me / assigned_to_me / reviews_for_me
+            // For the "closed" view, GitLab uses separate state=closed (rejected) and state=merged.
+            // Combine both so users see all done MRs when they tap "Show Closed".
             final GitLabMergeRequestService mrService =
                     ServiceFactory.get(GitLabMergeRequestService.class, bypassCache);
-            return mrService.listMyMergeRequests(mIssueState, mScope != null ? mScope : "assigned_to_me", page, 25)
-                    .map(response -> {
-                        if (!response.isSuccessful())
-                            return Response.<GitLabPage<GitLabIssue>>error(response.errorBody(), response.raw());
-                        // Convert MR list to issue list for display (reuse IssueAdapter)
-                        java.util.List<GitLabIssue> issues = new java.util.ArrayList<>();
-                        if (response.body() != null) {
-                            for (com.gl4a.gitlab.model.GitLabMergeRequest mr : response.body()) {
-                                GitLabIssue stub = new GitLabIssue();
-                                stub.iid = mr.iid;
-                                stub.title = mr.title;
-                                stub.state = mr.state;
-                                stub.author = mr.author;
-                                stub.createdAt = mr.createdAt;
-                                stub.updatedAt = mr.updatedAt;
-                                stub.webUrl = mr.webUrl;
-                                stub.commentsCount = mr.commentsCount;
-                                stub.projectId = mr.projectId;
-                                issues.add(stub);
-                            }
-                        }
-                        return Response.success(ApiHelpers.toPage(
-                                retrofit2.Response.success(issues, response.headers())));
+            final String scope = mScope != null ? mScope : "assigned_to_me";
+            final boolean showingClosed = "closed".equals(mIssueState);
+
+            if (!showingClosed) {
+                // Open MRs: straightforward single call
+                return mrService.listMyMergeRequests(mIssueState, scope, page, 25)
+                        .map(response -> {
+                            if (!response.isSuccessful())
+                                return Response.<GitLabPage<GitLabIssue>>error(response.errorBody(), response.raw());
+                            return Response.success(ApiHelpers.toPage(
+                                    retrofit2.Response.success(mrStubs(response.body()), response.headers())));
+                        });
+            } else {
+                // Closed view: combine state=closed (rejected) and state=merged
+                Single<Response<java.util.List<com.gl4a.gitlab.model.GitLabMergeRequest>>> closedCall =
+                        mrService.listMyMergeRequests("closed", scope, page, 25)
+                                .onErrorReturn(e -> retrofit2.Response.success(new java.util.ArrayList<>()));
+                Single<Response<java.util.List<com.gl4a.gitlab.model.GitLabMergeRequest>>> mergedCall =
+                        mrService.listMyMergeRequests("merged", scope, page, 25)
+                                .onErrorReturn(e -> retrofit2.Response.success(new java.util.ArrayList<>()));
+                return Single.zip(closedCall, mergedCall,
+                        (Response<java.util.List<com.gl4a.gitlab.model.GitLabMergeRequest>> c,
+                         Response<java.util.List<com.gl4a.gitlab.model.GitLabMergeRequest>> m) -> {
+                    java.util.List<com.gl4a.gitlab.model.GitLabMergeRequest> combined = new java.util.ArrayList<>();
+                    if (c.isSuccessful() && c.body() != null) combined.addAll(c.body());
+                    if (m.isSuccessful() && m.body() != null) combined.addAll(m.body());
+                    combined.sort((a, b) -> {
+                        String da = a.updatedAt != null ? a.updatedAt : "";
+                        String db = b.updatedAt != null ? b.updatedAt : "";
+                        return db.compareTo(da);
                     });
+                    boolean hasMore = (c.isSuccessful() && c.body() != null && c.body().size() >= 25)
+                            || (m.isSuccessful() && m.body() != null && m.body().size() >= 25);
+                    return Response.success(new GitLabPage<>(
+                            mrStubs(combined), page, hasMore ? page + 1 : 0,
+                            hasMore ? page + 2 : page, combined.size()));
+                });
+            }
         } else if ("mentioned".equals(mScope) || "participating".equals(mScope)) {
             // Mentioned / Participating via GitLab Todos API.
             // Strategy confirmed by Grok: standard offset pagination (page + per_page).
