@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-07-28
+
+### Fixed
+- Your Activity: fixed crash parsing GitLab event responses where `noteable_id` is null — added Moshi null→0 adapter for primitive `long` fields
+
 ## [1.2.1] - 2026-07-28
 
 ### Fixed
