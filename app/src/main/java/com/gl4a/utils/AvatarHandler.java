@@ -109,19 +109,21 @@ public class AvatarHandler {
 
     /**
      * Loads an avatar for a git author who has no GitLab user account (e.g. commit authors).
-     * Uses a Gravatar lookup keyed on the email address. Falls back to initials when email is null.
+     * Reuses the same 3-tier fallback as regular users: Gravatar (built from email) → GitLab
+     * Avatar API → initials. Falls back to initials immediately when email is absent.
      */
     public static void assignAvatarByEmail(ImageView view, String userName, String email) {
-        String gravatarUrl = buildGravatarUrl(email);
-        if (gravatarUrl == null) {
-            view.setImageDrawable(new DefaultAvatarDrawable(userName, email));
+        if (email == null || email.trim().isEmpty()) {
+            view.setImageDrawable(new DefaultAvatarDrawable(userName, null));
             return;
         }
         // Derive a stable, always-positive cache key from the email hash so the
         // assignAvatarInternal early-return guard (userId <= 0) is not triggered.
         long cacheId = ((long) email.toLowerCase(java.util.Locale.ROOT).trim().hashCode()
                 & 0x7FFF_FFFFL) + 1L;
-        assignAvatarInternal(new ImageViewDelegate(view), userName, cacheId, gravatarUrl, null);
+        // Pass null URL + email: assignAvatarInternal builds the Gravatar URL from the email
+        // as the primary and stores the email for the GitLab Avatar API retry (Tier 2).
+        assignAvatarInternal(new ImageViewDelegate(view), userName, cacheId, null, email);
     }
 
     public static void assignAvatar(Context context, MenuItem item,
