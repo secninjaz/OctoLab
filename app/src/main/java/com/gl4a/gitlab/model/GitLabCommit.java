@@ -43,6 +43,7 @@ public class GitLabCommit implements Parcelable {
         GitLabUser u = new GitLabUser();
         u.username = authorEmail;
         u.name = authorName;
+        u.email = authorEmail;
         return u;
     }
 

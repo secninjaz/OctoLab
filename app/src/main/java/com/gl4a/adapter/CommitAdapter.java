@@ -19,7 +19,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Typeface;
 import androidx.recyclerview.widget.RecyclerView;
-import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -50,14 +49,7 @@ public class CommitAdapter extends RootAdapter<GitLabCommit, CommitAdapter.ViewH
 
     @Override
     public void onBindViewHolder(ViewHolder holder, GitLabCommit commit) {
-        if (commit.authorUser != null) {
-            AvatarHandler.assignAvatar(holder.ivGravatar, commit.authorUser);
-        } else {
-            GitLabCommit.GitLabGitUser commitAuthor = commit.commit().author();
-            String userName = commitAuthor != null ? commitAuthor.name() : null;
-            String email = commitAuthor != null ? commitAuthor.email() : null;
-            AvatarHandler.assignAvatarByEmail(holder.ivGravatar, userName, email);
-        }
+        AvatarHandler.assignAvatar(holder.ivGravatar, commit.author());
         holder.ivGravatar.setTag(commit);
 
         String message = commit.commit().message();

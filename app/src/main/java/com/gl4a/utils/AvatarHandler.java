@@ -95,8 +95,17 @@ public class AvatarHandler {
     };
 
     public static void assignAvatar(ImageView view, GitLabUser user) {
-        if (user == null || user.id() == 0L) {
+        if (user == null) {
             assignAvatarInternal(new ImageViewDelegate(view), null, 0, null, null);
+            return;
+        }
+        if (user.id() == 0L) {
+            // No user ID — use email-based lookup (GitLab Avatar API → Gravatar) if available.
+            if (user.email != null && !user.email.isEmpty()) {
+                assignAvatarByEmail(view, user.name != null ? user.name : user.login(), user.email);
+            } else {
+                assignAvatarInternal(new ImageViewDelegate(view), null, 0, null, null);
+            }
             return;
         }
         // Pass email so we can fall back to Gravatar if the instance avatar fails.
