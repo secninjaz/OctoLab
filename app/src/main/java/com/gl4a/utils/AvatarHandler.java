@@ -282,6 +282,40 @@ public class AvatarHandler {
     }
 
     /**
+     * Calls GET /api/v4/users?search=EMAIL&per_page=1.
+     * Returns the first matching user's avatar_url — this is the actual uploaded profile picture,
+     * unlike /api/v4/avatar?email= which ignores uploaded avatars on some instances and returns
+     * a Gravatar URL regardless.
+     */
+    private static String fetchUserAvatarByEmail(String email) throws IOException {
+        com.gl4a.Gl4Application app = com.gl4a.Gl4Application.get();
+        String apiUrl = app.getApiBaseUrl() + "users?search="
+                + android.net.Uri.encode(email) + "&per_page=1";
+
+        OkHttpClient client = ServiceFactory.getImageHttpClient();
+        okhttp3.Request request = new okhttp3.Request.Builder().url(apiUrl).build();
+
+        try (okhttp3.Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) throw new IOException("Users API HTTP " + response.code());
+            okhttp3.ResponseBody body = response.body();
+            if (body == null) throw new IOException("Empty Users API body");
+            String json = body.string();
+            // Response is an array: [{"id":N,"avatar_url":"..."},...] or []
+            if (json.trim().startsWith("[]") || !json.contains("avatar_url")) return null;
+            int keyIdx = json.indexOf("\"avatar_url\":\"");
+            if (keyIdx < 0) return null;
+            int start = keyIdx + 14;
+            int end = json.indexOf("\"", start);
+            if (end <= start) return null;
+            String avatarUrl = json.substring(start, end)
+                    .replace("\\u0026", "&")
+                    .replace("\\/", "/");
+            // Ignore Gravatar results — we'll use our own Gravatar fallback with correct sizing
+            return avatarUrl.contains("gravatar.com") ? null : avatarUrl;
+        }
+    }
+
+    /**
      * Calls GET /api/v4/avatar?email=EMAIL&size=N (authenticated via sImageHttpClient interceptor).
      * Returns the avatar_url from the JSON response, which is always an accessible URL
      * (Gravatar or GitLab-CDN), bypassing /uploads/ auth restrictions.
@@ -445,13 +479,13 @@ public class AvatarHandler {
                     Request req = sRequests.get(requestId);
                     Bitmap bitmap = null;
                     if (req != null && req.apiFirst && req.email != null) {
-                        // Email-only path: GitLab Avatar API first (returns the real instance
-                        // profile picture), Gravatar (req.url) as fallback.
+                        // Email-only path: user search first (returns actual uploaded avatar),
+                        // then Gravatar (req.url) as fallback.
                         try {
-                            String apiUrl = fetchAvatarUrlFromApi(req.email);
-                            if (apiUrl != null) bitmap = fetchBitmap(apiUrl);
+                            String userAvatarUrl = fetchUserAvatarByEmail(req.email);
+                            if (userAvatarUrl != null) bitmap = fetchBitmap(userAvatarUrl);
                         } catch (IOException e) {
-                            Log.d(TAG, "Avatar API failed for " + req.email + ", trying Gravatar");
+                            Log.d(TAG, "User search failed for " + req.email + ", trying Gravatar");
                         }
                         if (bitmap == null && req.url != null) {
                             try {
