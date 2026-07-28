@@ -129,8 +129,7 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
             ivGravatar.setOnClickListener(this);
             ivGravatar.setTag(mCommit.authorUser);
         } else {
-            ivGravatar.setImageDrawable(
-                    new AvatarHandler.DefaultAvatarDrawable(mCommit.authorName, mCommit.authorEmail));
+            AvatarHandler.assignAvatarByEmail(ivGravatar, mCommit.authorName, mCommit.authorEmail);
             ivGravatar.setOnClickListener(null);
         }
 
