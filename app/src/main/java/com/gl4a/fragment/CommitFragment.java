@@ -124,12 +124,11 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
         final Gl4Application app = Gl4Application.get();
 
         ImageView ivGravatar = mContentView.findViewById(R.id.iv_gravatar);
+        AvatarHandler.assignAvatar(ivGravatar, mCommit.author());
         if (mCommit.authorUser != null) {
-            AvatarHandler.assignAvatar(ivGravatar, mCommit.authorUser);
             ivGravatar.setOnClickListener(this);
             ivGravatar.setTag(mCommit.authorUser);
         } else {
-            AvatarHandler.assignAvatarByEmail(ivGravatar, mCommit.authorName, mCommit.authorEmail);
             ivGravatar.setOnClickListener(null);
         }
 
