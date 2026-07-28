@@ -12,6 +12,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Commit link regex in Your Activity now correctly handles projects under nested groups (e.g. `group/subgroup/project`)
 - Commit list item tap now passes the project ID directly so the activity skips the redundant project-path API lookup
 - Commit list uses the URL-safe `path` field (not the display `name`) so project lookup works even when the project name contains capital letters
+- Fixed `NullPointerException` crash in `CommitFragment.fillStatsFromDiffs` when diffs loaded before the fragment view was created — deferred to `onViewCreated`
 
 ## [1.2.2] - 2026-07-28
 

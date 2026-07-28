@@ -65,6 +65,10 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
     private List<GitLabComment> mComments;
     protected View mContentView;
 
+    // Diffs that arrived before onCreateView — applied in onViewCreated.
+    private List<GitLabDiff> mPendingDiffs;
+    private List<GitLabComment> mPendingDiffComments;
+
     private final ActivityResultLauncher<Intent> mDiffViewerLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             new ActivityResultHelpers.ActivityResultSuccessCallback(() -> {
@@ -94,6 +98,11 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         populateUiIfReady();
+        if (mPendingDiffs != null) {
+            fillStatsFromDiffs(mPendingDiffs, mPendingDiffComments);
+            mPendingDiffs = null;
+            mPendingDiffComments = null;
+        }
     }
 
     @Override
@@ -207,6 +216,11 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
     }
 
     public void fillStatsFromDiffs(List<GitLabDiff> diffs, List<GitLabComment> comments) {
+        if (mContentView == null) {
+            mPendingDiffs = diffs;
+            mPendingDiffComments = comments;
+            return;
+        }
         LinearLayout llChanged = mContentView.findViewById(R.id.ll_changed);
         LinearLayout llAdded = mContentView.findViewById(R.id.ll_added);
         LinearLayout llRenamed = mContentView.findViewById(R.id.ll_renamed);
