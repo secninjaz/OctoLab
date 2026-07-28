@@ -476,7 +476,9 @@ public static Intent makeIntent(Context context, String repoOwner, String repoNa
                     mIsCollaborator = result.second;
                     fillHeader();
                     setContentShown(true);
-                    invalidateTabs();
+                    // Guard against "Fragment already added" if invalidateTabs was
+                    // already called (e.g. from onRefresh before load completes)
+                    try { invalidateTabs(); } catch (IllegalStateException ignored) {}
                     updateFabVisibility();
                     supportInvalidateOptionsMenu();
 

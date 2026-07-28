@@ -29,9 +29,20 @@ public class RepositoryIssueAdapter extends IssueAdapter {
     public void onBindViewHolder(ViewHolder holder, GitLabIssue issue) {
         super.onBindViewHolder(holder, issue);
 
-        // https://api.github.com/repos/batterseapower/pinyin-toolkit/issues/132
-        String[] urlPart = issue.url().split("/");
-        holder.tvNumber.setText(mContext.getString(R.string.repo_issue_on,
-                issue.number(), urlPart[4], urlPart[5]));
+        // GitLab webUrl: https://host/namespace/project/-/issues/{iid}
+        //                https://host/namespace/project/-/merge_requests/{iid}
+        boolean isMR = issue.webUrl != null && issue.webUrl.contains("/-/merge_requests/");
+        String prefix = isMR ? "!" : "#";
+        String repoDisplay = "";
+        if (issue.webUrl != null) {
+            try {
+                java.util.List<String> segs =
+                        android.net.Uri.parse(issue.webUrl).getPathSegments();
+                // segs: [namespace, project, -, issues/merge_requests, iid]
+                if (segs.size() >= 2) repoDisplay = segs.get(0) + "/" + segs.get(1);
+            } catch (Exception ignored) {}
+        }
+        holder.tvNumber.setText(prefix + issue.number()
+                + (repoDisplay.isEmpty() ? "" : " on " + repoDisplay));
     }
 }

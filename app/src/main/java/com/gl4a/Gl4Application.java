@@ -66,6 +66,16 @@ public class Gl4Application extends Application implements
         com.gl4a.utils.DebugLogger.get().init(this);
         ServiceFactory.initClient(this);
         updateNotificationWorker(prefs);
+
+        // RxJava 2: swallow UndeliverableException (error arrives after subscriber is disposed,
+        // e.g. user navigated away while a network call was in flight). Re-throw real crashes.
+        io.reactivex.plugins.RxJavaPlugins.setErrorHandler(error -> {
+            if (error instanceof io.reactivex.exceptions.UndeliverableException) return;
+            if (error instanceof InterruptedException) return;
+            Thread currentThread = Thread.currentThread();
+            Thread.UncaughtExceptionHandler handler = currentThread.getUncaughtExceptionHandler();
+            if (handler != null) handler.uncaughtException(currentThread, error);
+        });
     }
 
     private void updateNotificationWorker(SharedPreferences prefs) {
