@@ -51,8 +51,11 @@ import java.util.Set;
 
 import io.reactivex.Single;
 
-public class CommitCommentAdapter extends RootAdapter<GitLabComment, CommitCommentAdapter.ViewHolder>
+public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerView.ViewHolder>
         implements ReactionBar.Callback, ReactionBar.ReactionDetailsCache.Listener {
+
+    private static final int VIEW_TYPE_COMMENT = CUSTOM_VIEW_TYPE_START;
+    private static final int VIEW_TYPE_SYSTEM_NOTE = CUSTOM_VIEW_TYPE_START + 1;
     public interface OnCommentAction {
         void editComment(GitLabComment comment);
         void deleteComment(GitLabComment comment);
@@ -151,7 +154,16 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, CommitComme
     }
 
     @Override
-    public ViewHolder onCreateViewHolder(LayoutInflater inflater, ViewGroup parent, int viewType) {
+    protected int getItemViewType(GitLabComment item) {
+        return item.isSystemNote() ? VIEW_TYPE_SYSTEM_NOTE : VIEW_TYPE_COMMENT;
+    }
+
+    @Override
+    public RecyclerView.ViewHolder onCreateViewHolder(LayoutInflater inflater, ViewGroup parent, int viewType) {
+        if (viewType == VIEW_TYPE_SYSTEM_NOTE) {
+            View v = inflater.inflate(R.layout.row_system_note, parent, false);
+            return new SystemNoteViewHolder(v);
+        }
         View v = inflater.inflate(R.layout.row_timeline_comment, parent, false);
         ViewHolder holder = new ViewHolder(v, mHolderCallback, this, mReactionDetailsCache);
         holder.ivGravatar.setOnClickListener(this);
@@ -160,7 +172,15 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, CommitComme
     }
 
     @Override
-    public void onBindViewHolder(ViewHolder holder, GitLabComment item) {
+    public void onBindViewHolder(RecyclerView.ViewHolder holder, GitLabComment item) {
+        if (holder instanceof SystemNoteViewHolder) {
+            ((SystemNoteViewHolder) holder).bind(item);
+            return;
+        }
+        bindComment((ViewHolder) holder, item);
+    }
+
+    private void bindComment(ViewHolder holder, GitLabComment item) {
         final GitLabUser user = item.user();
         final Date createdAt = item.createdAtDate();
         final Date updatedAt = item.updatedAtDate();
@@ -171,12 +191,8 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, CommitComme
         holder.ivGravatar.setTag(user);
 
         holder.tvTimestamp.setText(StringUtils.formatRelativeTime(mContext, createdAt, true));
-        if (createdAt == null || createdAt.equals(updatedAt)) {
-            holder.tvEditTimestamp.setVisibility(View.GONE);
-        } else {
-            holder.tvEditTimestamp.setText(StringUtils.formatRelativeTime(mContext, updatedAt, true));
-            holder.tvEditTimestamp.setVisibility(View.VISIBLE);
-        }
+        // Commit comments cannot be edited (no note ID), so never show the edit timestamp.
+        holder.tvEditTimestamp.setVisibility(View.GONE);
 
         // Commit comments have no API id (id=0 for all). Use createdAt as a unique
         // cache key so each comment gets its own ObjectInfo in HttpImageGetter.
@@ -233,6 +249,29 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, CommitComme
         holder.reactions.setReactions(reactions);
         if (holder.mReactionMenuHelper != null) {
             holder.mReactionMenuHelper.updateMenuItems();
+        }
+    }
+
+    static class SystemNoteViewHolder extends RecyclerView.ViewHolder {
+        private final android.widget.TextView tvNote;
+        private final android.widget.TextView tvTimestamp;
+
+        SystemNoteViewHolder(View itemView) {
+            super(itemView);
+            tvNote = itemView.findViewById(R.id.tv_system_note);
+            tvTimestamp = itemView.findViewById(R.id.tv_timestamp);
+        }
+
+        void bind(GitLabComment item) {
+            GitLabUser author = item.user();
+            String body = item.body() != null ? item.body() : "";
+            if (author != null && author.name() != null && !author.name().isEmpty()) {
+                tvNote.setText(author.name() + " " + body);
+            } else {
+                tvNote.setText(body);
+            }
+            tvTimestamp.setText(StringUtils.formatRelativeTime(
+                    itemView.getContext(), item.createdAtDate(), true));
         }
     }
 
