@@ -415,8 +415,14 @@ public class IssueActivity extends BaseActivity implements
                 : SingleFactory.getProjectId(mRepoOwner, mRepoName)
                         .doOnSuccess(id -> mProjectId = id);
         projectIdSingle
-                .flatMap(pid -> service.getIssue(pid, mIssueNumber)
-                        .map(ApiHelpers::throwOnFailure))
+                .flatMap(pid -> service.getIssueWithLabels(pid, mIssueNumber, true)
+                        .map(ApiHelpers::throwOnFailure)
+                        .map(issues -> {
+                            if (issues == null || issues.isEmpty()) {
+                                throw new RuntimeException("Issue not found: " + mIssueNumber);
+                            }
+                            return issues.get(0);
+                        }))
                 .compose(makeLoaderSingle(ID_LOADER_ISSUE, force))
                 .subscribe(result -> {
                     mIssue = result;
