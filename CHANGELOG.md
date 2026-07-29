@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-07-29
+
+### Fixed
+- Commit comments: cross-reference updates ("mentioned in issue #N") now render as minimal update rows (no avatar, no menu) matching the issue timeline style — previously showed as regular comment rows
+- Commit comments: switched from `/comments` to `/discussions` API so the `system` flag is available; the old endpoint always returned `system=null`
+- Commit comments: removed spurious edit-timestamp pencil icon (commits cannot be edited)
+- Issue label colours now show in the issue list, detail view, and all My Issues tabs (Created, Assigned, Mentioned, Participating)
+- Todos API and other endpoints always return labels as plain strings; added a Moshi adapter that handles both string and object label arrays so parsing no longer crashes
+- Detail view label colours: the single-issue endpoint ignores `with_labels_details`; switched to the list endpoint with `iids[]` filter which does honour it
+- Back-navigation crash from detailed issue: `GitLabLabel` Parcelable wrote null `Integer` fields without a null guard, causing NPE when Android saved instance state; fixed with `-1` sentinel
+- Mentioned/Participating tabs: label colours now enriched after loading from Todos API by batch-fetching issues per project with `with_labels_details=true`
+
 ## [1.2.3] - 2026-07-28
 
 ### Fixed
