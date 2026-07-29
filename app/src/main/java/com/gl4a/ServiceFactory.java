@@ -85,6 +85,61 @@ public class ServiceFactory {
                     writer.value(value != null ? value : 0L);
                 }
             })
+            // Parse GitLabLabel lists that may be either string arrays (Todos API, no
+            // with_labels_details) or object arrays (issue endpoints with with_labels_details=true).
+            .add(
+                com.squareup.moshi.Types.newParameterizedType(java.util.List.class,
+                        com.gl4a.gitlab.model.GitLabLabel.class),
+                new com.squareup.moshi.JsonAdapter<java.util.List<com.gl4a.gitlab.model.GitLabLabel>>() {
+                    @androidx.annotation.NonNull @Override
+                    public java.util.List<com.gl4a.gitlab.model.GitLabLabel> fromJson(
+                            @androidx.annotation.NonNull com.squareup.moshi.JsonReader reader)
+                            throws java.io.IOException {
+                        java.util.List<com.gl4a.gitlab.model.GitLabLabel> result = new java.util.ArrayList<>();
+                        reader.beginArray();
+                        while (reader.hasNext()) {
+                            com.squareup.moshi.JsonReader.Token token = reader.peek();
+                            if (token == com.squareup.moshi.JsonReader.Token.STRING) {
+                                com.gl4a.gitlab.model.GitLabLabel label =
+                                        new com.gl4a.gitlab.model.GitLabLabel();
+                                label.name = reader.nextString();
+                                result.add(label);
+                            } else if (token == com.squareup.moshi.JsonReader.Token.BEGIN_OBJECT) {
+                                reader.beginObject();
+                                com.gl4a.gitlab.model.GitLabLabel label =
+                                        new com.gl4a.gitlab.model.GitLabLabel();
+                                while (reader.hasNext()) {
+                                    String key = reader.nextName();
+                                    switch (key) {
+                                        case "name": label.name = reader.nextString(); break;
+                                        case "color": label.color = reader.nextString(); break;
+                                        case "text_color": label.textColor = reader.nextString(); break;
+                                        default: reader.skipValue(); break;
+                                    }
+                                }
+                                reader.endObject();
+                                result.add(label);
+                            } else {
+                                reader.skipValue();
+                            }
+                        }
+                        reader.endArray();
+                        return result;
+                    }
+                    @Override
+                    public void toJson(
+                            @androidx.annotation.NonNull com.squareup.moshi.JsonWriter writer,
+                            java.util.List<com.gl4a.gitlab.model.GitLabLabel> value)
+                            throws java.io.IOException {
+                        writer.beginArray();
+                        if (value != null) {
+                            for (com.gl4a.gitlab.model.GitLabLabel l : value) {
+                                writer.value(l.name);
+                            }
+                        }
+                        writer.endArray();
+                    }
+                })
             .build();
 
     private static final HttpLoggingInterceptor LOGGING_INTERCEPTOR =

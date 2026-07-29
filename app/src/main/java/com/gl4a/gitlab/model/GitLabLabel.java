@@ -35,8 +35,10 @@ public class GitLabLabel implements Parcelable {
         color = in.readString();
         textColor = in.readString();
         description = in.readString();
-        openIssuesCount = in.readInt();
-        closedIssuesCount = in.readInt();
+        int raw = in.readInt();
+        openIssuesCount = raw == -1 ? null : raw;
+        raw = in.readInt();
+        closedIssuesCount = raw == -1 ? null : raw;
     }
 
     @Override
@@ -46,8 +48,8 @@ public class GitLabLabel implements Parcelable {
         dest.writeString(color);
         dest.writeString(textColor);
         dest.writeString(description);
-        dest.writeInt(openIssuesCount);
-        dest.writeInt(closedIssuesCount);
+        dest.writeInt(openIssuesCount != null ? openIssuesCount : -1);
+        dest.writeInt(closedIssuesCount != null ? closedIssuesCount : -1);
     }
 
     @Override

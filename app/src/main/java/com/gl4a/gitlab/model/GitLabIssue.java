@@ -19,7 +19,7 @@ public class GitLabIssue implements Parcelable {
     @Json(name = "author") public GitLabUser author;
     @Json(name = "assignees") public List<GitLabUser> assignees;
     @Json(name = "assignee") public GitLabUser assignee;
-    @Json(name = "labels") public List<String> labelNames;
+    @Json(name = "labels") public List<GitLabLabel> labelNames;
     @Json(name = "milestone") public GitLabMilestone milestone;
     @Json(name = "created_at") public String createdAt;
     @Json(name = "updated_at") public String updatedAt;
@@ -62,16 +62,9 @@ public class GitLabIssue implements Parcelable {
     public String bodyHtml() { return com.gl4a.utils.HtmlUtils.markdownToHtml(description); }
     public GitLabReactions reactions() { return null; }
 
-    /** Returns labels as GitLabLabel objects using labelNames. */
+    /** Returns labels with colour data (populated when fetched with with_labels_details=true). */
     public List<GitLabLabel> labels() {
-        if (labelNames == null) return Collections.emptyList();
-        List<GitLabLabel> result = new ArrayList<>();
-        for (String name : labelNames) {
-            GitLabLabel label = new GitLabLabel();
-            label.name = name;
-            result.add(label);
-        }
-        return result;
+        return labelNames != null ? labelNames : Collections.emptyList();
     }
 
     public GitLabIssue() {}
@@ -87,7 +80,7 @@ public class GitLabIssue implements Parcelable {
         assignee = in.readParcelable(GitLabUser.class.getClassLoader());
         closedBy = in.readParcelable(GitLabUser.class.getClassLoader());
         assignees = in.createTypedArrayList(GitLabUser.CREATOR);
-        labelNames = in.createStringArrayList();
+        labelNames = in.createTypedArrayList(GitLabLabel.CREATOR);
         createdAt = in.readString();
         updatedAt = in.readString();
         closedAt = in.readString();
@@ -128,7 +121,7 @@ public class GitLabIssue implements Parcelable {
         dest.writeParcelable(assignee, flags);
         dest.writeParcelable(closedBy, flags);
         dest.writeTypedList(assignees);
-        dest.writeStringList(labelNames);
+        dest.writeTypedList(labelNames);
         dest.writeString(createdAt);
         dest.writeString(updatedAt);
         dest.writeString(closedAt);

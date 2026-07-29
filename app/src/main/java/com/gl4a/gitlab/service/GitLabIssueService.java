@@ -32,7 +32,8 @@ public interface GitLabIssueService {
             @Query("per_page") int perPage,
             @Query("order_by") String orderBy,
             @Query("sort") String sort,
-            @Query("search") String search
+            @Query("search") String search,
+            @Query("with_labels_details") boolean withLabelsDetails
     );
 
     // state must be "opened" or "closed" — GitLab API v4 does not accept "open"
@@ -41,13 +42,32 @@ public interface GitLabIssueService {
             @Query("state") String state,       // "opened" | "closed" | "all"
             @Query("scope") String scope,
             @Query("page") int page,
-            @Query("per_page") int perPage
+            @Query("per_page") int perPage,
+            @Query("with_labels_details") boolean withLabelsDetails
     );
 
     @GET("projects/{id}/issues/{iid}")
     Single<Response<GitLabIssue>> getIssue(
             @Path("id") long projectId,
             @Path("iid") int iid
+    );
+
+    // Use the list endpoint with iids[] filter so with_labels_details is honoured.
+    // The single-issue endpoint ignores with_labels_details.
+    @GET("projects/{id}/issues")
+    Single<Response<List<GitLabIssue>>> getIssueWithLabels(
+            @Path("id") long projectId,
+            @Query("iids[]") int iid,
+            @Query("with_labels_details") boolean withLabelsDetails
+    );
+
+    // Batch fetch multiple issues by iid for label colour enrichment.
+    @GET("projects/{id}/issues")
+    Single<Response<List<GitLabIssue>>> getIssuesByIids(
+            @Path("id") long projectId,
+            @Query("iids[]") java.util.List<Integer> iids,
+            @Query("with_labels_details") boolean withLabelsDetails,
+            @Query("per_page") int perPage
     );
 
     // Body should use "assignee_ids" (int array), not "assignee_id" (scalar)

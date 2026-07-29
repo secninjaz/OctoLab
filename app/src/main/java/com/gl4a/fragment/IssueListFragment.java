@@ -223,7 +223,7 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
             String state = mIssueState != null ? mIssueState : "opened";
             if (mProjectId > 0) {
                 return service.listIssues(mProjectId, state,
-                        mFilterLabel, mFilterMilestone, mFilterAssignee, page, 25, mSortMode, mOrder, mQuery)
+                        mFilterLabel, mFilterMilestone, mFilterAssignee, page, 25, mSortMode, mOrder, mQuery, true)
                         .map(response -> {
                             if (response.isSuccessful())
                                 return Response.success(ApiHelpers.toPage(response));
@@ -234,7 +234,7 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
                 return SingleFactory.getProjectId(mRepoOwner, mRepoName)
                         .doOnSuccess(id -> mProjectId = id)
                         .flatMap(id -> service.listIssues(id, state,
-                                mFilterLabel, mFilterMilestone, mFilterAssignee, page, 25, mSortMode, mOrder, mQuery))
+                                mFilterLabel, mFilterMilestone, mFilterAssignee, page, 25, mSortMode, mOrder, mQuery, true))
                         .map(response -> {
                             if (response.isSuccessful())
                                 return Response.success(ApiHelpers.toPage(response));
@@ -356,6 +356,47 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
                 // Sort most recently notified first
                 issues.sort((a, b) ->
                         latestDate.getOrDefault(b.id, "").compareTo(latestDate.getOrDefault(a.id, "")));
+                // Enrich label colours: Todos API returns labels as plain strings.
+                // Group issues by projectId and fetch label details in one call per project.
+                java.util.Map<Long, java.util.List<Integer>> iidsByProject = new java.util.LinkedHashMap<>();
+                for (GitLabIssue issue : issues) {
+                    if (issue.projectId > 0 && issue.labelNames != null && !issue.labelNames.isEmpty()) {
+                        iidsByProject.computeIfAbsent(issue.projectId,
+                                k -> new java.util.ArrayList<>()).add(issue.iid);
+                    }
+                }
+                if (!iidsByProject.isEmpty()) {
+                    GitLabIssueService labelService =
+                            ServiceFactory.get(GitLabIssueService.class, false);
+                    // Build projectId → (iid → labelList) map from batch fetches
+                    java.util.Map<Long, java.util.Map<Integer, java.util.List<com.gl4a.gitlab.model.GitLabLabel>>>
+                            labelMap = new java.util.HashMap<>();
+                    for (java.util.Map.Entry<Long, java.util.List<Integer>> entry
+                            : iidsByProject.entrySet()) {
+                        try {
+                            retrofit2.Response<java.util.List<GitLabIssue>> resp =
+                                    labelService.getIssuesByIids(
+                                            entry.getKey(), entry.getValue(), true, 100)
+                                            .blockingGet();
+                            if (resp.isSuccessful() && resp.body() != null) {
+                                java.util.Map<Integer, java.util.List<com.gl4a.gitlab.model.GitLabLabel>> m =
+                                        new java.util.HashMap<>();
+                                for (GitLabIssue ei : resp.body()) {
+                                    if (ei.labelNames != null) m.put(ei.iid, ei.labelNames);
+                                }
+                                labelMap.put(entry.getKey(), m);
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                    // Apply enriched labels back to the todo issues
+                    for (GitLabIssue issue : issues) {
+                        java.util.Map<Integer, java.util.List<com.gl4a.gitlab.model.GitLabLabel>> m =
+                                labelMap.get(issue.projectId);
+                        if (m != null && m.containsKey(issue.iid)) {
+                            issue.labelNames = m.get(issue.iid);
+                        }
+                    }
+                }
                 // Pagination: if any sub-call returned a full page, assume there is a next page
                 boolean hasMore = maxPageSize >= PER_PAGE;
                 return Response.success(new GitLabPage<>(
@@ -366,7 +407,7 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
             // Personal issues: GET /issues?scope=assigned_to_me&state=opened
             final GitLabIssueService service = ServiceFactory.get(GitLabIssueService.class, bypassCache);
             String state = mIssueState != null ? mIssueState : "opened";
-            return service.listMyIssues(state, mScope, page, 25)
+            return service.listMyIssues(state, mScope, page, 25, true)
                     .map(response -> {
                         if (response.isSuccessful())
                             return Response.success(ApiHelpers.toPage(response));

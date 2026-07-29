@@ -50,7 +50,7 @@ public class IssueAdapter extends RootAdapter<GitLabIssue, IssueAdapter.ViewHold
         AvatarHandler.assignAvatar(holder.ivGravatar, issue.user());
         holder.ivGravatar.setTag(issue);
 
-        holder.lvLabels.setLabelNames(issue.labelNames);
+        holder.lvLabels.setLabels(issue.labels());
         // Use ! prefix for MRs (detected via webUrl), # for issues
         String numPrefix = issue.webUrl != null && issue.webUrl.contains("/-/merge_requests/") ? "!" : "#";
         holder.tvNumber.setText(numPrefix + issue.number());
