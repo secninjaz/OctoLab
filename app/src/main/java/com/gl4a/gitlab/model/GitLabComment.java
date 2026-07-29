@@ -102,6 +102,7 @@ public class GitLabComment implements Parcelable {
     protected GitLabComment(Parcel in) {
         id = in.readLong();
         body = in.readString();
+        note = in.readString();
         author = in.readParcelable(GitLabUser.class.getClassLoader());
         createdAt = in.readString();
         updatedAt = in.readString();
@@ -117,6 +118,7 @@ public class GitLabComment implements Parcelable {
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeLong(id);
         dest.writeString(body);
+        dest.writeString(note);
         dest.writeParcelable(author, flags);
         dest.writeString(createdAt);
         dest.writeString(updatedAt);

@@ -47,7 +47,7 @@ public class CommitCommentsFragment extends ListDataBaseFragment<GitLabComment> 
         CommitCommentsFragment f = new CommitCommentsFragment();
 
         ArrayList<GitLabComment> nonPositionalComments = allComments.stream()
-                .filter(comment -> comment.position() == null)
+                .filter(comment -> comment.position() == null && !comment.isSystemNote())
                 .collect(toCollection(ArrayList::new));
 
         Bundle args = new Bundle();
