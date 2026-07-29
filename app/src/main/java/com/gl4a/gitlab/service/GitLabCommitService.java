@@ -1,6 +1,7 @@
 package com.gl4a.gitlab.service;
 
 import com.gl4a.gitlab.model.GitLabComment;
+import com.gl4a.gitlab.model.GitLabCommitDiscussion;
 import com.gl4a.gitlab.model.GitLabCommit;
 import com.gl4a.gitlab.model.GitLabDiff;
 import com.squareup.moshi.Json;
@@ -37,6 +38,14 @@ public interface GitLabCommitService {
 
     @GET("projects/{id}/repository/commits/{sha}/diff")
     Single<Response<List<GitLabDiff>>> getCommitDiff(
+            @Path("id") long projectId,
+            @Path("sha") String sha,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
+    @GET("projects/{id}/repository/commits/{sha}/discussions")
+    Single<Response<List<GitLabCommitDiscussion>>> getCommitDiscussions(
             @Path("id") long projectId,
             @Path("sha") String sha,
             @Query("page") int page,

@@ -47,7 +47,7 @@ public class CommitCommentsFragment extends ListDataBaseFragment<GitLabComment> 
         CommitCommentsFragment f = new CommitCommentsFragment();
 
         ArrayList<GitLabComment> nonPositionalComments = allComments.stream()
-                .filter(comment -> comment.position() == null && !comment.isSystemNote())
+                .filter(comment -> comment.position() == null)
                 .collect(toCollection(ArrayList::new));
 
         Bundle args = new Bundle();
@@ -232,15 +232,27 @@ public class CommitCommentsFragment extends ListDataBaseFragment<GitLabComment> 
     protected Single<List<GitLabComment>> onCreateDataSingle(boolean bypassCache) {
         GitLabCommitService service = ServiceFactory.get(GitLabCommitService.class, bypassCache);
         return com.gl4a.utils.SingleFactory.getProjectId(mRepoOwner, mRepoName)
-                .flatMap(projectId -> service.getCommitComments(projectId, mObjectSha, 1, 100)
+                .flatMap(projectId -> service.getCommitDiscussions(projectId, mObjectSha, 1, 100)
                         .map(ApiHelpers::throwOnFailure))
-                .compose(RxUtils.<GitLabComment>filter(comment -> comment.position() == null));
+                .map(discussions -> {
+                    // Flatten discussions → notes, keeping only non-positional notes.
+                    java.util.List<GitLabComment> notes = new java.util.ArrayList<>();
+                    for (com.gl4a.gitlab.model.GitLabCommitDiscussion d : discussions) {
+                        if (d.notes != null) {
+                            for (GitLabComment note : d.notes) {
+                                if (note.position() == null) notes.add(note);
+                            }
+                        }
+                    }
+                    return notes;
+                });
     }
 
     @Override
     protected List<GitLabComment> onGetInitialData() {
-        List<GitLabComment> comments = IntentUtils.readCompressedValueFromBundle(getArguments(), "comments");
-        return comments != null && !comments.isEmpty() ? comments : null;
+        // Always fetch via discussions API so system notes have system=true set correctly.
+        // The initial comments bundle (from /comments endpoint) lacks the system field.
+        return null;
     }
 
     @Override
