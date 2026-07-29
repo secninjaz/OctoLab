@@ -178,7 +178,11 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, CommitComme
             holder.tvEditTimestamp.setVisibility(View.VISIBLE);
         }
 
-        mImageGetter.bindMarkdown(holder.tvDesc, item.body(), item.id());
+        // Commit comments have no API id (id=0 for all). Use createdAt as a unique
+        // cache key so each comment gets its own ObjectInfo in HttpImageGetter.
+        Object cacheKey = item.id() != 0 ? item.id()
+                : (item.createdAt() != null ? item.createdAt() : System.identityHashCode(item));
+        mImageGetter.bindMarkdown(holder.tvDesc, item.body(), cacheKey);
 
         final SpannableStringBuilder login = ApiHelpers.getUserLoginWithType(mContext, user, true);
         holder.tvExtra.setText(login);
