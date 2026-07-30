@@ -91,6 +91,8 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
     @Override
     public void onStart() {
         super.onStart();
+        // Mark system notifications as seen whenever the user opens the notifications tab.
+        com.gl4a.worker.NotificationsWorker.markNotificationsAsSeen(requireContext());
         if (!mInitialLoadDone) {
             mInitialLoadDone = true;
             setContentShown(false);

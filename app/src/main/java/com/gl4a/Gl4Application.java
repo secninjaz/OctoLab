@@ -65,6 +65,10 @@ public class Gl4Application extends Application implements
         mPt = new PrettyTime();
         com.gl4a.utils.DebugLogger.get().init(this);
         ServiceFactory.initClient(this);
+        // Write XML defaultValue="true" for the notifications toggle to SharedPreferences on
+        // first run so updateNotificationWorker() sees the correct default without the user
+        // having to open Settings first.
+        androidx.preference.PreferenceManager.setDefaultValues(this, R.xml.settings, false);
         updateNotificationWorker(prefs);
 
         // RxJava 2: swallow UndeliverableException (error arrives after subscriber is disposed,
@@ -192,6 +196,11 @@ public class Gl4Application extends Application implements
                 .putLong(KEY_PREFIX_USER_ID + login, user.id())
                 .putString(KEY_PREFIX_INSTANCE_URL + login, currentUrl)
                 .apply();
+        // Ensure notifications are enabled by default for every new login.
+        // setDefaultValues() writes the XML default only if the key is absent.
+        if (!prefs.contains(SettingsFragment.KEY_NOTIFICATIONS)) {
+            prefs.edit().putBoolean(SettingsFragment.KEY_NOTIFICATIONS, true).apply();
+        }
         ServiceFactory.invalidateCache();
         updateNotificationWorker(prefs);
     }
@@ -254,6 +263,35 @@ public class Gl4Application extends Application implements
         return getSharedPreferences(SettingsFragment.PREF_NAME, MODE_PRIVATE);
     }
 
+    // --- Per-account helpers used by NotificationsWorker ---
+
+    public java.util.Set<String> getAllLogins() {
+        return new java.util.HashSet<>(getPrefs().getStringSet(KEY_ALL_LOGINS, new java.util.HashSet<>()));
+    }
+
+    public String getTokenForLogin(String login) {
+        return login != null ? getPrefs().getString(KEY_PREFIX_TOKEN + login, null) : null;
+    }
+
+    public String getTokenTypeForLogin(String login) {
+        if (login == null) return TOKEN_TYPE_PAT;
+        String type = getPrefs().getString(KEY_PREFIX_TOKEN_TYPE + login, null);
+        if (type == null) {
+            String token = getPrefs().getString(KEY_PREFIX_TOKEN + login, "");
+            type = (token != null && (token.startsWith("glpat-") || token.startsWith("glgat-")
+                    || token.startsWith("gldt-") || token.startsWith("glsoat-")))
+                    ? TOKEN_TYPE_PAT : TOKEN_TYPE_OAUTH;
+        }
+        return type;
+    }
+
+    public String getInstanceUrlForLogin(String login) {
+        if (login == null) return DEFAULT_INSTANCE;
+        String url = getPrefs().getString(KEY_PREFIX_INSTANCE_URL + login,
+                getPrefs().getString(KEY_INSTANCE_URL, DEFAULT_INSTANCE));
+        return (url == null || url.isEmpty()) ? DEFAULT_INSTANCE : url;
+    }
+
     public static Gl4Application get() { return sInstance; }
 
     private String mCurrentProjectPath;
@@ -275,8 +313,9 @@ public class Gl4Application extends Application implements
         if (key == null) return;
         if (key.equals(SettingsFragment.KEY_THEME)) {
             updateTheme(prefs);
-        } else if (key.equals(KEY_ACTIVE_LOGIN)) {
-            // Account switched — reschedule worker for new account's settings
+        } else if (key.equals(KEY_ACTIVE_LOGIN)
+                || key.equals(SettingsFragment.KEY_NOTIFICATIONS)
+                || key.equals(SettingsFragment.KEY_NOTIFICATION_INTERVAL)) {
             updateNotificationWorker(prefs);
         }
     }

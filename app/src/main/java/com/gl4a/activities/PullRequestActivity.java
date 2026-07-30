@@ -281,7 +281,7 @@ public static Intent makeIntent(Context context, String repoOwner, String repoNa
                     mMergeRequestNumber, mMergeRequest.sha);
         } else {
             Fragment f = PullRequestConversationFragment.newInstance(mMergeRequest,
-                    null, mIsCollaborator, mInitialComment);
+                    mRepoOwner, mRepoName, null, mIsCollaborator, mInitialComment);
             mInitialComment = null;
             return f;
         }

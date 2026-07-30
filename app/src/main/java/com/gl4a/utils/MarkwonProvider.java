@@ -45,10 +45,12 @@ public final class MarkwonProvider {
                                         return new ClickableSpan() {
                                             @Override
                                             public void onClick(@NonNull View widget) {
-                                                IntentUtils.openLinkInternallyOrExternally(
-                                                        (androidx.fragment.app.FragmentActivity)
-                                                                widget.getContext(),
-                                                        android.net.Uri.parse(url));
+                                                androidx.fragment.app.FragmentActivity activity =
+                                                        IntentUtils.findActivity(widget.getContext());
+                                                if (activity != null) {
+                                                    IntentUtils.openLinkInternallyOrExternally(
+                                                            activity, android.net.Uri.parse(url));
+                                                }
                                             }
                                             @Override
                                             public void updateDrawState(@NonNull TextPaint ds) {

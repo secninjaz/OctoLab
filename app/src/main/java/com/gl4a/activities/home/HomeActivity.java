@@ -49,6 +49,8 @@ import java.util.HashMap;
 public class HomeActivity extends BaseFragmentPagerActivity implements
         View.OnClickListener, RepositoryListContainerFragment.Callback,
         NotificationListFragment.ParentCallback, LoginModeChooserFragment.ParentCallback {
+    public static final String EXTRA_NOTIFICATION_ACCOUNT = "notification_account";
+
     public static Intent makeIntent(Context context, @IdRes int initialPageId) {
         String initialPage = START_PAGE_MAPPING.get(initialPageId);
         Intent intent = new Intent(context, HomeActivity.class);
@@ -109,7 +111,38 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
     }
 
     @Override
+    protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleNotificationAccountSwitch(intent);
+    }
+
+    private void handleNotificationAccountSwitch(android.content.Intent intent) {
+        if (intent == null) return;
+        String notifAccount = intent.getStringExtra(EXTRA_NOTIFICATION_ACCOUNT);
+        if (notifAccount == null) return;
+        intent.removeExtra(EXTRA_NOTIFICATION_ACCOUNT);
+        String active = com.gl4a.Gl4Application.get().getAuthLogin();
+        if (!notifAccount.equals(active)) {
+            switchActiveUser(notifAccount);
+        }
+        // Navigate to the notifications tab regardless.
+        mSelectedFactoryId = R.id.notifications;
+        switchTo(mSelectedFactoryId, getFactoryForItem(mSelectedFactoryId));
+    }
+
+    @Override
     public void onCreate(Bundle savedInstanceState) {
+        // If launched from a notification for a different account, switch before setting up UI.
+        String notifAccount = getIntent() != null
+                ? getIntent().getStringExtra(EXTRA_NOTIFICATION_ACCOUNT) : null;
+        if (notifAccount != null) {
+            getIntent().removeExtra(EXTRA_NOTIFICATION_ACCOUNT);
+            String active = com.gl4a.Gl4Application.get().getAuthLogin();
+            if (!notifAccount.equals(active)) {
+                com.gl4a.Gl4Application.get().setActiveLogin(notifAccount);
+            }
+        }
         mUserLogin = Gl4Application.get().getAuthLogin();
         if (TextUtils.isEmpty(mUserLogin)) {
             startActivity(new Intent(this, GitLabLoginActivity.class));

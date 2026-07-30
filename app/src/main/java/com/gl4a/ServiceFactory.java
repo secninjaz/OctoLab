@@ -252,6 +252,31 @@ public class ServiceFactory {
         return Gl4Application.TOKEN_TYPE_PAT;
     }
 
+    /**
+     * Creates an uncached Retrofit service for a specific account's base URL and token.
+     * Used by NotificationsWorker to poll todos for each logged-in account independently.
+     */
+    public static <S> S getForAccount(Class<S> serviceClass, String apiBaseUrl, String token) {
+        OkHttpClient client = sApiHttpClient.newBuilder()
+                .addInterceptor(chain -> {
+                    Request.Builder rb = chain.request().newBuilder();
+                    if (Gl4Application.TOKEN_TYPE_OAUTH.equals(inferTokenType(token))) {
+                        rb.header("Authorization", "Bearer " + token);
+                    } else {
+                        rb.header("PRIVATE-TOKEN", token);
+                    }
+                    return chain.proceed(rb.build());
+                })
+                .build();
+        return new Retrofit.Builder()
+                .baseUrl(apiBaseUrl)
+                .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
+                .addConverterFactory(MoshiConverterFactory.create(MOSHI))
+                .client(client)
+                .build()
+                .create(serviceClass);
+    }
+
     public static void invalidateCache() { sCache.clear(); }
     public static OkHttpClient.Builder getHttpClientBuilder() { return sApiHttpClient.newBuilder(); }
     public static OkHttpClient getImageHttpClient() { return sImageHttpClient; }
