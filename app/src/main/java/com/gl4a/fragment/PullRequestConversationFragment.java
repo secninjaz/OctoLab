@@ -60,15 +60,19 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
     private boolean mHasLoadedHeadInfo;
 
     public static PullRequestConversationFragment newInstance(GitLabMergeRequest mr,
+            String repoOwner, String repoName,
             GitLabIssue issue, boolean isCollaborator,
             IntentUtils.InitialCommentMarker initialComment) {
         PullRequestConversationFragment f = new PullRequestConversationFragment();
 
-        GitLabMergeRequest.GitLabMRBranch base = mr.base();
-        String owner = base != null && base.repo() != null
-                ? base.repo().owner().login() : "";
-        String repoName = base != null && base.repo() != null
-                ? base.repo().name() : "";
+        // Use the caller-provided owner/repo (from PullRequestActivity.mRepoOwner/mRepoName)
+        // rather than base.repo() which is often null/empty. An empty owner corrupts the
+        // global currentProjectPath and breaks Phase 2 Markdown API rendering everywhere.
+        if (android.text.TextUtils.isEmpty(repoOwner) || android.text.TextUtils.isEmpty(repoName)) {
+            GitLabMergeRequest.GitLabMRBranch base = mr.base();
+            repoOwner = base != null && base.repo() != null ? base.repo().owner().login() : "";
+            repoName  = base != null && base.repo() != null ? base.repo().name() : "";
+        }
 
         // When issue is null, derive a stub GitLabIssue from the MR so that
         // IssueFragmentBase.fillData() does not NPE on mIssue.user(), mIssue.createdAt(), etc.
@@ -76,7 +80,7 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
             issue = buildStubIssueFromMR(mr);
         }
 
-        Bundle args = buildArgs(owner, repoName, issue, isCollaborator, initialComment);
+        Bundle args = buildArgs(repoOwner, repoName, issue, isCollaborator, initialComment);
         args.putParcelable("mr", mr);
         f.setArguments(args);
 

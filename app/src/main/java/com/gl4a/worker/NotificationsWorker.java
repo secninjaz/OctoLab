@@ -110,20 +110,47 @@ public class NotificationsWorker extends Worker {
         notificationManager.cancelAll();
 
         synchronized (sPrefsLock) {
-            getPrefs(context)
-                    .edit()
-                    .putLong(KEY_LAST_NOTIFICATION_SEEN, System.currentTimeMillis())
-                    .putStringSet(KEY_LAST_SHOWN_PROJECT_IDS, null)
-                    .apply();
+            SharedPreferences prefs = getPrefs(context);
+            long now = System.currentTimeMillis();
+            SharedPreferences.Editor editor = prefs.edit();
+            // Update seen timestamp for every known account so the worker knows
+            // the user has viewed the notifications and won't re-alert for them.
+            java.util.Set<String> logins = prefs.getStringSet("logins", new java.util.HashSet<>());
+            for (String login : logins) {
+                editor.putLong(keyLastSeen(login), now);
+                editor.remove(keyShownIds(login));
+            }
+            // Also update legacy global key for any older code paths.
+            editor.putLong(KEY_LAST_NOTIFICATION_SEEN, now);
+            editor.putStringSet(KEY_LAST_SHOWN_PROJECT_IDS, null);
+            editor.apply();
         }
     }
 
     public static long getLastCheckTimestamp(Context context) {
         SharedPreferences prefs = getPrefs(context);
-        if (!prefs.getBoolean(SettingsFragment.KEY_NOTIFICATIONS, false)) {
+        if (!prefs.getBoolean(SettingsFragment.KEY_NOTIFICATIONS, true)) {
             return 0;
         }
         return prefs.getLong(KEY_LAST_NOTIFICATION_CHECK, 0);
+    }
+
+    private static String keyLastCheck(String login) {
+        return KEY_LAST_NOTIFICATION_CHECK + "_" + login;
+    }
+
+    private static String keyLastSeen(String login) {
+        return KEY_LAST_NOTIFICATION_SEEN + "_" + login;
+    }
+
+    private static String keyShownIds(String login) {
+        return KEY_LAST_SHOWN_PROJECT_IDS + "_" + login;
+    }
+
+    // Unique notification ID: combines a stable hash of the account login with the project id
+    // so notifications from different accounts on the same project don't collide.
+    private static int notificationId(String login, long projectId) {
+        return (login.hashCode() & 0x0000FFFF) << 16 | (int) (projectId & 0x0000FFFF);
     }
 
     public static void handleNotificationDismiss(Context context, int id) {
@@ -154,96 +181,114 @@ public class NotificationsWorker extends Worker {
     @NonNull
     @Override
     public Result doWork() {
-        // Fetch pending GitLab todos grouped by project
-        List<GitLabTodo> allTodos;
-        try {
-            Log.d(TAG, "Starting todo fetch in background");
-            GitLabTodoService service = ServiceFactory.get(GitLabTodoService.class, true);
-            allTodos = service.listTodosByState("pending", 1, 100)
-                    .map(ApiHelpers::throwOnFailure)
-                    .blockingGet();
-        } catch (Exception e) {
-            Log.d(TAG, "Failed fetching todos", e);
-            return Result.failure();
+        com.gl4a.Gl4Application app = com.gl4a.Gl4Application.get();
+        java.util.Set<String> logins = app.getAllLogins();
+        if (logins.isEmpty()) return Result.success();
+
+        NotificationManagerCompat nm = NotificationManagerCompat.from(getApplicationContext());
+        SharedPreferences prefs = getPrefs(getApplicationContext());
+
+        // Track whether any notification was shown across all accounts for the summary.
+        int totalUnseen = 0;
+        boolean anyNew = false;
+
+        for (String login : logins) {
+            String token = app.getTokenForLogin(login);
+            if (token == null) continue;
+
+            String instanceUrl = app.getInstanceUrlForLogin(login);
+            String apiBase = instanceUrl.endsWith("/")
+                    ? instanceUrl + "api/v4/"
+                    : instanceUrl + "/api/v4/";
+
+            // Fetch pending todos for this account using its own token and instance URL.
+            List<GitLabTodo> allTodos;
+            try {
+                Log.d(TAG, "Fetching todos for " + login + " at " + apiBase);
+                GitLabTodoService service =
+                        ServiceFactory.getForAccount(GitLabTodoService.class, apiBase, token);
+                allTodos = service.listTodosByState("pending", 1, 100)
+                        .map(ApiHelpers::throwOnFailure)
+                        .blockingGet();
+            } catch (Exception e) {
+                Log.d(TAG, "Failed fetching todos for " + login, e);
+                continue;
+            }
+
+            // Group todos by project.
+            Map<Long, List<GitLabTodo>> todosByProject = new HashMap<>();
+            for (GitLabTodo todo : allTodos) {
+                long pid = todo.project != null ? todo.project.id : 0L;
+                List<GitLabTodo> list = todosByProject.get(pid);
+                if (list == null) { list = new ArrayList<>(); todosByProject.put(pid, list); }
+                list.add(todo);
+            }
+
+            synchronized (sPrefsLock) {
+                long lastCheck = prefs.getLong(keyLastCheck(login), 0);
+                long lastSeen  = prefs.getLong(keyLastSeen(login), 0);
+                Set<String> lastShown = StringUtils.getEditableStringSetFromPrefs(
+                        prefs, keyShownIds(login));
+                Set<String> newShown = new HashSet<>();
+                boolean hasUnseen = false, hasNew = false;
+
+                for (List<GitLabTodo> list : todosByProject.values()) {
+                    for (GitLabTodo todo : list) {
+                        long ts = parseIso8601Ms(todo.createdAt);
+                        hasNew    |= ts > lastCheck;
+                        hasUnseen |= ts > lastSeen;
+                    }
+                }
+
+                if (!hasUnseen) continue;
+
+                for (Map.Entry<Long, List<GitLabTodo>> entry : todosByProject.entrySet()) {
+                    String pidStr = String.valueOf(entry.getKey());
+                    showProjectTodoNotification(nm, entry.getValue(), lastCheck, login);
+                    if (lastShown != null) lastShown.remove(pidStr);
+                    newShown.add(pidStr);
+                }
+
+                // Cancel notifications for projects that no longer have pending todos.
+                if (lastShown != null) {
+                    for (String pid : lastShown) {
+                        try { nm.cancel(notificationId(login, Long.parseLong(pid))); }
+                        catch (NumberFormatException ignored) {}
+                    }
+                }
+
+                prefs.edit()
+                        .putLong(keyLastCheck(login), System.currentTimeMillis())
+                        .putStringSet(keyShownIds(login), newShown)
+                        .apply();
+
+                totalUnseen += allTodos.size();
+                anyNew |= hasNew;
+            }
         }
 
-        // Group todos by project ID
-        Map<Long, List<GitLabTodo>> todosByProject = new HashMap<>();
-        for (GitLabTodo todo : allTodos) {
-            long projectId = todo.project != null ? todo.project.id : 0L;
-            List<GitLabTodo> list = todosByProject.get(projectId);
-            if (list == null) {
-                list = new ArrayList<>();
-                todosByProject.put(projectId, list);
-            }
-            list.add(todo);
-        }
-
-        synchronized (sPrefsLock) {
-            SharedPreferences prefs = getPrefs(getApplicationContext());
-            long lastCheck = prefs.getLong(KEY_LAST_NOTIFICATION_CHECK, 0);
-            long lastSeen = prefs.getLong(KEY_LAST_NOTIFICATION_SEEN, 0);
-            Set<String> lastShownProjectIds =
-                    StringUtils.getEditableStringSetFromPrefs(prefs, KEY_LAST_SHOWN_PROJECT_IDS);
-            Set<String> newShownProjectIds = new HashSet<>();
-            boolean hasUnseenTodo = false, hasNewTodo = false;
-
-            for (List<GitLabTodo> list : todosByProject.values()) {
-                for (GitLabTodo todo : list) {
-                    long timestamp = parseIso8601Ms(todo.createdAt);
-                    hasNewTodo |= timestamp > lastCheck;
-                    hasUnseenTodo |= timestamp > lastSeen;
-                }
-            }
-
-            Log.d(TAG, "Last check was " + new Date(lastCheck) + ", last seen " + new Date(lastSeen)
-                    + " -> has new " + hasNewTodo + ", has unseen " + hasUnseenTodo);
-
-            if (!hasUnseenTodo) {
-                return Result.success();
-            }
-
-            NotificationManagerCompat nm =
-                    NotificationManagerCompat.from(getApplicationContext());
-
-            showSummaryNotification(nm, todosByProject, allTodos.size(), hasNewTodo);
-            for (Map.Entry<Long, List<GitLabTodo>> entry : todosByProject.entrySet()) {
-                String projectIdStr = String.valueOf(entry.getKey());
-                showProjectTodoNotification(nm, entry.getValue(), lastCheck);
-                if (lastShownProjectIds != null) {
-                    lastShownProjectIds.remove(projectIdStr);
-                }
-                newShownProjectIds.add(projectIdStr);
-            }
-
-            if (lastShownProjectIds != null) {
-                for (String projectId : lastShownProjectIds) {
-                    nm.cancel(Integer.parseInt(projectId));
-                }
-            }
-
-            prefs.edit()
-                    .putLong(KEY_LAST_NOTIFICATION_CHECK, System.currentTimeMillis())
-                    .putStringSet(KEY_LAST_SHOWN_PROJECT_IDS, newShownProjectIds)
-                    .apply();
+        if (totalUnseen > 0) {
+            showSummaryNotification(nm, totalUnseen, anyNew);
         }
 
         return Result.success();
     }
 
     private void showProjectTodoNotification(NotificationManagerCompat nm,
-            List<GitLabTodo> todos, long lastCheck) {
+            List<GitLabTodo> todos, long lastCheck, String accountLogin) {
         if (todos.isEmpty()) return;
         final Context context = getApplicationContext();
         GitLabTodo first = todos.get(0);
         String projectName = first.project != null ? first.project.nameWithNamespace : "GitLab";
-        final int id = first.project != null ? (int) first.project.id : 0;
+        long projectId = first.project != null ? first.project.id : 0L;
+        final int id = notificationId(accountLogin, projectId);
         long when = parseIso8601Ms(first.createdAt);
         String text = context.getResources().getQuantityString(
-                R.plurals.unread_notifications_summary_text,
-                todos.size(), todos.size());
+                R.plurals.unread_notifications_summary_text, todos.size(), todos.size());
 
+        // Intent includes the account login so HomeActivity can switch accounts on tap.
         Intent intent = HomeActivity.makeIntent(context, R.id.notifications)
+                .putExtra(HomeActivity.EXTRA_NOTIFICATION_ACCOUNT, accountLogin)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent contentIntent = PendingIntent.getActivity(context, id, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -273,28 +318,37 @@ public class NotificationsWorker extends Worker {
                 .setAutoCancel(true)
                 .setContentText(text);
 
+        // Set project avatar as the large icon so users can identify the project at a glance.
+        String projectAvatarUrl = first.project != null ? first.project.avatarUrl : null;
+        android.graphics.Bitmap projectIcon = loadProjectIcon(projectAvatarUrl, projectId);
+        if (projectIcon != null) {
+            builder.setLargeIcon(projectIcon);
+        }
+
         boolean hasNewTodo = false;
-        NotificationCompat.MessagingStyle style = new NotificationCompat.MessagingStyle("")
-                .setConversationTitle(projectName);
+        NotificationCompat.InboxStyle inbox = new NotificationCompat.InboxStyle()
+                .setBigContentTitle(projectName);
         for (int i = todos.size() - 1; i >= 0; i--) {
             GitLabTodo todo = todos.get(i);
             long todoTs = parseIso8601Ms(todo.createdAt);
-            String todoBody = todo.body != null ? todo.body : todo.title();
-            style.addMessage(todoBody, todoTs, todo.actionName);
+            inbox.addLine(formatTodoMessage(context, todo));
             hasNewTodo = hasNewTodo || todoTs > lastCheck;
         }
-        builder.setStyle(style);
+        builder.setStyle(inbox);
 
-        if (!hasNewTodo) {
-            builder.setOnlyAlertOnce(true);
-        }
+        if (!hasNewTodo) builder.setOnlyAlertOnce(true);
+
+        // "Mark as read" action — dismisses all notifications and updates seen state.
+        PendingIntent markSeenIntent = PendingIntent.getService(context, 0,
+                NotificationHandlingService.makeMarkNotificationsSeenIntent(context),
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        builder.addAction(R.drawable.icon_notifications, "Mark as read", markSeenIntent);
 
         nm.notify(id, builder.build());
     }
 
     private void showSummaryNotification(NotificationManagerCompat nm,
-            Map<Long, List<GitLabTodo>> todosByProject, int totalCount,
-            boolean hasNewTodo) {
+            int totalCount, boolean hasNewTodo) {
         final Context context = getApplicationContext();
 
         String title = context.getString(R.string.unread_notifications_summary_title);
@@ -314,6 +368,7 @@ public class NotificationsWorker extends Worker {
         PendingIntent deleteIntent = PendingIntent.getService(context, 0,
                 NotificationHandlingService.makeMarkNotificationsSeenIntent(context),
                 PendingIntent.FLAG_IMMUTABLE);
+
         NotificationCompat.Builder builder = makeBaseBuilder()
                 .setGroup(GROUP_ID_GITLAB)
                 .setGroupSummary(true)
@@ -327,39 +382,7 @@ public class NotificationsWorker extends Worker {
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setNumber(totalCount);
 
-        NotificationCompat.InboxStyle inboxStyle = new NotificationCompat.InboxStyle(builder)
-                .setBigContentTitle(text);
-        for (Map.Entry<Long, List<GitLabTodo>> entry : todosByProject.entrySet()) {
-            List<GitLabTodo> list = entry.getValue();
-            if (list.isEmpty()) continue;
-            GitLabTodo first = list.get(0);
-            String projectName = first.project != null ? first.project.nameWithNamespace : "GitLab";
-
-            final TextAppearanceSpan notificationPrimarySpan =
-                    new TextAppearanceSpan(context, R.style.TextAppearance_NotificationEmphasized);
-            SpannableStringBuilder line = new SpannableStringBuilder(projectName).append(" ");
-            final int emphasisEnd;
-
-            if (list.size() == 1) {
-                line.append(first.actionName != null ? first.actionName : "");
-                emphasisEnd = line.length();
-                String firstBody = first.body != null ? first.body : first.title();
-                line.append(" ").append(firstBody != null ? firstBody : "");
-            } else {
-                emphasisEnd = line.length();
-                line.append(context.getResources().getQuantityString(R.plurals.notification,
-                        list.size(), list.size()));
-            }
-
-            line.setSpan(notificationPrimarySpan, 0, emphasisEnd,
-                    SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE);
-            inboxStyle.addLine(line);
-        }
-        builder.setStyle(inboxStyle);
-
-        if (!hasNewTodo) {
-            builder.setOnlyAlertOnce(true);
-        }
+        if (!hasNewTodo) builder.setOnlyAlertOnce(true);
 
         nm.notify(0, builder.build());
     }
@@ -368,6 +391,83 @@ public class NotificationsWorker extends Worker {
         return new NotificationCompat.Builder(getApplicationContext(), CHANNEL_GITLAB_NOTIFICATIONS)
                 .setSmallIcon(R.drawable.notification)
                 .setColor(ContextCompat.getColor(getApplicationContext(), R.color.octodroid));
+    }
+
+    /**
+     * Fetches the project avatar for use as setLargeIcon.
+     * The Todos API project sub-object omits avatar_url, so we fall back to
+     * GET /projects/{id} which always includes it.
+     */
+    private static android.graphics.Bitmap loadProjectIcon(String avatarUrl, long projectId) {
+        String url = avatarUrl;
+        if ((url == null || url.isEmpty()) && projectId > 0) {
+            // Resolve avatar_url via the full project endpoint.
+            try {
+                String apiUrl = com.gl4a.Gl4Application.get().getApiBaseUrl()
+                        + "projects/" + projectId;
+                okhttp3.OkHttpClient api = com.gl4a.ServiceFactory.getImageHttpClient();
+                okhttp3.Request req = new okhttp3.Request.Builder().url(apiUrl).build();
+                try (okhttp3.Response resp = api.newCall(req).execute()) {
+                    if (resp.isSuccessful() && resp.body() != null) {
+                        String json = resp.body().string();
+                        int idx = json.indexOf("\"avatar_url\":\"");
+                        if (idx >= 0) {
+                            int start = idx + 14;
+                            int end = json.indexOf("\"", start);
+                            if (end > start) {
+                                url = json.substring(start, end)
+                                        .replace("\\/", "/");
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        if (url == null || url.isEmpty() || url.equals("null")) return null;
+        try {
+            okhttp3.OkHttpClient client = com.gl4a.ServiceFactory.getImageHttpClient();
+            okhttp3.Request req = new okhttp3.Request.Builder().url(url).build();
+            try (okhttp3.Response resp = client.newCall(req).execute()) {
+                if (!resp.isSuccessful() || resp.body() == null) return null;
+                byte[] data = resp.body().bytes();
+                return android.graphics.BitmapFactory.decodeByteArray(data, 0, data.length);
+            }
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    /** Maps raw GitLab Todos API action_name values to natural English. */
+    private static String formatActionVerb(String actionName) {
+        if (actionName == null) return "notified you";
+        switch (actionName) {
+            case "mentioned":
+            case "directly_addressed": return "mentioned you";
+            case "assigned":            return "assigned you";
+            case "review_requested":    return "requested your review";
+            case "approval_required":   return "requested your approval";
+            case "build_failed":        return "build failed";
+            case "unmergeable":         return "MR cannot be merged";
+            case "marked":              return "marked as todo";
+            case "merge_train_removed": return "removed from merge train";
+            default: return actionName.replace('_', ' ');
+        }
+    }
+
+    /** Builds a one-line notification message: "Jay mentioned you in #34 Fix login bug". */
+    private static String formatTodoMessage(Context ctx, GitLabTodo todo) {
+        String authorName = (todo.author != null && todo.author.name() != null)
+                ? todo.author.name() : "Someone";
+        String verb = formatActionVerb(todo.actionName);
+        String ref = "";
+        if (todo.target != null) {
+            String prefix = "MergeRequest".equals(todo.targetType) ? "!" : "#";
+            ref = " in " + prefix + todo.target.iid;
+            if (todo.target.title != null && !todo.target.title.isEmpty()) {
+                ref += " " + todo.target.title;
+            }
+        }
+        return authorName + " " + verb + ref;
     }
 
     private static SharedPreferences getPrefs(Context context) {

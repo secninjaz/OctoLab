@@ -136,7 +136,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         mRepoName = args.getString("repo");
         mIssue = args.getParcelable("issue");
         mIsCollaborator = args.getBoolean("collaborator");
-        if (mRepoOwner != null && mRepoName != null) {
+        if (!android.text.TextUtils.isEmpty(mRepoOwner) && !android.text.TextUtils.isEmpty(mRepoName)) {
             Gl4Application.get().setCurrentProjectPath(mRepoOwner + "/" + mRepoName);
         }
         mInitialComment = args.getParcelable("initial_comment");

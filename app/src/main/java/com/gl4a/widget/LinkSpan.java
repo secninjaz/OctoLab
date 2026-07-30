@@ -19,9 +19,10 @@ public class LinkSpan extends ClickableSpan {
 
     @Override
     public void onClick(@NonNull View widget) {
-        Uri clickedUri = Uri.parse(mUrl);
-        var activity = (FragmentActivity) widget.getContext();
-        IntentUtils.openLinkInternallyOrExternally(activity, clickedUri);
+        FragmentActivity activity = IntentUtils.findActivity(widget.getContext());
+        if (activity != null) {
+            IntentUtils.openLinkInternallyOrExternally(activity, Uri.parse(mUrl));
+        }
     }
 
     @Override

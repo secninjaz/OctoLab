@@ -46,6 +46,24 @@ public class IntentUtils {
     private IntentUtils() {
     }
 
+    /**
+     * Walks the ContextWrapper chain to find the underlying FragmentActivity.
+     * Direct casts from widget.getContext() fail when views are inflated with
+     * ContextThemeWrapper (e.g. IssueFragmentBase uses one for highlight colours).
+     */
+    @Nullable
+    public static FragmentActivity findActivity(android.content.Context ctx) {
+        while (ctx != null) {
+            if (ctx instanceof FragmentActivity) return (FragmentActivity) ctx;
+            if (ctx instanceof android.content.ContextWrapper) {
+                ctx = ((android.content.ContextWrapper) ctx).getBaseContext();
+            } else {
+                return null;
+            }
+        }
+        return null;
+    }
+
     public static void openLinkInternallyOrExternally(FragmentActivity activity, Uri uri) {
         String uriScheme = uri.getScheme();
         if (uriScheme == null || uriScheme.equals("file") || uriScheme.equals("content")) {
