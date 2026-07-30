@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-07-30
+
+### Fixed
+- Notifications now enabled by default for every account from the moment login completes
+- Notifications are polled for ALL logged-in accounts independently, each using their own token and instance URL
+- Per-account notification seen/check timestamps — opening the notifications tab dismisses alerts for the active account only
+- Tapping a notification from a different account now switches to that account before opening the notifications tab
+- OctoLab monochrome icon replaces the OctoDroid octopus in the status bar; icon scaled 1.4× to fill the 24 dp slot
+- Project avatar shown as the large icon in the notification card (fetched via `/projects/{id}` since Todos API omits it)
+- Notification re-triggering on every app open fixed: `markNotificationsAsSeen` now updates per-account timestamps
+- Notification action names are now natural English ("mentioned you", "assigned you", "requested your review", etc.)
+- "Mark as read" action button added to each notification card
+- `@mention` and `#reference` links in issue/MR bodies were silently non-clickable — `LinkSpan.onClick` cast directly to `FragmentActivity` which fails when views are inflated inside a `ContextThemeWrapper`; fixed by walking the wrapper chain
+- After opening any MR, `@mentions` and `#refs` in all subsequent issue views also stopped rendering as links — `PullRequestConversationFragment` was writing an empty/wrong `currentProjectPath` globally, breaking the Phase 2 Markdown API context; fixed by passing the correct owner/repo from `PullRequestActivity`
+- README hyperlinks in the WebView now render without underlines
+
 ## [1.2.4] - 2026-07-29
 
 ### Fixed
