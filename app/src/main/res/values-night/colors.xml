@@ -39,7 +39,7 @@
     <color name="list_background">@android:color/transparent</color>
     <color name="theme_surface">#121212</color>
     <color name="theme_text_primary">#DEDEDE</color>
-    <color name="theme_hint">#99DEDEDE</color>
+    <color name="theme_hint">#AAAAAA</color>
     <color name="icon_foreground">#ccffffff</color>
     <color name="breadcrumb_background">#7a2e0c</color>
 </resources>
