@@ -51,6 +51,7 @@ public class AvatarHandler {
         String email;        // used to call /api/v4/avatar?email= if primary URL fails
         String fallbackUrl;  // Gravatar URL, tried if Avatar API also fails
         boolean apiFirst;    // true → try GitLab Avatar API before url (for email-only lookups)
+        long projectId;      // > 0 → fetch avatar via GET /projects/{id} (project avatar path)
         ArrayList<ViewDelegate> views;
     }
     private static final LongSparseArray<Request> sRequests = new LongSparseArray<>();
@@ -180,6 +181,53 @@ public class AvatarHandler {
         sWorkerHandler.obtainMessage(MSG_LOAD, requestId, 0, request.url).sendToTarget();
     }
 
+    /**
+     * Loads the project avatar for the To-do list header row.
+     * Fetches avatar_url via GET /projects/{id} (Todos API omits it) and caches by project ID.
+     */
+    public static void assignAvatarForProject(ImageView view, String projectName, long projectId) {
+        if (projectId <= 0) {
+            view.setImageDrawable(new DefaultAvatarDrawable(projectName, null));
+            return;
+        }
+        // Use a large negative offset so project IDs don't collide with user IDs in the cache.
+        long cacheId = Long.MIN_VALUE / 2 + projectId;
+
+        ImageViewDelegate delegate = new ImageViewDelegate(view);
+        removeOldRequest(delegate);
+
+        Bitmap cached = loadBitmapFromCache(view.getContext(), cacheId);
+        if (cached != null) {
+            applyAvatarToView(delegate, cached);
+            return;
+        }
+
+        view.setImageDrawable(new DefaultAvatarDrawable(projectName, projectId));
+
+        Request existing = getRequestForId(cacheId);
+        if (existing != null) {
+            existing.views.add(delegate);
+            return;
+        }
+
+        int requestId = sNextRequestId++;
+        Request request = new Request();
+        request.id = cacheId;
+        request.projectId = projectId;
+        request.apiFirst = true; // worker checks projectId > 0 and uses project path
+        request.views = new ArrayList<>();
+        request.views.add(delegate);
+        sRequests.put(requestId, request);
+
+        sHandler.removeMessages(MSG_DESTROY);
+        if (sWorkerThread == null) {
+            sWorkerThread = new HandlerThread("GravatarLoader");
+            sWorkerThread.start();
+            sWorkerHandler = new WorkerHandler(sWorkerThread.getLooper());
+        }
+        sWorkerHandler.obtainMessage(MSG_LOAD, requestId, 0, (Object) null).sendToTarget();
+    }
+
     public static void assignAvatar(Context context, MenuItem item,
             String userName, long userId) {
         assignAvatarInternal(new MenuItemDelegate(context, item), userName, userId, null, null);
@@ -290,6 +338,25 @@ public class AvatarHandler {
 
         Resources res = context.getResources();
         sMaxImageSizePx = Math.round(res.getDisplayMetrics().density * MAX_CACHED_IMAGE_SIZE);
+    }
+
+    /** Fetches a project's avatar_url via GET /projects/{id}. */
+    private static String fetchProjectAvatarUrl(long projectId) throws IOException {
+        com.gl4a.Gl4Application app = com.gl4a.Gl4Application.get();
+        String apiUrl = app.getApiBaseUrl() + "projects/" + projectId;
+        okhttp3.OkHttpClient client = ServiceFactory.getImageHttpClient();
+        okhttp3.Request req = new okhttp3.Request.Builder().url(apiUrl).build();
+        try (okhttp3.Response resp = client.newCall(req).execute()) {
+            if (!resp.isSuccessful() || resp.body() == null) return null;
+            String json = resp.body().string();
+            int idx = json.indexOf("\"avatar_url\":\"");
+            if (idx < 0) return null;
+            int start = idx + 14;
+            int end = json.indexOf("\"", start);
+            if (end <= start) return null;
+            String avatarUrl = json.substring(start, end).replace("\\/", "/");
+            return (avatarUrl.isEmpty() || avatarUrl.equals("null")) ? null : avatarUrl;
+        }
     }
 
     /**
@@ -518,7 +585,15 @@ public class AvatarHandler {
                     int requestId = msg.arg1;
                     Request req = sRequests.get(requestId);
                     Bitmap bitmap = null;
-                    if (req != null && req.apiFirst && req.email != null) {
+                    if (req != null && req.apiFirst && req.projectId > 0) {
+                        // Project avatar path: fetch via GET /projects/{id}.
+                        try {
+                            String projectAvatarUrl = fetchProjectAvatarUrl(req.projectId);
+                            if (projectAvatarUrl != null) bitmap = fetchBitmap(projectAvatarUrl);
+                        } catch (IOException e) {
+                            Log.d(TAG, "Project avatar fetch failed for id=" + req.projectId);
+                        }
+                    } else if (req != null && req.apiFirst && req.email != null) {
                         // Email-only path: user search first (returns actual uploaded avatar),
                         // then Gravatar (req.url) as fallback.
                         try {

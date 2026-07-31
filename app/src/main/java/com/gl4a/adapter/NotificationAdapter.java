@@ -139,18 +139,20 @@ public class NotificationAdapter extends
             holder.ivAction.setVisibility(item.isRead() ? View.GONE : View.VISIBLE);
             holder.tvTitle.setText(ApiHelpers.formatRepoName(mContext, item.repository));
 
-            GitLabUser owner = item.repository != null ? item.repository.owner() : null;
-            if (owner == null && item.repository != null) {
-                // Group projects have no owner field — build a stub GitLabUser so
-                // AvatarHandler displays the project's initial instead of a ? mark.
-                owner = new GitLabUser();
-                owner.id = item.repository.id;
-                owner.username = item.repository.path != null ? item.repository.path : item.repository.name;
-                owner.name = item.repository.name;
-                owner.avatarUrl = item.repository.avatarUrl;
-            }
-            AvatarHandler.assignAvatar(holder.ivAvatar, owner);
-            if (owner != null) {
+            // Use assignAvatarForProject so the project's own uploaded avatar is shown.
+            // The Todos API omits avatar_url from the project sub-object; the method
+            // fetches it asynchronously via GET /projects/{id}.
+            if (item.repository != null) {
+                String projectName = item.repository.name != null ? item.repository.name : "";
+                AvatarHandler.assignAvatarForProject(holder.ivAvatar, projectName, item.repository.id);
+                // Keep the tag for click handling (opens RepositoryActivity).
+                GitLabUser owner = item.repository.owner();
+                if (owner == null) {
+                    owner = new GitLabUser();
+                    owner.id = item.repository.id;
+                    owner.username = item.repository.path != null ? item.repository.path : item.repository.name;
+                    owner.name = item.repository.name;
+                }
                 holder.ivAvatar.setTag(owner);
             }
             holder.ivAvatar.setAlpha(alpha);
