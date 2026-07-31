@@ -31,7 +31,8 @@ public interface GitLabMergeRequestService {
             @Query("per_page") int perPage,
             @Query("order_by") String orderBy,
             @Query("sort") String sort,
-            @Query("search") String search
+            @Query("search") String search,
+            @Query("with_labels_details") boolean withLabelsDetails
     );
 
     // state must be "opened", "closed", "locked", or "merged" — NOT "open"
@@ -40,7 +41,8 @@ public interface GitLabMergeRequestService {
             @Query("state") String state,       // "opened" | "closed" | "merged" | "all"
             @Query("scope") String scope,
             @Query("page") int page,
-            @Query("per_page") int perPage
+            @Query("per_page") int perPage,
+            @Query("with_labels_details") boolean withLabelsDetails
     );
 
     @GET("projects/{id}/merge_requests/{iid}")
