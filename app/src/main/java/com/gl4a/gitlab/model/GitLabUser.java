@@ -94,6 +94,21 @@ public class GitLabUser implements Parcelable {
     @Override
     public int describeContents() { return 0; }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof GitLabUser)) return false;
+        GitLabUser other = (GitLabUser) o;
+        // Use id when available; fall back to username for synthetic users (id == 0).
+        if (id != 0 && other.id != 0) return id == other.id;
+        return username != null && username.equals(other.username);
+    }
+
+    @Override
+    public int hashCode() {
+        return id != 0 ? Long.hashCode(id) : (username != null ? username.hashCode() : 0);
+    }
+
     public static final Creator<GitLabUser> CREATOR = new Creator<GitLabUser>() {
         @Override
         public GitLabUser createFromParcel(Parcel in) { return new GitLabUser(in); }
