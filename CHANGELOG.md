@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-07-31
+
+### Fixed
+- To-do list: items now correctly grouped under their own project header regardless of API sort order; items from Project A no longer appear under Project B's header
+- To-do list: project avatars now load in header rows (fetched via `GET /projects/{id}` since Todos API omits `avatar_url`)
+- @mention suggestions no longer show duplicate users — same person participating N times now appears only once (fixed `GitLabUser.equals`/`hashCode`)
+- Markdown editor Preview tab background now matches app warm-white theme (`#FFFFF5`) instead of pure white (`#fafafa`)
+- Placeholder/hint text colours: solid `#666666` (light) / `#AAAAAA` (dark) replace opacity-based values that were barely distinguishable from Material defaults
+- MR label colours now show correctly in My MRs list and MR detail views (`with_labels_details=true` on MR endpoints)
+- Commit comments: system notes (mentions, cross-references) now render as compact update rows matching the issue timeline style, instead of full comment rows
+
 ## [1.2.5] - 2026-07-30
 
 ### Fixed
