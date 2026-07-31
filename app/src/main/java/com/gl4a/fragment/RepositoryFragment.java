@@ -464,7 +464,7 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         GitLabMergeRequestService service = ServiceFactory.get(GitLabMergeRequestService.class, force);
         long projectId = mRepository.id();
 
-        service.listMergeRequests(projectId, "opened", null, null, 1, 1, null, null, null)
+        service.listMergeRequests(projectId, "opened", null, null, 1, 1, null, null, null, false)
                 .map(response -> {
                     if (!response.isSuccessful()) {
                         throw new com.gl4a.ApiRequestException(response);
