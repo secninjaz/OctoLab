@@ -4,6 +4,7 @@ import android.os.Parcel;
 import android.os.Parcelable;
 
 import com.squareup.moshi.Json;
+import java.util.ArrayList;
 import java.util.List;
 
 public class GitLabMergeRequest implements Parcelable {
@@ -17,7 +18,7 @@ public class GitLabMergeRequest implements Parcelable {
     @Json(name = "assignees") public List<GitLabUser> assignees;
     @Json(name = "assignee") public GitLabUser assignee;
     @Json(name = "reviewers") public List<GitLabUser> reviewers;
-    @Json(name = "labels") public List<String> labelNames;
+    @Json(name = "labels") public List<GitLabLabel> labelNames;
     @Json(name = "milestone") public GitLabMilestone milestone;
     @Json(name = "source_branch") public String sourceBranch;
     @Json(name = "target_branch") public String targetBranch;
@@ -96,7 +97,7 @@ public class GitLabMergeRequest implements Parcelable {
         assignee = in.readParcelable(GitLabUser.class.getClassLoader());
         mergedBy = in.readParcelable(GitLabUser.class.getClassLoader());
         closedBy = in.readParcelable(GitLabUser.class.getClassLoader());
-        labelNames = in.createStringArrayList();
+        labelNames = in.createTypedArrayList(GitLabLabel.CREATOR);
         sourceBranch = in.readString();
         targetBranch = in.readString();
         sha = in.readString();
@@ -152,7 +153,7 @@ public class GitLabMergeRequest implements Parcelable {
         dest.writeParcelable(assignee, flags);
         dest.writeParcelable(mergedBy, flags);
         dest.writeParcelable(closedBy, flags);
-        dest.writeStringList(labelNames);
+        dest.writeTypedList(labelNames);
         dest.writeString(sourceBranch);
         dest.writeString(targetBranch);
         dest.writeString(sha);

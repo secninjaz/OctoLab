@@ -173,6 +173,7 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
             stub.iid = mr.iid; stub.title = mr.title; stub.state = mr.state;
             stub.author = mr.author; stub.createdAt = mr.createdAt; stub.updatedAt = mr.updatedAt;
             stub.webUrl = mr.webUrl; stub.commentsCount = mr.commentsCount; stub.projectId = mr.projectId;
+            stub.labelNames = mr.labelNames; // carry colour data from with_labels_details
             stubs.add(stub);
         }
         return stubs;
@@ -252,7 +253,7 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
 
             if (!showingClosed) {
                 // Open MRs: straightforward single call
-                return mrService.listMyMergeRequests(mIssueState, scope, page, 25)
+                return mrService.listMyMergeRequests(mIssueState, scope, page, 25, true)
                         .map(response -> {
                             if (!response.isSuccessful())
                                 return Response.<GitLabPage<GitLabIssue>>error(response.errorBody(), response.raw());
@@ -262,10 +263,10 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
             } else {
                 // Closed view: combine state=closed (rejected) and state=merged
                 Single<Response<java.util.List<com.gl4a.gitlab.model.GitLabMergeRequest>>> closedCall =
-                        mrService.listMyMergeRequests("closed", scope, page, 25)
+                        mrService.listMyMergeRequests("closed", scope, page, 25, true)
                                 .onErrorReturn(e -> retrofit2.Response.success(new java.util.ArrayList<>()));
                 Single<Response<java.util.List<com.gl4a.gitlab.model.GitLabMergeRequest>>> mergedCall =
-                        mrService.listMyMergeRequests("merged", scope, page, 25)
+                        mrService.listMyMergeRequests("merged", scope, page, 25, true)
                                 .onErrorReturn(e -> retrofit2.Response.success(new java.util.ArrayList<>()));
                 return Single.zip(closedCall, mergedCall,
                         (Response<java.util.List<com.gl4a.gitlab.model.GitLabMergeRequest>> c,

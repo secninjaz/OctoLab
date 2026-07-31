@@ -130,16 +130,8 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
             mIssue.webUrl = mMergeRequest.webUrl;
             mIssue.commentsCount = mMergeRequest.commentsCount;
             mIssue.confidential = false;
-            // Convert MR label name strings to GitLabLabel objects (no colour — MR API
-            // does not support with_labels_details yet; colours shown on issue side only).
-            if (mMergeRequest.labelNames != null) {
-                mIssue.labelNames = new java.util.ArrayList<>();
-                for (String name : mMergeRequest.labelNames) {
-                    com.gl4a.gitlab.model.GitLabLabel l = new com.gl4a.gitlab.model.GitLabLabel();
-                    l.name = name;
-                    mIssue.labelNames.add(l);
-                }
-            }
+            // MR labels now have colour data (with_labels_details=true on MR endpoints).
+            mIssue.labelNames = mMergeRequest.labelNames;
             mIssue.milestone = mMergeRequest.milestone;
             mIssue.assignees = mMergeRequest.assignees;
             mIssue.assignee = mMergeRequest.assignee;
