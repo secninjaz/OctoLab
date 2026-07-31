@@ -341,16 +341,33 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
      * the existing adapter's expected structure.
      */
     private List<NotificationHolder> buildHolders(List<GitLabTodo> todos) {
-        Map<Long, GitLabProject> seenProjects = new HashMap<>();
-        List<NotificationHolder> result = new ArrayList<>();
+        // The Todos API returns items sorted by created_at, not by project.
+        // Inserting a header only on first-seen caused todos from Project A that
+        // appeared after Project B's header to render under Project B visually.
+        // Fix: collect all todos per project first, preserving the order of each
+        // project's first appearance, then emit header + all todos per project.
+        java.util.LinkedHashMap<Long, GitLabProject> projectOrder = new java.util.LinkedHashMap<>();
+        java.util.LinkedHashMap<Long, List<GitLabTodo>> todosByProject = new java.util.LinkedHashMap<>();
 
         for (GitLabTodo todo : todos) {
             GitLabProject project = todo.repository();
-            if (project != null && !seenProjects.containsKey(project.id())) {
-                seenProjects.put(project.id(), project);
+            long key = project != null && project.id() > 0 ? project.id() : 0L;
+            if (!projectOrder.containsKey(key)) {
+                projectOrder.put(key, project);
+                todosByProject.put(key, new ArrayList<>());
+            }
+            todosByProject.get(key).add(todo);
+        }
+
+        List<NotificationHolder> result = new ArrayList<>();
+        for (Map.Entry<Long, GitLabProject> entry : projectOrder.entrySet()) {
+            GitLabProject project = entry.getValue();
+            if (project != null) {
                 result.add(new NotificationHolder(project));
             }
-            result.add(new NotificationHolder(todo));
+            for (GitLabTodo todo : todosByProject.get(entry.getKey())) {
+                result.add(new NotificationHolder(todo));
+            }
         }
         return result;
     }
