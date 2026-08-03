@@ -64,6 +64,10 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
     private String mFilterLabel;
     private String mFilterMilestone;
     private String mFilterAssignee;
+    // Cross-page dedup for Mentioned/Participating: tracks issue IDs already loaded on
+    // previous pages so duplicates from overlapping parallel todo calls don't reappear.
+    private final java.util.Set<Long> mSeenMentionedIds =
+            java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
 
     private final ActivityResultLauncher<Intent> mIssueLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -205,6 +209,12 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
     }
 
     @Override
+    public void onRefresh() {
+        mSeenMentionedIds.clear();
+        super.onRefresh();
+    }
+
+    @Override
     protected RootAdapter<GitLabIssue, ? extends RecyclerView.ViewHolder> onCreateAdapter() {
         return mShowRepository
                 ? new RepositoryIssueAdapter(getActivity())
@@ -299,7 +309,7 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
             // Use a generous per-page to cover all mentions in one shot. Pagination across
             // these 4 parallel calls causes cross-page duplicates because each page is
             // deduplicated independently before being appended to the accumulated list.
-            final int PER_PAGE = 100;
+            final int PER_PAGE = 50;
 
             // onePage: fetch one (action, state) slice for the current page number.
             // Returns the response so we can inspect X-Next-Page for pagination.
@@ -435,11 +445,14 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
                         }
                     }
                 }
-                // No pagination for Mentioned/Participating: 4 parallel calls × PER_PAGE todos
-                // is sufficient for any realistic mention volume, and paginating these tabs
-                // causes cross-page duplicates (each page is independently deduplicated before
-                // being appended to the accumulated list).
-                return Response.success(new GitLabPage<>(issues, page, 0, page, issues.size()));
+                // Cross-page dedup: filter out IDs already delivered on previous pages.
+                // mSeenMentionedIds is cleared on onRefresh() so it resets with each fresh load.
+                issues.removeIf(issue -> !mSeenMentionedIds.add(issue.id));
+                // Pagination: if any sub-call returned a full page there may be more todos.
+                boolean hasMore = maxPageSize >= PER_PAGE;
+                return Response.success(new GitLabPage<>(
+                        issues, page, hasMore ? page + 1 : 0,
+                        hasMore ? page + 2 : page, issues.size()));
             });
         } else if (mScope != null && !mScope.isEmpty()) {
             // Personal issues: GET /issues?scope=assigned_to_me&state=opened

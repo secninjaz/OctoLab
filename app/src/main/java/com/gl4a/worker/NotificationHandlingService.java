@@ -27,9 +27,13 @@ public class NotificationHandlingService extends IntentService {
     private static final String ACTION_HANDLE_NOTIFICATION_DISMISS =
             "com.gl4a.action.HANDLE_NOTIFICATION_DISMISS";
 
-    public static Intent makeMarkNotificationsSeenIntent(Context context) {
+    public static Intent makeMarkNotificationsSeenIntent(Context context, int notificationId) {
+        // Encode the ID in the data URI so filterEquals() sees each project as a distinct
+        // PendingIntent. Extras are ignored by filterEquals(), meaning FLAG_UPDATE_CURRENT
+        // could silently return a cached PendingIntent without the new extras.
         return new Intent(context, NotificationHandlingService.class)
-                .setAction(ACTION_MARK_SEEN);
+                .setAction(ACTION_MARK_SEEN)
+                .setData(android.net.Uri.parse("notification://cancel/" + notificationId));
     }
 
     public static Intent makeHandleDismissIntent(Context context, int notificationId) {
@@ -40,12 +44,14 @@ public class NotificationHandlingService extends IntentService {
 
     public static Intent makeMarkReposNotificationsAsReadActionIntent(Context context,
             int notificationId, String repoOwner, String repoName) {
+        // Encode ID in data URI so filterEquals() treats each project as a distinct
+        // PendingIntent — extras are ignored by filterEquals(), causing FLAG_UPDATE_CURRENT
+        // to return a cached PendingIntent without the extras (notificationId == -1).
         return new Intent(context, NotificationHandlingService.class)
                 .setAction(ACTION_MARK_READ)
-                .putExtra(EXTRA_NOTIFICATION_ID, notificationId)
+                .setData(android.net.Uri.parse("notification://cancel/" + notificationId))
                 .putExtra(EXTRA_REPO_OWNER, repoOwner)
-                .putExtra(EXTRA_REPO_NAME, repoName)
-                .putExtra(EXTRA_TIMESTAMP, System.currentTimeMillis());
+                .putExtra(EXTRA_REPO_NAME, repoName);
     }
 
     public NotificationHandlingService() {
@@ -60,14 +66,29 @@ public class NotificationHandlingService extends IntentService {
 
         String repoOwner = intent.getStringExtra(EXTRA_REPO_OWNER);
         String repoName = intent.getStringExtra(EXTRA_REPO_NAME);
+        // Read ID from data URI (set by makeMarkNotificationsSeenIntent) or fall back to extra.
         int notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1);
+        if (intent.getData() != null) {
+            try {
+                notificationId = Integer.parseInt(intent.getData().getLastPathSegment());
+            } catch (NumberFormatException ignored) {}
+        }
 
         switch (intent.getAction()) {
             case ACTION_MARK_SEEN:
-                NotificationsWorker.markNotificationsAsSeen(this);
+                // notificationId==0 or -1 (summary/not-found) → cancelAll.
+                // Any other value (including negative) is a valid per-project ID → cancel specific.
+                if (notificationId != 0 && notificationId != -1) {
+                    NotificationsWorker.markNotificationsAsSeen(this, false);
+                    NotificationManager nm =
+                            (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                    if (nm != null) nm.cancel(notificationId);
+                } else {
+                    NotificationsWorker.markNotificationsAsSeen(this, true);
+                }
                 break;
             case ACTION_HANDLE_NOTIFICATION_DISMISS:
-                if (notificationId > 0) {
+                if (notificationId != -1) {
                     NotificationsWorker.handleNotificationDismiss(this, notificationId);
                 }
                 break;
@@ -76,11 +97,17 @@ public class NotificationHandlingService extends IntentService {
                     // TODO: Implement GitLab to-do mark-as-read via GitLabTodoService
                     Log.d(Gl4Application.LOG_TAG, "Mark repo todos as read: " + repoOwner + "/" + repoName);
                 }
-                if (notificationId > 0) {
-                    NotificationManager notificationManager =
-                            (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                // notificationId==0 reserved for group summary; -1 means ID not found.
+                // Any other value (including negative) is a valid per-project ID.
+                if (notificationId != 0 && notificationId != -1) {
+                    androidx.core.app.NotificationManagerCompat nm =
+                            androidx.core.app.NotificationManagerCompat.from(this);
                     NotificationsWorker.handleNotificationDismiss(this, notificationId);
-                    notificationManager.cancel(notificationId);
+                    nm.cancel(notificationId);
+                    // Do NOT cancel the group summary (ID=0) here — cancelling the
+                    // summary cancels ALL children on Android. The summary will clear
+                    // automatically when the user opens the app (markNotificationsAsSeen
+                    // in onStart calls cancelAll) or when all children are dismissed.
                 }
                 break;
         }
