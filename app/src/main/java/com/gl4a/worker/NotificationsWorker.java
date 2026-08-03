@@ -131,10 +131,15 @@ public class NotificationsWorker extends Worker {
         notificationManager.createNotificationChannel(channel);
     }
 
-    public static void markNotificationsAsSeen(Context context) {
-        NotificationManager notificationManager =
-                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        notificationManager.cancelAll();
+    /** Marks all accounts' notifications as seen. Pass {@code cancelAll=true} when the user
+     *  opens the app (clears every system notification); pass {@code false} when called from
+     *  a per-notification action so other projects' system notifications are not dismissed. */
+    public static void markNotificationsAsSeen(Context context, boolean cancelAll) {
+        if (cancelAll) {
+            NotificationManager notificationManager =
+                    (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (notificationManager != null) notificationManager.cancelAll();
+        }
 
         synchronized (sPrefsLock) {
             SharedPreferences prefs = getPrefs(context);
@@ -365,11 +370,18 @@ public class NotificationsWorker extends Worker {
 
         if (!hasNewTodo) builder.setOnlyAlertOnce(true);
 
-        // "Mark as read" action — dismisses all notifications and updates seen state.
-        PendingIntent markSeenIntent = PendingIntent.getService(context, 0,
-                NotificationHandlingService.makeMarkNotificationsSeenIntent(context),
+        // "Mark as read" action — uses the original ACTION_MARK_READ path which calls
+        // handleNotificationDismiss(id) + nm.cancel(id) for THIS notification only.
+        String pns = first.project != null && first.project.pathWithNamespace != null
+                ? first.project.pathWithNamespace : "";
+        int slash = pns.lastIndexOf('/');
+        String repoOwner = slash >= 0 ? pns.substring(0, slash) : pns;
+        String repoName  = slash >= 0 ? pns.substring(slash + 1) : pns;
+        PendingIntent markReadIntent = PendingIntent.getService(context, id,
+                NotificationHandlingService.makeMarkReposNotificationsAsReadActionIntent(
+                        context, id, repoOwner, repoName),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        builder.addAction(R.drawable.icon_notifications, "Mark as read", markSeenIntent);
+        builder.addAction(R.drawable.icon_notifications, "Mark as read", markReadIntent);
 
         nm.notify(id, builder.build());
     }
@@ -392,8 +404,10 @@ public class NotificationsWorker extends Worker {
         PendingIntent contentIntent = PendingIntent.getActivity(context, 0,
                 HomeActivity.makeIntent(context, R.id.notifications),
                 PendingIntent.FLAG_IMMUTABLE);
+        // Summary notification delete intent: pass id=0 so the handler calls cancelAll()
+        // (clearing all project notifications when the group summary is dismissed).
         PendingIntent deleteIntent = PendingIntent.getService(context, 0,
-                NotificationHandlingService.makeMarkNotificationsSeenIntent(context),
+                NotificationHandlingService.makeMarkNotificationsSeenIntent(context, 0),
                 PendingIntent.FLAG_IMMUTABLE);
 
         NotificationCompat.Builder builder = makeBaseBuilder()

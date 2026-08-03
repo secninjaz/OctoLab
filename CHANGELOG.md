@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.9] - 2026-08-03
+
+### Fixed
+- Notification "Mark as read" action button on a project's system notification now dismisses only that project's card — previously `cancelAll()` was called, removing every other project's notification from the shade simultaneously. Dismissing the group summary still clears all children.
+- Mentioned and Participating tabs pagination restored in both My Issues and My MRs — pagination was disabled as a workaround for duplicate-item regression in v1.2.7. Fixed properly with a per-load `ConcurrentHashSet` that filters cross-page duplicates before they reach the list.
+
 ## [1.2.8] - 2026-08-03
 
 ### Fixed
