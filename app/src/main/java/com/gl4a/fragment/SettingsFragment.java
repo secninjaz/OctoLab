@@ -152,7 +152,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                     stateSummary = getString(R.string.worker_state_unknown);
                 }
                 long lastCheckMs = NotificationsWorker.getLastCheckMillis(ctx);
-                final String lastSyncSummary;
+                final CharSequence lastSyncSummary;
                 if (lastCheckMs == 0) {
                     lastSyncSummary = getString(R.string.worker_last_sync_never);
                 } else {
