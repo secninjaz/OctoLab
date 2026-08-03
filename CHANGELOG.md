@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.8] - 2026-08-03
+
+### Fixed
+- MR label colours in the Mentioned and Participating list tabs now show correctly — the enrichment was calling the issues endpoint with MR iids (silently ignored); switched to fetching all project labels and matching by name, consistent with the MR detail view fix in v1.2.7
+- Bookmarks now scoped per account — all bookmarks were stored in a shared table with no account column, causing every account to see every other account's bookmarks; added `account` column (DB v5) and filter all read/write/check operations to the active login
+- Tapping the project avatar or project name in the to-do list now opens the correct repository — the avatar was tagged with a `GitLabUser` stub using the project path as username, causing `UserActivity` to open and return a 404; fixed by tagging the avatar with `GitLabProject` and routing to `RepositoryActivity`
+
 ## [1.2.7] - 2026-08-03
 
 ### Added

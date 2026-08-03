@@ -52,8 +52,12 @@ public class BookmarkListFragment extends LoadingListFragmentBase implements
 
     @Override
     public Loader<Cursor> onCreateLoader(int id, Bundle args) {
+        String account = com.gl4a.Gl4Application.get().getAuthLogin();
         return new CursorLoader(getActivity(), BookmarksProvider.Columns.CONTENT_URI,
-                null, null, null, BookmarksProvider.Columns.ORDER_ID + " ASC");
+                null,
+                BookmarksProvider.Columns.ACCOUNT + " = ?",
+                new String[]{ account != null ? account : "" },
+                BookmarksProvider.Columns.ORDER_ID + " ASC");
     }
 
     @Override

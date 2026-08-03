@@ -11,7 +11,7 @@ import java.net.URISyntaxException;
 
 public class DbHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "gh4adb.db";
-    private static final int DATABASE_VERSION = 4;
+    private static final int DATABASE_VERSION = 5;
 
     static final String BOOKMARKS_TABLE = "bookmarks";
     static final String SUGGESTIONS_TABLE = "suggestions";
@@ -37,6 +37,9 @@ public class DbHelper extends SQLiteOpenHelper {
         if (oldVersion < 4) {
             addBookmarksOrderIdColumn(db);
         }
+        if (oldVersion < 5) {
+            addBookmarksAccountColumn(db);
+        }
     }
 
     private void createBookmarksTable(SQLiteDatabase db, String tableName) {
@@ -46,7 +49,12 @@ public class DbHelper extends SQLiteOpenHelper {
                 + "type integer not null, "
                 + "uri text not null, "
                 + "extra_data text, "
-                + "order_id integer not null);");
+                + "order_id integer not null, "
+                + "account text not null default '');");
+    }
+
+    private void addBookmarksAccountColumn(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE " + BOOKMARKS_TABLE + " ADD COLUMN account text not null default '';");
     }
 
     private void createSuggestionsTable(SQLiteDatabase db) {
