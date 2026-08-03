@@ -372,32 +372,66 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
                 if (!iidsByProject.isEmpty()) {
                     GitLabIssueService labelService =
                             ServiceFactory.get(GitLabIssueService.class, false);
-                    // Build projectId → (iid → labelList) map from batch fetches
-                    java.util.Map<Long, java.util.Map<Integer, java.util.List<com.gl4a.gitlab.model.GitLabLabel>>>
-                            labelMap = new java.util.HashMap<>();
-                    for (java.util.Map.Entry<Long, java.util.List<Integer>> entry
-                            : iidsByProject.entrySet()) {
-                        try {
-                            retrofit2.Response<java.util.List<GitLabIssue>> resp =
-                                    labelService.getIssuesByIids(
-                                            entry.getKey(), entry.getValue(), true, 100)
-                                            .blockingGet();
-                            if (resp.isSuccessful() && resp.body() != null) {
-                                java.util.Map<Integer, java.util.List<com.gl4a.gitlab.model.GitLabLabel>> m =
-                                        new java.util.HashMap<>();
-                                for (GitLabIssue ei : resp.body()) {
-                                    if (ei.labelNames != null) m.put(ei.iid, ei.labelNames);
+                    if (mIsMR) {
+                        // MR iids cannot be used with the issues endpoint to get label colours.
+                        // Fetch all project labels (name + colour) and match by name — same
+                        // approach as SingleFactory.getMergeRequest for the MR detail view.
+                        java.util.Map<Long, java.util.Map<String, com.gl4a.gitlab.model.GitLabLabel>>
+                                projectLabelsByName = new java.util.HashMap<>();
+                        for (long projectId : iidsByProject.keySet()) {
+                            try {
+                                retrofit2.Response<java.util.List<com.gl4a.gitlab.model.GitLabLabel>> resp =
+                                        labelService.getLabels(projectId, 1, 100).blockingGet();
+                                if (resp.isSuccessful() && resp.body() != null) {
+                                    java.util.Map<String, com.gl4a.gitlab.model.GitLabLabel> byName =
+                                            new java.util.HashMap<>();
+                                    for (com.gl4a.gitlab.model.GitLabLabel l : resp.body()) {
+                                        if (l.name != null) byName.put(l.name, l);
+                                    }
+                                    projectLabelsByName.put(projectId, byName);
                                 }
-                                labelMap.put(entry.getKey(), m);
+                            } catch (Exception ignored) {}
+                        }
+                        for (GitLabIssue issue : issues) {
+                            java.util.Map<String, com.gl4a.gitlab.model.GitLabLabel> byName =
+                                    projectLabelsByName.get(issue.projectId);
+                            if (byName != null && issue.labelNames != null) {
+                                for (com.gl4a.gitlab.model.GitLabLabel ml : issue.labelNames) {
+                                    com.gl4a.gitlab.model.GitLabLabel full = byName.get(ml.name);
+                                    if (full != null) {
+                                        ml.color = full.color;
+                                        ml.textColor = full.textColor;
+                                    }
+                                }
                             }
-                        } catch (Exception ignored) {}
-                    }
-                    // Apply enriched labels back to the todo issues
-                    for (GitLabIssue issue : issues) {
-                        java.util.Map<Integer, java.util.List<com.gl4a.gitlab.model.GitLabLabel>> m =
-                                labelMap.get(issue.projectId);
-                        if (m != null && m.containsKey(issue.iid)) {
-                            issue.labelNames = m.get(issue.iid);
+                        }
+                    } else {
+                        // Issues: use iids[] with with_labels_details=true for batch enrichment.
+                        java.util.Map<Long, java.util.Map<Integer, java.util.List<com.gl4a.gitlab.model.GitLabLabel>>>
+                                labelMap = new java.util.HashMap<>();
+                        for (java.util.Map.Entry<Long, java.util.List<Integer>> entry
+                                : iidsByProject.entrySet()) {
+                            try {
+                                retrofit2.Response<java.util.List<GitLabIssue>> resp =
+                                        labelService.getIssuesByIids(
+                                                entry.getKey(), entry.getValue(), true, 100)
+                                                .blockingGet();
+                                if (resp.isSuccessful() && resp.body() != null) {
+                                    java.util.Map<Integer, java.util.List<com.gl4a.gitlab.model.GitLabLabel>> m =
+                                            new java.util.HashMap<>();
+                                    for (GitLabIssue ei : resp.body()) {
+                                        if (ei.labelNames != null) m.put(ei.iid, ei.labelNames);
+                                    }
+                                    labelMap.put(entry.getKey(), m);
+                                }
+                            } catch (Exception ignored) {}
+                        }
+                        for (GitLabIssue issue : issues) {
+                            java.util.Map<Integer, java.util.List<com.gl4a.gitlab.model.GitLabLabel>> m =
+                                    labelMap.get(issue.projectId);
+                            if (m != null && m.containsKey(issue.iid)) {
+                                issue.labelNames = m.get(issue.iid);
+                            }
                         }
                     }
                 }

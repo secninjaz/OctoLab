@@ -32,6 +32,7 @@ public class BookmarksProvider extends ContentProvider {
         String URI = "uri";
         String EXTRA = "extra_data";
         String ORDER_ID = "order_id";
+        String ACCOUNT = "account";
 
         int TYPE_USER = 0;
         int TYPE_REPO = 1;
@@ -54,6 +55,7 @@ public class BookmarksProvider extends ContentProvider {
     public static void saveBookmark(Context context, String name, int type, String url,
             String extraData, boolean showToast) {
         ContentResolver cr = context.getContentResolver();
+        String account = com.gl4a.Gl4Application.get().getAuthLogin();
 
         ContentValues cv = new ContentValues();
         cv.put(BookmarksProvider.Columns.NAME, name);
@@ -61,6 +63,7 @@ public class BookmarksProvider extends ContentProvider {
         cv.put(BookmarksProvider.Columns.URI, url);
         cv.put(BookmarksProvider.Columns.EXTRA, extraData);
         cv.put(BookmarksProvider.Columns.ORDER_ID, getNextOrderId(cr));
+        cv.put(BookmarksProvider.Columns.ACCOUNT, account != null ? account : "");
 
         if (cr.insert(BookmarksProvider.Columns.CONTENT_URI, cv) != null && showToast) {
             Toast.makeText(context, R.string.bookmark_saved, Toast.LENGTH_LONG).show();
@@ -83,19 +86,21 @@ public class BookmarksProvider extends ContentProvider {
     }
 
     public static void removeBookmark(Context context, String url) {
+        String account = com.gl4a.Gl4Application.get().getAuthLogin();
         int removedRows = context.getContentResolver().delete(Columns.CONTENT_URI,
-                Columns.URI + " = ?",
-                new String[] { url });
+                Columns.URI + " = ? AND " + Columns.ACCOUNT + " = ?",
+                new String[] { url, account != null ? account : "" });
         if (removedRows > 0) {
             Toast.makeText(context, R.string.bookmark_removed, Toast.LENGTH_SHORT).show();
         }
     }
 
     public static boolean hasBookmarked(Context context, String url) {
+        String account = com.gl4a.Gl4Application.get().getAuthLogin();
         Cursor cursor = context.getContentResolver().query(Columns.CONTENT_URI,
                 new String[] { Columns._ID },
-                Columns.URI + " = ?",
-                new String[] { url },
+                Columns.URI + " = ? AND " + Columns.ACCOUNT + " = ?",
+                new String[] { url, account != null ? account : "" },
                 null);
 
         boolean hasBookmarked = false;

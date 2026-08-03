@@ -13,6 +13,7 @@ import android.widget.PopupMenu;
 import android.widget.TextView;
 
 import com.gl4a.R;
+import com.gl4a.activities.RepositoryActivity;
 import com.gl4a.activities.UserActivity;
 import com.gl4a.gitlab.model.GitLabProject;
 import com.gl4a.gitlab.model.GitLabTodo;
@@ -145,15 +146,9 @@ public class NotificationAdapter extends
             if (item.repository != null) {
                 String projectName = item.repository.name != null ? item.repository.name : "";
                 AvatarHandler.assignAvatarForProject(holder.ivAvatar, projectName, item.repository.id);
-                // Keep the tag for click handling (opens RepositoryActivity).
-                GitLabUser owner = item.repository.owner();
-                if (owner == null) {
-                    owner = new GitLabUser();
-                    owner.id = item.repository.id;
-                    owner.username = item.repository.path != null ? item.repository.path : item.repository.name;
-                    owner.name = item.repository.name;
-                }
-                holder.ivAvatar.setTag(owner);
+                // Tag with the project so the click handler opens RepositoryActivity,
+                // not UserActivity (which would search for a user named after the project).
+                holder.ivAvatar.setTag(item.repository);
             }
             holder.ivAvatar.setAlpha(alpha);
             return;
@@ -285,7 +280,11 @@ public class NotificationAdapter extends
                 }
                 case R.id.iv_avatar: {
                     Object tag = v.getTag();
-                    if (tag instanceof GitLabUser) {
+                    if (tag instanceof GitLabProject) {
+                        Intent intent = RepositoryActivity.makeIntent(v.getContext(),
+                                (GitLabProject) tag);
+                        v.getContext().startActivity(intent);
+                    } else if (tag instanceof GitLabUser) {
                         GitLabUser user = (GitLabUser) tag;
                         Intent intent = UserActivity.makeIntent(v.getContext(), user);
                         if (intent != null) {
