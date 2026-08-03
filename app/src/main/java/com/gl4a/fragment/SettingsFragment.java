@@ -55,12 +55,19 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
     private static final String KEY_DEBUG_SHARE = "debug_share_logs";
     private static final String KEY_DEBUG_CLEAR = "debug_clear_logs";
 
+    private static final String KEY_WORKER_STATUS_INFO = "worker_status_info";
+    private static final String KEY_WORKER_LAST_SYNC   = "worker_last_sync";
+    private static final String KEY_WORKER_SYNC_NOW    = "worker_sync_now";
+
     private OnStateChangeListener mListener;
     private IntegerListPreference mThemePref;
     private Preference mAboutPref;
     private Preference mOpenSourcePref;
     private TwoStatePreference mNotificationsPref;
     private IntegerListPreference mNotificationIntervalPref;
+    private Preference mWorkerStatusPref;
+    private Preference mWorkerLastSyncPref;
+    private Preference mWorkerSyncNowPref;
     private SwitchPreference mDebugLoggingPref;
     private Preference mDebugSharePref;
     private Preference mDebugClearPref;
@@ -95,6 +102,12 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         mNotificationIntervalPref = findPreference(KEY_NOTIFICATION_INTERVAL);
         mNotificationIntervalPref.setOnPreferenceChangeListener(this);
 
+        mWorkerStatusPref  = findPreference(KEY_WORKER_STATUS_INFO);
+        mWorkerLastSyncPref = findPreference(KEY_WORKER_LAST_SYNC);
+        mWorkerSyncNowPref  = findPreference(KEY_WORKER_SYNC_NOW);
+        mWorkerSyncNowPref.setOnPreferenceClickListener(this);
+        refreshWorkerStatus();
+
         mDebugLoggingPref = findPreference(KEY_DEBUG_LOGGING);
         mDebugLoggingPref.setOnPreferenceChangeListener(this);
 
@@ -103,6 +116,55 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
 
         mDebugClearPref = findPreference(KEY_DEBUG_CLEAR);
         mDebugClearPref.setOnPreferenceClickListener(this);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        refreshWorkerStatus();
+    }
+
+    private void refreshWorkerStatus() {
+        if (mWorkerStatusPref == null || mWorkerLastSyncPref == null) return;
+        Context ctx = getContext();
+        if (ctx == null) return;
+
+        // Query WorkManager for the periodic task state on a background thread.
+        com.google.common.util.concurrent.ListenableFuture<java.util.List<androidx.work.WorkInfo>> future =
+                androidx.work.WorkManager.getInstance(ctx)
+                        .getWorkInfosByTag(NotificationsWorker.WORK_TAG);
+        future.addListener(() -> {
+            if (!isAdded()) return;
+            try {
+                java.util.List<androidx.work.WorkInfo> infos = future.get();
+                androidx.work.WorkInfo.State state = null;
+                for (androidx.work.WorkInfo info : infos) {
+                    androidx.work.WorkInfo.State s = info.getState();
+                    if (state == null || s == androidx.work.WorkInfo.State.RUNNING) state = s;
+                }
+                final String stateSummary;
+                if (state == androidx.work.WorkInfo.State.RUNNING
+                        || state == androidx.work.WorkInfo.State.ENQUEUED) {
+                    stateSummary = getString(R.string.worker_state_running);
+                } else if (state == null) {
+                    stateSummary = getString(R.string.worker_state_stopped);
+                } else {
+                    stateSummary = getString(R.string.worker_state_unknown);
+                }
+                long lastCheckMs = NotificationsWorker.getLastCheckMillis(ctx);
+                final String lastSyncSummary;
+                if (lastCheckMs == 0) {
+                    lastSyncSummary = getString(R.string.worker_last_sync_never);
+                } else {
+                    lastSyncSummary = com.gl4a.utils.StringUtils.formatRelativeTime(
+                            ctx, new java.util.Date(lastCheckMs), true);
+                }
+                requireActivity().runOnUiThread(() -> {
+                    mWorkerStatusPref.setSummary(stateSummary);
+                    mWorkerLastSyncPref.setSummary(lastSyncSummary);
+                });
+            } catch (Exception ignored) {}
+        }, ctx.getMainExecutor());
     }
 
     @Override
@@ -141,7 +203,13 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
 
     @Override
     public boolean onPreferenceClick(Preference pref) {
-        if (pref == mAboutPref) {
+        if (pref == mWorkerSyncNowPref) {
+            NotificationsWorker.runNow(requireContext());
+            Toast.makeText(getContext(), R.string.worker_sync_now_toast, Toast.LENGTH_SHORT).show();
+            // Refresh status after a short delay to pick up the enqueued state.
+            requireView().postDelayed(this::refreshWorkerStatus, 600);
+            return true;
+        } else if (pref == mAboutPref) {
             boolean loggedIn = Gl4Application.get().isAuthorized();
             AboutDialogFragment.newInstance(getAppName(), loggedIn)
                     .show(getChildFragmentManager(), "about");

@@ -296,7 +296,10 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
             final String todoType = mIsMR ? "MergeRequest" : "Issue";
             final boolean isMentionedTab = "mentioned".equals(mScope);
             final String filterState = mIssueState != null ? mIssueState : "opened";
-            final int PER_PAGE = 25;
+            // Use a generous per-page to cover all mentions in one shot. Pagination across
+            // these 4 parallel calls causes cross-page duplicates because each page is
+            // deduplicated independently before being appended to the accumulated list.
+            final int PER_PAGE = 100;
 
             // onePage: fetch one (action, state) slice for the current page number.
             // Returns the response so we can inspect X-Next-Page for pagination.
@@ -398,11 +401,11 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
                         }
                     }
                 }
-                // Pagination: if any sub-call returned a full page, assume there is a next page
-                boolean hasMore = maxPageSize >= PER_PAGE;
-                return Response.success(new GitLabPage<>(
-                        issues, page, hasMore ? page + 1 : 0,
-                        hasMore ? page + 2 : page, issues.size()));
+                // No pagination for Mentioned/Participating: 4 parallel calls × PER_PAGE todos
+                // is sufficient for any realistic mention volume, and paginating these tabs
+                // causes cross-page duplicates (each page is independently deduplicated before
+                // being appended to the accumulated list).
+                return Response.success(new GitLabPage<>(issues, page, 0, page, issues.size()));
             });
         } else if (mScope != null && !mScope.isEmpty()) {
             // Personal issues: GET /issues?scope=assigned_to_me&state=opened

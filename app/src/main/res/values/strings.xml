@@ -114,6 +114,7 @@
     <string name="pulls">Merge Requests</string>
     <string name="issue_milestone_hint">Milestone</string>
     <string name="issue_assignee_hint">Assignees</string>
+    <string name="mr_reviewer_hint">Reviewers</string>
     <string name="link_not_openable">Link could not be opened</string>
     <string name="download_created">Created %1$s</string>
     <string name="download_mobile_warning_title">Mobile connection download</string>
@@ -641,6 +642,17 @@
     <string name="notification_subject_release">Release</string>
     <string name="notification_subject_discussion">Discussion</string>
     <string name="notification_interval">Sync interval</string>
+    <string name="worker_status_category">Notification worker</string>
+    <string name="worker_status_title">Worker state</string>
+    <string name="worker_state_running">Running (periodic)</string>
+    <string name="worker_state_enqueued">Enqueued (pending first run)</string>
+    <string name="worker_state_stopped">Stopped — notifications disabled</string>
+    <string name="worker_state_unknown">Unknown</string>
+    <string name="worker_last_sync_title">Last synced</string>
+    <string name="worker_last_sync_never">Never</string>
+    <string name="worker_sync_now_title">Sync now</string>
+    <string name="worker_sync_now_summary">Trigger an immediate background poll</string>
+    <string name="worker_sync_now_toast">Background sync triggered</string>
     <string name="detach">Open in new window</string>
 
     <string name="theme_light">Day</string>

@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.7] - 2026-08-03
+
+### Added
+- MR detail view: Reviewers section in the issue header, matching the Assignees row style — shows avatar, username, tappable to open profile
+- Settings → Notification Worker section (visible when notifications are enabled): shows live worker state, last sync time, and a Sync Now button for immediate background poll
+
+### Fixed
+- Crash when opening the To-do list on gitlab.com accounts: relative avatar URLs (e.g. `/uploads/...`) now have the instance base URL prepended before being passed to OkHttp
+- Project/group avatars: when a project has no avatar set, the app now walks up the namespace hierarchy (parent group → grandparent → root) until an avatar is found; initials shown only if nothing is set anywhere in the chain
+- MR detail view: label colours now show correctly — the single-MR endpoint ignores `with_labels_details`; fixed by fetching project labels separately and matching by name
+- MR detail view: labels, milestone, assignees, and reviewers were missing because the stub issue built in `newInstance` did not copy those fields from the MR
+- Mentioned / Participating tabs: duplicate items appeared on scroll when pagination fired; fixed by increasing per-page to 100 and disabling pagination for these tabs (4 parallel calls × 100 already covers realistic mention volumes)
+- Hint/placeholder text colour: unified to `#888888` for both light and dark themes, applied globally via `AppTheme` and `HeaderTheme`
+- Issue creation form hint colour: `HeaderTheme` (used by the title input) now inherits `theme_hint` and `OctoLab.TextInputLayout` style so changes propagate from a single token
+- Error text and icon colour in form fields: Material's default pinkish-purple replaced with `#C62828` (light) / `#FF5252` (dark), legible on both backgrounds
+
 ## [1.2.6] - 2026-07-31
 
 ### Fixed

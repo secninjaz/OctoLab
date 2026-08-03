@@ -101,11 +101,24 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
         stub.updatedAt = mr.updatedAt;
         stub.webUrl = mr.webUrl;
         stub.commentsCount = mr.commentsCount;
+        stub.labelNames = mr.labelNames;
+        stub.milestone = mr.milestone;
+        stub.assignees = mr.assignees;
+        stub.assignee = mr.assignee;
         return stub;
     }
 
     public void updateState(GitLabMergeRequest mr) {
         mMergeRequest = mr;
+        if (mIssue != null) {
+            mIssue.labelNames = mr.labelNames;
+            mIssue.milestone  = mr.milestone;
+            mIssue.assignees  = mr.assignees;
+            mIssue.assignee   = mr.assignee;
+        }
+        if (mListHeaderView != null) {
+            fillReviewers(mListHeaderView);
+        }
         assignHighlightColor();
         reloadEvents(false);
     }
@@ -174,6 +187,35 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
         if (branchContainer != null && mMergeRequest != null) {
             branchContainer.bind(mMergeRequest.head(), mMergeRequest.base());
             branchContainer.setVisibility(View.VISIBLE);
+        }
+        fillReviewers(headerView);
+    }
+
+    private void fillReviewers(View headerView) {
+        android.view.View reviewerGroup = headerView.findViewById(R.id.reviewer_container);
+        if (reviewerGroup == null) return;
+        java.util.List<com.gl4a.gitlab.model.GitLabUser> reviewers =
+                mMergeRequest != null ? mMergeRequest.reviewers : null;
+        if (reviewers != null && !reviewers.isEmpty()) {
+            android.widget.LinearLayout reviewerList =
+                    headerView.findViewById(R.id.reviewer_list);
+            android.view.LayoutInflater inflater = getLayoutInflater();
+            reviewerList.removeAllViews();
+            for (com.gl4a.gitlab.model.GitLabUser reviewer : reviewers) {
+                android.view.View row =
+                        inflater.inflate(R.layout.row_assignee, reviewerList, false);
+                android.widget.TextView tvReviewer = row.findViewById(R.id.tv_assignee);
+                tvReviewer.setText(
+                        com.gl4a.utils.ApiHelpers.getUserLogin(getActivity(), reviewer));
+                android.widget.ImageView ivReviewer = row.findViewById(R.id.iv_assignee);
+                com.gl4a.utils.AvatarHandler.assignAvatar(ivReviewer, reviewer);
+                ivReviewer.setTag(reviewer);
+                ivReviewer.setOnClickListener(this);
+                reviewerList.addView(row);
+            }
+            reviewerGroup.setVisibility(android.view.View.VISIBLE);
+        } else {
+            reviewerGroup.setVisibility(android.view.View.GONE);
         }
     }
 
