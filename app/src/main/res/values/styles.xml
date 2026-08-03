@@ -93,11 +93,14 @@
         <item name="android:paddingRight">@dimen/content_padding</item>
     </style>
 
-    <!-- TextInputLayout override: force hint colour through hintTextColor (the attribute
-         Material actually reads) rather than android:textColorHint which it ignores. -->
+    <!-- TextInputLayout override: force hint colour and error colour to theme-controlled values.
+         Changing @color/theme_hint or @color/form_error propagates to all fields app-wide. -->
     <style name="OctoLab.TextInputLayout" parent="Widget.MaterialComponents.TextInputLayout.FilledBox">
         <item name="hintTextColor">@color/theme_hint</item>
         <item name="android:textColorHint">@color/theme_hint</item>
+        <item name="errorTextColor">@color/form_error</item>
+        <item name="errorIconTint">@color/form_error</item>
+        <item name="boxStrokeErrorColor">@color/form_error</item>
     </style>
 
     <style name="CardContainer">

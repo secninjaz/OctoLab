@@ -60,7 +60,7 @@ public class NotificationsWorker extends Worker {
 
     private static final String CHANNEL_GITLAB_NOTIFICATIONS = "channel_notifications";
     private static final String GROUP_ID_GITLAB = "gitlab_notifications";
-    private static final String WORK_TAG = "job_notifications";
+    public static final String WORK_TAG = "job_notifications";
 
     private static final String KEY_LAST_NOTIFICATION_CHECK = "last_notification_check";
     private static final String KEY_LAST_NOTIFICATION_SEEN = "last_notification_seen";
@@ -87,6 +87,33 @@ public class NotificationsWorker extends Worker {
         Log.d(TAG, "Canceling notification fetch");
         WorkManager.getInstance(context).cancelAllWorkByTag(WORK_TAG);
         WorkManager.getInstance(context).cancelUniqueWork(WORK_TAG);
+    }
+
+    /**
+     * Returns the most recent last-check timestamp (ms) across all logged-in accounts,
+     * or 0 if the worker has never run.
+     */
+    public static long getLastCheckMillis(Context context) {
+        android.content.SharedPreferences prefs =
+                context.getSharedPreferences(com.gl4a.fragment.SettingsFragment.PREF_NAME,
+                        Context.MODE_PRIVATE);
+        com.gl4a.Gl4Application app = com.gl4a.Gl4Application.get();
+        long latest = 0;
+        for (String login : app.getAllLogins()) {
+            long t = prefs.getLong(KEY_LAST_NOTIFICATION_CHECK + "_" + login, 0);
+            if (t > latest) latest = t;
+        }
+        if (latest == 0) latest = prefs.getLong(KEY_LAST_NOTIFICATION_CHECK, 0);
+        return latest;
+    }
+
+    /** Enqueues an immediate one-time run of the notification worker. */
+    public static void runNow(Context context) {
+        androidx.work.OneTimeWorkRequest req = new androidx.work.OneTimeWorkRequest.Builder(
+                NotificationsWorker.class)
+                .addTag(WORK_TAG)
+                .build();
+        WorkManager.getInstance(context).enqueue(req);
     }
 
     public static void createNotificationChannels(Context context) {

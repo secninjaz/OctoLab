@@ -251,7 +251,7 @@ public class AvatarHandler {
                 }
             }
             return bitmap;
-        } catch (IOException e) {
+        } catch (Exception e) {
             return null;
         }
     }
@@ -340,23 +340,103 @@ public class AvatarHandler {
         sMaxImageSizePx = Math.round(res.getDisplayMetrics().density * MAX_CACHED_IMAGE_SIZE);
     }
 
-    /** Fetches a project's avatar_url via GET /projects/{id}. */
+    /**
+     * Fetches the avatar URL for a project, walking up the namespace hierarchy when no avatar
+     * is set at the project level:
+     *   project avatar → parent group/namespace avatar → grandparent group → … → root namespace.
+     * Returns null only when no level has an avatar (caller shows initials).
+     * The namespace object is embedded in the project response so the first two levels cost
+     * only one API call; each subsequent ancestor level costs one /groups/{id} call (max 5).
+     */
     private static String fetchProjectAvatarUrl(long projectId) throws IOException {
         com.gl4a.Gl4Application app = com.gl4a.Gl4Application.get();
-        String apiUrl = app.getApiBaseUrl() + "projects/" + projectId;
-        okhttp3.OkHttpClient client = ServiceFactory.getImageHttpClient();
-        okhttp3.Request req = new okhttp3.Request.Builder().url(apiUrl).build();
+        OkHttpClient client = ServiceFactory.getImageHttpClient();
+
+        String projectJson = fetchJsonString(client, app.getApiBaseUrl() + "projects/" + projectId);
+        if (projectJson == null) return null;
+
+        // Level 1: project's own avatar
+        String avatarUrl = parseJsonString(projectJson, "avatar_url");
+        if (avatarUrl != null) return avatarUrl;
+
+        // Level 2: immediate parent namespace (embedded — no extra API call)
+        String nsJson = parseJsonObject(projectJson, "namespace");
+        if (nsJson == null) return null;
+
+        avatarUrl = parseJsonString(nsJson, "avatar_url");
+        if (avatarUrl != null) return avatarUrl;
+
+        // User namespaces are always root — nothing further to walk.
+        if (!"group".equals(parseJsonString(nsJson, "kind"))) return null;
+
+        // Levels 3+: walk up ancestor groups via parent_id (bounded to 5 levels)
+        long parentId = parseJsonLong(nsJson, "parent_id");
+        for (int depth = 0; depth < 5 && parentId > 0; depth++) {
+            try {
+                String groupJson = fetchJsonString(client,
+                        app.getApiBaseUrl() + "groups/" + parentId);
+                if (groupJson == null) break;
+                avatarUrl = parseJsonString(groupJson, "avatar_url");
+                if (avatarUrl != null) return avatarUrl;
+                parentId = parseJsonLong(groupJson, "parent_id");
+            } catch (IOException e) {
+                Log.d(TAG, "Group avatar walk-up stopped at parent_id=" + parentId);
+                break;
+            }
+        }
+        return null;
+    }
+
+    private static String fetchJsonString(OkHttpClient client, String url) throws IOException {
+        okhttp3.Request req = new okhttp3.Request.Builder().url(url).build();
         try (okhttp3.Response resp = client.newCall(req).execute()) {
             if (!resp.isSuccessful() || resp.body() == null) return null;
-            String json = resp.body().string();
-            int idx = json.indexOf("\"avatar_url\":\"");
-            if (idx < 0) return null;
-            int start = idx + 14;
-            int end = json.indexOf("\"", start);
-            if (end <= start) return null;
-            String avatarUrl = json.substring(start, end).replace("\\/", "/");
-            return (avatarUrl.isEmpty() || avatarUrl.equals("null")) ? null : avatarUrl;
+            return resp.body().string();
         }
+    }
+
+    /** Returns the unescaped value of {@code "key":"VALUE"}, or null if absent/null/empty. */
+    private static String parseJsonString(String json, String key) {
+        String search = "\"" + key + "\":\"";
+        int idx = json.indexOf(search);
+        if (idx < 0) return null;
+        int start = idx + search.length();
+        int end = json.indexOf("\"", start);
+        if (end <= start) return null;
+        String v = json.substring(start, end).replace("\\/", "/").replace("\\u0026", "&");
+        return (v.isEmpty() || v.equals("null")) ? null : v;
+    }
+
+    /** Returns the long value of {@code "key":N}, or 0 if absent or JSON null. */
+    private static long parseJsonLong(String json, String key) {
+        String search = "\"" + key + "\":";
+        int idx = json.indexOf(search);
+        if (idx < 0) return 0;
+        int start = idx + search.length();
+        while (start < json.length() && json.charAt(start) == ' ') start++;
+        if (start >= json.length() || json.charAt(start) == 'n') return 0; // null
+        int end = start;
+        while (end < json.length()
+                && (Character.isDigit(json.charAt(end)) || json.charAt(end) == '-')) end++;
+        try { return Long.parseLong(json.substring(start, end)); }
+        catch (NumberFormatException e) { return 0; }
+    }
+
+    /** Returns the raw JSON object string for {@code "key":{...}}, or null if absent. */
+    private static String parseJsonObject(String json, String key) {
+        String search = "\"" + key + "\":{";
+        int idx = json.indexOf(search);
+        if (idx < 0) return null;
+        int start = idx + search.length() - 1; // position of opening {
+        int depth = 1;
+        int i = start + 1;
+        while (i < json.length() && depth > 0) {
+            char c = json.charAt(i);
+            if (c == '{') depth++;
+            else if (c == '}') depth--;
+            i++;
+        }
+        return depth == 0 ? json.substring(start, i) : null;
     }
 
     /**
@@ -531,6 +611,12 @@ public class AvatarHandler {
     }
 
     private static Bitmap fetchBitmap(String url) throws IOException {
+        // gitlab.com and some self-hosted instances return relative avatar URLs (e.g. /uploads/...).
+        // OkHttp requires an absolute URL; prepend the instance base URL when the path is relative.
+        if (url != null && url.startsWith("/")) {
+            String base = com.gl4a.Gl4Application.get().getInstanceUrl();
+            if (base != null) url = base + url;
+        }
         OkHttpClient client = ServiceFactory.getImageHttpClient();
         okhttp3.Request request = new okhttp3.Request.Builder()
                 .url(url)
@@ -590,7 +676,7 @@ public class AvatarHandler {
                         try {
                             String projectAvatarUrl = fetchProjectAvatarUrl(req.projectId);
                             if (projectAvatarUrl != null) bitmap = fetchBitmap(projectAvatarUrl);
-                        } catch (IOException e) {
+                        } catch (Exception e) {
                             Log.d(TAG, "Project avatar fetch failed for id=" + req.projectId);
                         }
                     } else if (req != null && req.apiFirst && req.email != null) {
@@ -599,20 +685,20 @@ public class AvatarHandler {
                         try {
                             String userAvatarUrl = fetchUserAvatarByEmail(req.email);
                             if (userAvatarUrl != null) bitmap = fetchBitmap(userAvatarUrl);
-                        } catch (IOException e) {
+                        } catch (Exception e) {
                             Log.d(TAG, "User search failed for " + req.email + ", trying Gravatar");
                         }
                         if (bitmap == null && req.url != null) {
                             try {
                                 bitmap = fetchBitmap(req.url);
-                            } catch (IOException e2) {
+                            } catch (Exception e2) {
                                 Log.d(TAG, "Gravatar fallback also failed for " + req.email);
                             }
                         }
                     } else {
                         try {
                             bitmap = fetchBitmap(url);
-                        } catch (IOException e) {
+                        } catch (Exception e) {
                             // Tier 2: GitLab Avatar API — GET /api/v4/avatar?email=EMAIL&size=N
                             // Works on instances where /uploads/ rejects token auth.
                             if (req != null && req.email != null) {
@@ -621,7 +707,7 @@ public class AvatarHandler {
                                     if (apiUrl != null && !apiUrl.equals(url)) {
                                         bitmap = fetchBitmap(apiUrl);
                                     }
-                                } catch (IOException e2) {
+                                } catch (Exception e2) {
                                     Log.d(TAG, "Avatar API fallback failed for " + req.email);
                                 }
                             }
@@ -629,7 +715,7 @@ public class AvatarHandler {
                             if (bitmap == null && req != null && req.fallbackUrl != null) {
                                 try {
                                     bitmap = fetchBitmap(req.fallbackUrl);
-                                } catch (IOException e3) {
+                                } catch (Exception e3) {
                                     Log.d(TAG, "Gravatar fallback also failed");
                                 }
                             }

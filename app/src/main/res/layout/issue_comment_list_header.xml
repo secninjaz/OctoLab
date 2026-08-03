@@ -154,6 +154,42 @@
     </RelativeLayout>
 
     <RelativeLayout
+        android:id="@+id/reviewer_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="@dimen/overview_item_spacing"
+        android:paddingLeft="@dimen/content_padding"
+        android:paddingRight="@dimen/content_padding"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <ImageView
+            android:id="@+id/iv_reviewer_icon"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginRight="10dp"
+            android:src="@drawable/timeline_event_review" />
+
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_reviewer_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@id/iv_reviewer_icon"
+            android:text="@string/mr_reviewer_hint"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+            android:textColor="?android:attr/textColorPrimary" />
+
+        <LinearLayout
+            android:id="@+id/reviewer_list"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_reviewer_label"
+            android:layout_toRightOf="@id/iv_reviewer_icon"
+            android:orientation="vertical" />
+
+    </RelativeLayout>
+
+    <RelativeLayout
         android:id="@+id/milestone_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

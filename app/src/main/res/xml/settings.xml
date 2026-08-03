@@ -65,6 +65,33 @@
 
     <PreferenceCategory
         app:iconSpaceReserved="false"
+        android:dependency="notifications"
+        android:title="@string/worker_status_category">
+
+        <Preference
+            app:iconSpaceReserved="false"
+            android:key="worker_status_info"
+            android:selectable="false"
+            android:title="@string/worker_status_title"
+            android:summary="@string/worker_state_unknown" />
+
+        <Preference
+            app:iconSpaceReserved="false"
+            android:key="worker_last_sync"
+            android:selectable="false"
+            android:title="@string/worker_last_sync_title"
+            android:summary="@string/worker_last_sync_never" />
+
+        <Preference
+            app:iconSpaceReserved="false"
+            android:key="worker_sync_now"
+            android:title="@string/worker_sync_now_title"
+            android:summary="@string/worker_sync_now_summary" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
         android:title="@string/debug_category">
 
         <SwitchPreference

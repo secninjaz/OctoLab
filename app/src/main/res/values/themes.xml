@@ -48,6 +48,7 @@
         <item name="android:textColorPrimary">@color/theme_text_primary</item>
         <item name="android:textColorHint">@color/theme_hint</item>
         <item name="colorOnSurface">@color/theme_text_primary</item>
+        <item name="colorError">@color/form_error</item>
         <item name="textInputStyle">@style/OctoLab.TextInputLayout</item>
     </style>
 
@@ -73,6 +74,12 @@
         <item name="android:spinnerStyle">@style/Widget.Spinner.ActionBar.Light</item>
         <!-- used by appcompat to tint the spinner background drawable -->
         <item name="android:colorBackground">#FFFFF5</item>
+        <!-- Hint and error colours: single source of truth — change theme_hint / form_error. -->
+        <item name="android:textColorHint">@color/theme_hint</item>
+        <item name="colorError">@color/form_error</item>
+        <!-- textInputStyle needed: Material TextInputLayout ignores android:textColorHint
+             and computes its own hint colour from colorOnSurface instead. -->
+        <item name="textInputStyle">@style/OctoLab.TextInputLayout</item>
     </style>
 
     <style name="PreferenceTheme" parent="PreferenceThemeOverlay.v14.Material" />

@@ -3,9 +3,11 @@ package com.gl4a.utils;
 import com.gl4a.Gl4Application;
 import com.gl4a.ServiceFactory;
 import com.gl4a.utils.ApiHelpers;
+import com.gl4a.gitlab.model.GitLabLabel;
 import com.gl4a.gitlab.model.GitLabMergeRequest;
 import com.gl4a.gitlab.model.GitLabProject;
 import com.gl4a.gitlab.model.GitLabTodo;
+import com.gl4a.gitlab.service.GitLabIssueService;
 import com.gl4a.gitlab.service.GitLabMergeRequestService;
 import com.gl4a.gitlab.service.GitLabProjectService;
 import com.gl4a.gitlab.service.GitLabTodoService;
@@ -106,6 +108,8 @@ public class SingleFactory {
 
     /**
      * Fetches a single merge request by owner/repo path and internal issue number (iid).
+     * Label colours are enriched by a follow-up call to GET /projects/{id}/labels because
+     * the single MR endpoint silently ignores the with_labels_details parameter.
      */
     public static Single<GitLabMergeRequest> getMergeRequest(String repoOwner, String repoName,
             int iid, boolean bypassCache) {
@@ -113,11 +117,41 @@ public class SingleFactory {
                 ServiceFactory.get(GitLabProjectService.class, bypassCache);
         GitLabMergeRequestService mrService =
                 ServiceFactory.get(GitLabMergeRequestService.class, bypassCache);
+        GitLabIssueService issueService =
+                ServiceFactory.get(GitLabIssueService.class, bypassCache);
 
         return projectService.getProjectByPath(encodedPath(repoOwner, repoName))
                 .map(ApiHelpers::throwOnFailure)
                 .flatMap(project -> mrService.getMergeRequest(project.id, iid)
-                        .map(ApiHelpers::throwOnFailure));
+                        .map(ApiHelpers::throwOnFailure)
+                        .flatMap(mr -> {
+                            if (mr.labelNames == null || mr.labelNames.isEmpty()) {
+                                return Single.just(mr);
+                            }
+                            return issueService.getLabels(project.id, 1, 100)
+                                    .map(r -> {
+                                        if (r.isSuccessful() && r.body() != null) {
+                                            enrichLabelColors(mr.labelNames, r.body());
+                                        }
+                                        return mr;
+                                    })
+                                    .onErrorReturn(e -> mr);
+                        }));
+    }
+
+    private static void enrichLabelColors(List<GitLabLabel> mrLabels,
+            List<GitLabLabel> projectLabels) {
+        Map<String, GitLabLabel> byName = new HashMap<>();
+        for (GitLabLabel pl : projectLabels) {
+            if (pl.name != null) byName.put(pl.name, pl);
+        }
+        for (GitLabLabel ml : mrLabels) {
+            GitLabLabel full = byName.get(ml.name);
+            if (full != null) {
+                ml.color = full.color;
+                ml.textColor = full.textColor;
+            }
+        }
     }
 
     // ---------------------------------------------------------------------------
