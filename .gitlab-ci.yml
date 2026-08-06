@@ -45,6 +45,7 @@ secret_detection:
   tags:
     - docker
   interruptible: true
+  allow_failure: false
   variables:
     GIT_DEPTH: 0
   rules:
