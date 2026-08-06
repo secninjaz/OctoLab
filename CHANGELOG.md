@@ -16,7 +16,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - MR detail view reaction popup and chip tinting now work correctly — the MR body was fetching from the issue award emoji endpoint instead of the MR endpoint (#122)
 - Account switcher side panel now shows avatars for all accounts on app start, not only the most recently active one — avatar URL is persisted on login and used for background fetch (#126)
 - Repo > Merge Requests no longer returns HTTP 400 — project-level MR list now uses the correct `/projects/:id/merge_requests` endpoint; "merged" state tab works correctly (#124)
-- Contributors, Collaborators, Wiki, Releases, Forks, Stars, and Files sections no longer return 404 for repositories nested more than one group deep (e.g. `it/int/proxmox`) — owner is now derived from `path_with_namespace` split on the last slash, works at any nesting depth (#125)
+- Contributors, Collaborators, Wiki, Releases, Forks, Stars, and Files sections no longer return 404 for repositories nested more than one group deep — owner is now derived from `path_with_namespace` split on the last slash, works at any nesting depth (#125)
 
 ## [1.2.9] - 2026-08-03
 
