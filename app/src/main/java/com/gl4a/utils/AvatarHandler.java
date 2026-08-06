@@ -1,6 +1,8 @@
 package com.gl4a.utils;
 import com.gl4a.gitlab.model.GitLabUser;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 
@@ -68,9 +70,10 @@ public class AvatarHandler {
         return sEmailUserCache.get(email.toLowerCase(java.util.Locale.ROOT).trim());
     }
 
-    private static final int MSG_LOAD = 1;
-    private static final int MSG_LOADED = 2;
-    private static final int MSG_DESTROY = 3;
+    private static final int MSG_LOAD       = 1;
+    private static final int MSG_LOADED     = 2;
+    private static final int MSG_DESTROY    = 3;
+    private static final int MSG_DISK_LOADED = 4;
 
     private static HandlerThread sWorkerThread = null;
     private static Handler sWorkerHandler = null;
@@ -79,8 +82,13 @@ public class AvatarHandler {
         @Override
         public void handleMessage(Message msg) {
             switch (msg.what) {
+                case MSG_DISK_LOADED:
+                    // Disk bitmap arrived — show immediately as placeholder, no crossfade.
+                    applyDiskPlaceholder(msg.arg1, (Bitmap) msg.obj);
+                    break;
                 case MSG_LOADED:
-                    processResult(msg.arg1, (Bitmap) msg.obj);
+                    // arg2 == 1 means the network bitmap differs from disk — crossfade allowed.
+                    processResult(msg.arg1, (Bitmap) msg.obj, msg.arg2 == 1);
                     if (sRequests.size() == 0) {
                         sendEmptyMessageDelayed(MSG_DESTROY, 3000);
                     }
@@ -91,16 +99,36 @@ public class AvatarHandler {
             }
         }
 
-        private void processResult(long requestId, Bitmap bitmap) {
+        private void applyDiskPlaceholder(int requestId, Bitmap diskBitmap) {
+            Request request = sRequests.get(requestId);
+            if (request == null || diskBitmap == null) return;
+            // Seed LruCache so same-session requests for this id get an instant hit.
+            synchronized (AvatarHandler.class) {
+                if (sCache == null) return;
+                if (sCache.get(request.id) == null) sCache.put(request.id, diskBitmap);
+            }
+            // Direct set — no crossfade; disk bitmap is the last-known state, not an update.
+            Resources res = request.views.get(0).getContext().getResources();
+            RoundedBitmapDrawable d = RoundedBitmapDrawableFactory.create(res, diskBitmap);
+            d.setCornerRadius(Math.max(diskBitmap.getWidth() / 2, diskBitmap.getHeight() / 2));
+            d.setAntiAlias(true);
+            for (ViewDelegate view : request.views) {
+                view.setDrawable(d);
+            }
+        }
+
+        private void processResult(int requestId, Bitmap bitmap, boolean changed) {
             final Request request = sRequests.get(requestId);
             if (request != null && bitmap != null) {
                 synchronized (AvatarHandler.class) {
-                    sCache.put(request.id, bitmap);
+                    sCache.put(request.id, bitmap);  // always keep LruCache fresh
                 }
-
-                for (ViewDelegate view : request.views) {
-                    applyAvatarToView(view, bitmap);
+                if (changed) {
+                    for (ViewDelegate view : request.views) {
+                        applyAvatarToView(view, bitmap);  // crossfade only when avatar changed
+                    }
                 }
+                // If unchanged: views already show the correct disk placeholder — no crossfade.
             }
             sRequests.remove(requestId);
         }
@@ -120,9 +148,15 @@ public class AvatarHandler {
             }
             return;
         }
+        // Persist the avatar URL so it is available when this account is shown as an
+        // inactive MenuItem in the drawer (which has no GitLabUser object available).
+        String avatarUrl = user.avatarUrl();
+        if (user.login() != null && avatarUrl != null) {
+            com.gl4a.Gl4Application.get().updateStoredAvatarUrl(user.login(), avatarUrl);
+        }
         // Pass email so we can fall back to Gravatar if the instance avatar fails.
         assignAvatarInternal(new ImageViewDelegate(view), user.login(), user.id(),
-                user.avatarUrl(), user.email);
+                avatarUrl, user.email);
     }
 
     public static void assignAvatar(ImageView view, String userName, long userId, String url) {
@@ -230,7 +264,10 @@ public class AvatarHandler {
 
     public static void assignAvatar(Context context, MenuItem item,
             String userName, long userId) {
-        assignAvatarInternal(new MenuItemDelegate(context, item), userName, userId, null, null);
+        // Look up the stored avatar URL so inactive accounts can also do a network fetch
+        // and benefit from the disk cache across sessions.
+        String avatarUrl = com.gl4a.Gl4Application.get().getAvatarUrlForLogin(userName);
+        assignAvatarInternal(new MenuItemDelegate(context, item), userName, userId, avatarUrl, null);
     }
 
     public static Bitmap loadUserAvatarSynchronously(Context context, GitLabUser user) {
@@ -249,6 +286,7 @@ public class AvatarHandler {
                 synchronized (AvatarHandler.class) {
                     sCache.put(user.id(), bitmap);
                 }
+                saveToDisk(user.id(), bitmap);
             }
             return bitmap;
         } catch (Exception e) {
@@ -324,16 +362,14 @@ public class AvatarHandler {
 
         sCache = new LruCache<Long, Bitmap>(limit) {
             @Override
-            protected void entryRemoved(boolean evicted, Long key, Bitmap oldValue, Bitmap newValue) {
-                super.entryRemoved(evicted, key, oldValue, newValue);
-                oldValue.recycle();
-            }
-
-            @Override
             protected int sizeOf(Long key, Bitmap value) {
                 final long sizeInBytes = value.getAllocationByteCount();
                 return (int) (sizeInBytes / 1024);
             }
+            // Do NOT override entryRemoved to call recycle(). On API 11+ with hardware
+            // acceleration, RoundedBitmapDrawables attached to views can outlive the
+            // LruCache entry; recycling the bitmap while it is still drawn causes
+            // "BitmapShader's bitmap has been recycled" crashes. The GC handles cleanup.
         };
 
         Resources res = context.getResources();
@@ -650,6 +686,49 @@ public class AvatarHandler {
         return bitmap;
     }
 
+    // ── Disk avatar cache ────────────────────────────────────────────────────
+    // Bitmaps are persisted to filesDir/avatars/{id}.png as a stale-while-revalidate
+    // placeholder. On app restart, assignAvatarInternal() shows the disk bitmap
+    // immediately (no initials flash) but still triggers a background network fetch
+    // so the avatar is always refreshed from the server each session.
+
+    private static File avatarFile(Context ctx, long id) {
+        File dir = new File(ctx.getFilesDir(), "avatars");
+        dir.mkdirs();
+        return new File(dir, id + ".png");
+    }
+
+    private static void saveToDisk(long id, Bitmap bitmap) {
+        Context ctx = com.gl4a.Gl4Application.get();
+        if (ctx == null || bitmap == null) return;
+        try (FileOutputStream fos = new FileOutputStream(avatarFile(ctx, id))) {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 90, fos);
+        } catch (Exception e) {
+            Log.d(TAG, "Failed to save avatar to disk for id=" + id);
+        }
+    }
+
+    /**
+     * Reads the persisted avatar for userId from disk, or null if none.
+     * Does NOT populate the LruCache — the caller decides what to do with it.
+     */
+    @Nullable
+    static Bitmap loadAvatarFromDisk(Context context, long id) {
+        File f = new File(new File(context.getFilesDir(), "avatars"), id + ".png");
+        if (!f.exists()) return null;
+        return BitmapFactory.decodeFile(f.getAbsolutePath());
+    }
+
+    /**
+     * No-op stub kept for call-site compatibility. Disk is read on demand in
+     * assignAvatarInternal(); pre-loading into the LruCache would suppress the
+     * background network refresh that keeps avatars up-to-date.
+     */
+    public static void prewarmFromDisk(Context context) {
+        // Intentionally empty — see loadAvatarFromDisk() / assignAvatarInternal().
+    }
+    // ── end disk avatar cache ────────────────────────────────────────────────
+
     private static void shutdownWorker() {
         if (sWorkerThread != null) {
             sWorkerThread.getLooper().quit();
@@ -671,6 +750,19 @@ public class AvatarHandler {
                     int requestId = msg.arg1;
                     Request req = sRequests.get(requestId);
                     Bitmap bitmap = null;
+                    // Read disk before network so we can send a placeholder immediately and
+                    // compare after the fetch — both on the background thread.
+                    Bitmap diskBitmap = null;
+                    if (req != null) {
+                        Context ctx = com.gl4a.Gl4Application.get();
+                        if (ctx != null) {
+                            diskBitmap = loadAvatarFromDisk(ctx, req.id);
+                            if (diskBitmap != null) {
+                                sHandler.obtainMessage(MSG_DISK_LOADED, requestId, 0, diskBitmap)
+                                        .sendToTarget();
+                            }
+                        }
+                    }
                     if (req != null && req.apiFirst && req.projectId > 0) {
                         // Project avatar path: fetch via GET /projects/{id}.
                         try {
@@ -724,7 +816,11 @@ public class AvatarHandler {
                             }
                         }
                     }
-                    sHandler.obtainMessage(MSG_LOADED, requestId, 0, bitmap).sendToTarget();
+                    boolean changed = bitmap != null
+                            && (diskBitmap == null || !bitmap.sameAs(diskBitmap));
+                    if (changed && req != null) saveToDisk(req.id, bitmap);
+                    sHandler.obtainMessage(MSG_LOADED, requestId, changed ? 1 : 0, bitmap)
+                            .sendToTarget();
                     break;
             }
         }

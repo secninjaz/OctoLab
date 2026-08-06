@@ -46,6 +46,7 @@ public class Gl4Application extends Application implements
     public static final String TOKEN_TYPE_OAUTH = "oauth";
     private static final String KEY_INSTANCE_URL = "instance_url";
     private static final String KEY_PREFIX_INSTANCE_URL = "instance_url_";
+    private static final String KEY_PREFIX_AVATAR_URL   = "avatar_url_";
 
     @Override
     public void onCreate() {
@@ -65,6 +66,9 @@ public class Gl4Application extends Application implements
         mPt = new PrettyTime();
         com.gl4a.utils.DebugLogger.get().init(this);
         ServiceFactory.initClient(this);
+        // Pre-warm account avatars from disk so the account-switcher drawer shows
+        // real avatars immediately on the next app start instead of initials fallback.
+        new Thread(() -> com.gl4a.utils.AvatarHandler.prewarmFromDisk(this)).start();
         // Write XML defaultValue="true" for the notifications toggle to SharedPreferences on
         // first run so updateNotificationWorker() sees the correct default without the user
         // having to open Settings first.
@@ -195,6 +199,7 @@ public class Gl4Application extends Application implements
                 .putString(KEY_PREFIX_TOKEN_TYPE + login, tokenType)
                 .putLong(KEY_PREFIX_USER_ID + login, user.id())
                 .putString(KEY_PREFIX_INSTANCE_URL + login, currentUrl)
+                .putString(KEY_PREFIX_AVATAR_URL + login, user.avatarUrl())
                 .apply();
         // Ensure notifications are enabled by default for every new login.
         // setDefaultValues() writes the XML default only if the key is absent.
@@ -290,6 +295,19 @@ public class Gl4Application extends Application implements
         String url = getPrefs().getString(KEY_PREFIX_INSTANCE_URL + login,
                 getPrefs().getString(KEY_INSTANCE_URL, DEFAULT_INSTANCE));
         return (url == null || url.isEmpty()) ? DEFAULT_INSTANCE : url;
+    }
+
+    public String getAvatarUrlForLogin(String login) {
+        if (login == null) return null;
+        return getPrefs().getString(KEY_PREFIX_AVATAR_URL + login, null);
+    }
+
+    public void updateStoredAvatarUrl(String login, String url) {
+        if (login == null || url == null) return;
+        String existing = getPrefs().getString(KEY_PREFIX_AVATAR_URL + login, null);
+        if (!url.equals(existing)) {
+            getPrefs().edit().putString(KEY_PREFIX_AVATAR_URL + login, url).apply();
+        }
     }
 
     public static Gl4Application get() { return sInstance; }

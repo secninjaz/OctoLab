@@ -88,6 +88,7 @@ public class ReactionBar extends HorizontalScrollView implements View.OnClickLis
     private MenuPopupHelper mAddReactionPopup;
     private @MenuRes int mAddReactionMenuResId = R.menu.reaction_menu;
     private AddReactionMenuHelper mAddReactionMenuHelper;
+    private java.util.Set<String> mViewerReactedContents;
 
     public ReactionBar(Context context) {
         this(context, null);
@@ -134,6 +135,59 @@ public class ReactionBar extends HorizontalScrollView implements View.OnClickLis
             setVisibility(View.VISIBLE);
         } else {
             setVisibility(View.GONE);
+        }
+        applyChipActiveStates();
+    }
+
+    /** Sets which emoji contents the current viewer has reacted with and updates chip tinting. */
+    public void setViewerReactedContents(@Nullable java.util.Set<String> contents) {
+        mViewerReactedContents = contents;
+        applyChipActiveStates();
+    }
+
+    private void applyChipActiveStates() {
+        // Synchronous when already laid out (normal scroll/rebind path) to avoid async
+        // races during fast RecyclerView recycling. Deferred only before first layout.
+        if (isLaidOut()) {
+            refreshChipActiveStates();
+        } else {
+            post(this::refreshChipActiveStates);
+        }
+    }
+
+    /**
+     * Re-reads the viewer's reacted emoji from the details cache and refreshes chip tinting.
+     * Call this after a reaction add/remove to keep chip colours in sync without a full reload.
+     */
+    public void refreshViewerStateFromCache() {
+        if (mDetailsCache == null || mReferenceItem == null) return;
+        java.util.List<GitLabReaction> details = mDetailsCache.getReactions(mReferenceItem);
+        if (details == null) return;
+        String ownLogin = Gl4Application.get().getAuthLogin();
+        java.util.Set<String> viewerReacted = new java.util.HashSet<>();
+        for (GitLabReaction r : details) {
+            if (ApiHelpers.loginEquals(r.user(), ownLogin)) viewerReacted.add(r.content());
+        }
+        setViewerReactedContents(viewerReacted);
+    }
+
+    private void refreshChipActiveStates() {
+        if (getVisibility() != View.VISIBLE) return;
+        @ColorInt int accentColor =
+                UiUtils.resolveColor(getContext(), androidx.appcompat.R.attr.colorAccent);
+        @ColorInt int defaultColor =
+                UiUtils.resolveColor(getContext(), android.R.attr.textColorSecondary);
+        for (int i = 0; i < REACTION_VIEW_IDS.length; i++) {
+            TextView chip = (TextView) findViewById(REACTION_VIEW_IDS[i]);
+            if (chip.getVisibility() != View.VISIBLE) continue;
+            boolean active = mViewerReactedContents != null
+                    && mViewerReactedContents.contains(REACTION_CONTENTS[i]);
+            @ColorInt int tint = active ? accentColor : defaultColor;
+            chip.setTextColor(tint);
+            // Tint the drawableLeft icon directly; mutate() isolates shared drawable state.
+            for (Drawable d : chip.getCompoundDrawables()) {
+                if (d != null) d.mutate().setTint(tint);
+            }
         }
     }
 
@@ -426,7 +480,9 @@ public class ReactionBar extends HorizontalScrollView implements View.OnClickLis
                 .compose(RxUtils.sortList((lhs, rhs) -> {
                     int result = lhs.content().compareTo(rhs.content());
                     if (result == 0) {
-                        result = rhs.createdAt().compareTo(lhs.createdAt());
+                        // createdAt() is nullable — guard before comparing
+                        java.util.Date l = lhs.createdAt(), r = rhs.createdAt();
+                        if (l != null && r != null) result = r.compareTo(l);
                     }
                     return result;
                 }))
@@ -542,10 +598,13 @@ public class ReactionBar extends HorizontalScrollView implements View.OnClickLis
 
         private void setReactionMenuItemsVisible(boolean visible) {
             mLoadingItem.setVisible(!visible);
+            // Apply icon tints BEFORE making items visible so the ListView never
+            // renders a frame with items shown but icons uninitialized.
+            if (visible) updateCheckedStates();
             for (MenuItem item : mReactionMenuItems) {
                 item.setVisible(visible);
             }
-            updateCheckedStates();
+            if (!visible) updateCheckedStates();
         }
 
         private void updateCheckedStates() {

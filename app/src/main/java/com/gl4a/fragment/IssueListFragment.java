@@ -228,8 +228,27 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
 
     @Override
     protected Single<Response<GitLabPage<GitLabIssue>>> loadPage(int page, boolean bypassCache) {
-        if (mProjectMode) {
-            // Project-level: use listIssues(projectId, state, ...) not personal feed endpoint
+        if (mProjectMode && mIsMR) {
+            // Project-level MRs: GET /projects/:id/merge_requests?state=...
+            // Valid states: "opened" | "closed" | "merged" | "all"
+            final com.gl4a.gitlab.service.GitLabMergeRequestService mrService =
+                    ServiceFactory.get(com.gl4a.gitlab.service.GitLabMergeRequestService.class, bypassCache);
+            final String mrState = mIssueState != null ? mIssueState : "opened";
+            io.reactivex.Single<Long> projectIdSingle = mProjectId > 0
+                    ? io.reactivex.Single.just(mProjectId)
+                    : SingleFactory.getProjectId(mRepoOwner, mRepoName)
+                            .doOnSuccess(id -> mProjectId = id);
+            return projectIdSingle.flatMap(id ->
+                    mrService.listMergeRequests(id, mrState,
+                            mFilterLabel, mFilterMilestone, page, 25, mSortMode, mOrder, mQuery, true)
+                    .map(response -> {
+                        if (!response.isSuccessful())
+                            return Response.<GitLabPage<GitLabIssue>>error(response.errorBody(), response.raw());
+                        return Response.success(ApiHelpers.toPage(
+                                retrofit2.Response.success(mrStubs(response.body()), response.headers())));
+                    }));
+        } else if (mProjectMode) {
+            // Project-level Issues: GET /projects/:id/issues?state=...
             final GitLabIssueService service = ServiceFactory.get(GitLabIssueService.class, bypassCache);
             String state = mIssueState != null ? mIssueState : "opened";
             if (mProjectId > 0) {

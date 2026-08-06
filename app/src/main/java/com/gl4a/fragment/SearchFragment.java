@@ -294,10 +294,10 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
                 .subscribe(projectOpt -> {
                     if (!projectOpt.isPresent()) return;
                     GitLabProject project = projectOpt.get();
-                    if (project.namespace != null) {
-                        String owner = project.namespace.path != null
-                                ? project.namespace.path : project.namespace.name;
-                        String repoName = project.path != null ? project.path : project.name;
+                    if (project.pathWithNamespace != null && project.pathWithNamespace.contains("/")) {
+                        int slash = project.pathWithNamespace.lastIndexOf('/');
+                        String owner = project.pathWithNamespace.substring(0, slash);
+                        String repoName = project.pathWithNamespace.substring(slash + 1);
                         startActivity(FileViewerActivity.makeIntent(getActivity(),
                                 owner, repoName, result.ref,
                                 result.path != null ? result.path : result.filename));

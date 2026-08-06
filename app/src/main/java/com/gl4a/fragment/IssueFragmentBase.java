@@ -461,9 +461,12 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         bindSpecialViews(mListHeaderView);
     }
 
+    /** Subclasses override to true when displaying a merge request rather than an issue. */
+    protected boolean isMergeRequestView() { return false; }
+
     private void loadIssueBodyReactions(ReactionBar bar) {
         GitLabAwardEmojiService service = ServiceFactory.get(GitLabAwardEmojiService.class, false);
-        boolean isMR = mIssue.pullRequest() != null;
+        boolean isMR = isMergeRequestView();
         Single<Response<List<GitLabAwardEmoji>>> request = isMR
                 ? service.getMergeRequestAwardEmojis(mIssue.projectId, mIssue.iid, 1, 100)
                 : service.getIssueAwardEmojis(mIssue.projectId, mIssue.iid, 1, 100);
@@ -471,8 +474,15 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
                 .compose(RxUtils::doInBackground)
                 .subscribe(emojis -> {
                     Map<String, Integer> counts = new HashMap<>();
+                    String ownLogin = com.gl4a.Gl4Application.get().getAuthLogin();
+                    java.util.Set<String> viewerReacted = new java.util.HashSet<>();
                     for (GitLabAwardEmoji e : emojis) {
                         counts.merge(e.name, 1, Integer::sum);
+                        if (ApiHelpers.loginEquals(e.user, ownLogin)) {
+                            GitLabReaction tmp = new GitLabReaction();
+                            tmp.name = e.name;
+                            viewerReacted.add(tmp.content());
+                        }
                     }
                     GitLabReactions r = GitLabReactions.builder()
                             .plusOne(counts.getOrDefault("thumbsup", 0))
@@ -485,6 +495,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
                             .eyes(counts.getOrDefault("eyes", 0))
                             .build();
                     bar.setReactions(r);
+                    bar.setViewerReactedContents(viewerReacted);
                 }, error -> { /* non-fatal — leave bar hidden */ });
     }
 
@@ -517,7 +528,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
             if (response.isSuccessful() && response.body() != null) {
                 for (GitLabAwardEmoji e : response.body()) {
                     GitLabReaction r = new GitLabReaction();
-                    r.id = e.id; r.name = e.name; r.user = e.user;
+                    r.id = e.id; r.name = e.name; r.user = e.user; r.createdAt = e.createdAt;
                     result.add(r);
                 }
             }
@@ -571,7 +582,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
                     if (response.isSuccessful() && response.body() != null) {
                         for (GitLabAwardEmoji e : response.body()) {
                             GitLabReaction r = new GitLabReaction();
-                            r.id = e.id; r.name = e.name; r.user = e.user;
+                            r.id = e.id; r.name = e.name; r.user = e.user; r.createdAt = e.createdAt;
                             result.add(r);
                         }
                     }
@@ -624,11 +635,14 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
 
     @Override
     public void onReactionsUpdated(ReactionBar.Item item, GitLabReactions reactions) {
-        // GitLab reactions: refresh issue instead
+        // Only handle updates for the issue/MR body itself.
+        // Comment reaction changes share the same cache but must not touch the issue bar.
+        if (item != IssueFragmentBase.this) return;
         loadIssue(true);
         if (mListHeaderView != null) {
             ReactionBar bar = mListHeaderView.findViewById(R.id.reactions);
             bar.setReactions(reactions);
+            bar.refreshViewerStateFromCache();
         }
         if (mReactionMenuHelper != null) {
             mReactionMenuHelper.updateMenuItems();

@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-06
+
+### Added
+- Avatar disk cache: all user, email-based, and project avatars are persisted to disk on first load and shown instantly on subsequent app starts — no more initials flash. Background network fetch runs every session and crossfades only when the avatar has actually changed. All disk I/O is off the main thread.
+
+### Fixed
+- Reaction popup and three-dot Add/Remove reaction menu now load correctly when a reaction type has more than one reactor — a null `createdAt` comparator caused a crash that silently dismissed the popup (#121)
+- Reaction chips now highlight with accent colour when the current user has reacted, both on issues and MR comments; chip state updates correctly after add/remove without requiring a refresh (#120)
+- MR detail view reaction popup and chip tinting now work correctly — the MR body was fetching from the issue award emoji endpoint instead of the MR endpoint (#122)
+- Account switcher side panel now shows avatars for all accounts on app start, not only the most recently active one — avatar URL is persisted on login and used for background fetch (#126)
+- Repo > Merge Requests no longer returns HTTP 400 — project-level MR list now uses the correct `/projects/:id/merge_requests` endpoint; "merged" state tab works correctly (#124)
+- Contributors, Collaborators, Wiki, Releases, Forks, Stars, and Files sections no longer return 404 for repositories nested more than one group deep (e.g. `it/int/proxmox`) — owner is now derived from `path_with_namespace` split on the last slash, works at any nesting depth (#125)
+
 ## [1.2.9] - 2026-08-03
 
 ### Fixed

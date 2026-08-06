@@ -108,6 +108,9 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
         return stub;
     }
 
+    @Override
+    protected boolean isMergeRequestView() { return true; }
+
     public void updateState(GitLabMergeRequest mr) {
         mMergeRequest = mr;
         if (mIssue != null) {
@@ -328,7 +331,7 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
                     if (response.isSuccessful() && response.body() != null) {
                         for (com.gl4a.gitlab.model.GitLabAwardEmoji e : response.body()) {
                             com.gl4a.gitlab.model.GitLabReaction r = new com.gl4a.gitlab.model.GitLabReaction();
-                            r.id = e.id; r.name = e.name; r.user = e.user;
+                            r.id = e.id; r.name = e.name; r.user = e.user; r.createdAt = e.createdAt;
                             result.add(r);
                         }
                     }
@@ -349,7 +352,7 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
                     if (response.isSuccessful() && response.body() != null) {
                         for (com.gl4a.gitlab.model.GitLabAwardEmoji e : response.body()) {
                             com.gl4a.gitlab.model.GitLabReaction r = new com.gl4a.gitlab.model.GitLabReaction();
-                            r.id = e.id; r.name = e.name; r.user = e.user;
+                            r.id = e.id; r.name = e.name; r.user = e.user; r.createdAt = e.createdAt;
                             result.add(r);
                         }
                     }

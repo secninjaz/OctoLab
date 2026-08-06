@@ -217,18 +217,21 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         }
     }
 
-    private void fillData() {
-        // Resolve owner display name: prefer namespace.name (display casing e.g. "testG")
-        // over namespace.path (URL path e.g. "testg") for consistent on-screen display.
-        final com.gl4a.gitlab.model.GitLabUser ownerUser = mRepository.owner();
-        final String owner;
-        if (mRepository.namespace != null && mRepository.namespace.name != null) {
-            owner = mRepository.namespace.name;
-        } else if (ownerUser != null && ownerUser.login() != null) {
-            owner = ownerUser.login();
-        } else {
-            owner = "";
+    private static String ownerFromPath(com.gl4a.gitlab.model.GitLabProject repo) {
+        String pwn = repo.pathWithNamespace;
+        if (pwn != null && pwn.contains("/")) {
+            return pwn.substring(0, pwn.lastIndexOf('/'));
         }
+        if (repo.namespace != null) {
+            return repo.namespace.path != null ? repo.namespace.path : repo.namespace.name;
+        }
+        return "";
+    }
+
+    private void fillData() {
+        final com.gl4a.gitlab.model.GitLabUser ownerUser = mRepository.owner();
+        // Use full path-derived owner so nested groups (e.g. "it/int") are included.
+        final String owner = ownerFromPath(mRepository);
         final String name = mRepository.name();
 
         TextView tvRepoName = mContentView.findViewById(R.id.tv_repo_name);
@@ -356,10 +359,7 @@ public class RepositoryFragment extends LoadingFragmentBase implements
             return;
         }
 
-        com.gl4a.gitlab.model.GitLabUser ownerObj = mRepository.owner();
-        String owner = (ownerObj != null && ownerObj.login() != null)
-                ? ownerObj.login()
-                : (mRepository.namespace != null ? mRepository.namespace.path : "");
+        String owner = ownerFromPath(mRepository);
         String name = mRepository.name();
         Intent intent = null;
 
@@ -408,10 +408,7 @@ public class RepositoryFragment extends LoadingFragmentBase implements
     private void loadReadme(boolean force) {
         Context context = getActivity();
         long id = mRepository.id();
-        com.gl4a.gitlab.model.GitLabUser ownerUser2 = mRepository.owner();
-        String repoOwner = (ownerUser2 != null && ownerUser2.login() != null)
-                ? ownerUser2.login()
-                : (mRepository.namespace != null ? mRepository.namespace.path : "");
+        String repoOwner = ownerFromPath(mRepository);
         String repoName = mRepository.name();
         String ref = mRef != null ? mRef : mRepository.defaultBranch();
 

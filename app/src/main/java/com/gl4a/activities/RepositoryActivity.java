@@ -402,6 +402,14 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
                 .compose(makeLoaderSingle(ID_LOADER_REPO, skipCache))
                 .subscribe(result -> {
                     mRepository = result;
+                    // Re-derive owner/name from pathWithNamespace so deeply nested groups
+                    // (e.g. "it/int/proxmox") are always represented correctly, regardless
+                    // of what was passed in the intent extras.
+                    if (result.pathWithNamespace != null && result.pathWithNamespace.contains("/")) {
+                        int slash = result.pathWithNamespace.lastIndexOf('/');
+                        mRepoOwner = result.pathWithNamespace.substring(0, slash);
+                        mRepoName  = result.pathWithNamespace.substring(slash + 1);
+                    }
                     updateTitle();
                     invalidateTabs();
                     // Apply initial page selection first time the repo is loaded

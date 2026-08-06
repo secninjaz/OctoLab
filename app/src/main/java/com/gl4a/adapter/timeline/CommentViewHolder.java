@@ -170,15 +170,30 @@ class CommentViewHolder
 
         ivMenu.setTag(item);
 
+        // Pre-warm the reaction details cache so icons are ready before the user opens
+        // the three-dot > Add reaction submenu. Starts a fetch if cache is cold; no-op
+        // if cache already has data for this comment.
+        if (mReactionMenuHelper != null) {
+            mReactionMenuHelper.startLoadingIfNeeded();
+        }
+        // Clear any viewer-reaction tinting from a previous binding before setting new state.
+        reactions.setViewerReactedContents(java.util.Collections.emptySet());
         // Show cached reactions immediately; fetch from API if not yet loaded
         reactions.setReactions(item.comment().reactions());
+        // Sync viewer state from cache immediately (no-op if cache has no entry for this item).
+        reactions.refreshViewerStateFromCache();
         if (item.comment().reactions() == null) {
             mCallback.loadReactionDetails(item, false)
                     .subscribe(details -> {
                         if (!details.isEmpty()) {
                             java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+                            String ownLogin = com.gl4a.Gl4Application.get().getAuthLogin();
+                            java.util.Set<String> viewerReacted = new java.util.HashSet<>();
                             for (com.gl4a.gitlab.model.GitLabReaction r : details) {
                                 counts.merge(r.name, 1, Integer::sum);
+                                if (com.gl4a.utils.ApiHelpers.loginEquals(r.user(), ownLogin)) {
+                                    viewerReacted.add(r.content());
+                                }
                             }
                             com.gl4a.gitlab.model.GitLabReactions agg =
                                     com.gl4a.gitlab.model.GitLabReactions.builder()
@@ -192,6 +207,7 @@ class CommentViewHolder
                                     .eyes(counts.getOrDefault("eyes", 0))
                                     .build();
                             updateReactions(agg);
+                            reactions.setViewerReactedContents(viewerReacted);
                         }
                     }, error -> { /* non-fatal */ });
         }
@@ -270,6 +286,7 @@ class CommentViewHolder
             mBoundItem.setReactions(reactions);
         }
         this.reactions.setReactions(reactions);
+        this.reactions.refreshViewerStateFromCache();
         if (mReactionMenuHelper != null) {
             mReactionMenuHelper.updateMenuItems();
         }
