@@ -47,6 +47,10 @@ secret_detection:
   interruptible: true
   variables:
     GIT_DEPTH: 0
+    GIT_STRATEGY: clone
+    # release.sh was remediated (credential removed, history rewritten).
+    # Exclude until gitaly server-side GC purges the stale unreferenced objects.
+    SECRET_DETECTION_EXCLUDED_PATHS: "release.sh"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
 
