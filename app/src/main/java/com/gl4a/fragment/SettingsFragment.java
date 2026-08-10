@@ -58,6 +58,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
     private static final String KEY_WORKER_STATUS_INFO = "worker_status_info";
     private static final String KEY_WORKER_LAST_SYNC   = "worker_last_sync";
     private static final String KEY_WORKER_SYNC_NOW    = "worker_sync_now";
+    private static final String KEY_WORKER_LOG_PREF    = "worker_log";
 
     private OnStateChangeListener mListener;
     private IntegerListPreference mThemePref;
@@ -68,6 +69,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
     private Preference mWorkerStatusPref;
     private Preference mWorkerLastSyncPref;
     private Preference mWorkerSyncNowPref;
+    private Preference mWorkerLogPref;
     private SwitchPreference mDebugLoggingPref;
     private Preference mDebugSharePref;
     private Preference mDebugClearPref;
@@ -106,6 +108,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         mWorkerLastSyncPref = findPreference(KEY_WORKER_LAST_SYNC);
         mWorkerSyncNowPref  = findPreference(KEY_WORKER_SYNC_NOW);
         mWorkerSyncNowPref.setOnPreferenceClickListener(this);
+        mWorkerLogPref = findPreference(KEY_WORKER_LOG_PREF);
         refreshWorkerStatus();
 
         mDebugLoggingPref = findPreference(KEY_DEBUG_LOGGING);
@@ -159,9 +162,14 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                     lastSyncSummary = com.gl4a.utils.StringUtils.formatRelativeTime(
                             ctx, new java.util.Date(lastCheckMs), true);
                 }
+                final String logText = com.gl4a.worker.NotificationsWorker.getWorkerLog(ctx);
                 requireActivity().runOnUiThread(() -> {
                     mWorkerStatusPref.setSummary(stateSummary);
                     mWorkerLastSyncPref.setSummary(lastSyncSummary);
+                    if (mWorkerLogPref != null) {
+                        mWorkerLogPref.setSummary(
+                                logText.isEmpty() ? "No runs recorded yet" : logText);
+                    }
                 });
             } catch (Exception ignored) {}
         }, ctx.getMainExecutor());

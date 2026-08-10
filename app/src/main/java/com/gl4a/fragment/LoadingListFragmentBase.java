@@ -133,10 +133,23 @@ public abstract class LoadingListFragmentBase extends LoadingFragmentBase implem
 
     protected void scrollToAndHighlightPosition(final int position) {
         getBaseActivity().collapseAppBar();
-        mLayoutManager.scrollToPositionWithOffset(position, 0);
+        // Jump to position immediately, then refine via a layout-aware correction.
+        mRecyclerView.scrollToPosition(position);
+        mRecyclerView.postDelayed(() -> {
+            mLayoutManager.scrollToPositionWithOffset(position, 0);
+            // Correct clipping for the last item (e.g. obscured by the comment input box).
+            mRecyclerView.postDelayed(() -> {
+                android.view.View child = mLayoutManager.findViewByPosition(position);
+                if (child != null) {
+                    int childBottom = mLayoutManager.getDecoratedBottom(child);
+                    int rvBottom = mRecyclerView.getHeight() - mRecyclerView.getPaddingBottom();
+                    if (childBottom > rvBottom) mRecyclerView.scrollBy(0, childBottom - rvBottom + 8);
+                }
+            }, 100);
+        }, 100);
         final RecyclerView.Adapter<?> adapter = mRecyclerView.getAdapter();
         if (adapter instanceof RootAdapter) {
-            mRecyclerView.postDelayed(() -> ((RootAdapter) adapter).highlight(position), 600);
+            mRecyclerView.postDelayed(() -> ((RootAdapter) adapter).highlight(position), 500);
         }
     }
 

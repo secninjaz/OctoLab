@@ -60,11 +60,17 @@ public class NotificationsWorker extends Worker {
 
     private static final String CHANNEL_GITLAB_NOTIFICATIONS = "channel_notifications";
     private static final String GROUP_ID_GITLAB = "gitlab_notifications";
-    public static final String WORK_TAG = "job_notifications";
+    // Include applicationId so debug/internal/release installs don't share
+    // the same WorkManager unique work ID and cancel each other's worker.
+    public static final String WORK_TAG = "job_notifications_" + com.gl4a.BuildConfig.APPLICATION_ID;
 
     private static final String KEY_LAST_NOTIFICATION_CHECK = "last_notification_check";
     private static final String KEY_LAST_NOTIFICATION_SEEN = "last_notification_seen";
     private static final String KEY_LAST_SHOWN_PROJECT_IDS = "last_notification_repo_ids";
+
+    /** SharedPreferences key storing the last 20 worker run log lines (newest first). */
+    public static final String KEY_WORKER_LOG = "worker_run_log";
+    private static final int MAX_LOG_ENTRIES = 20;
 
     private static final Object sPrefsLock = new Object();
 
@@ -215,7 +221,11 @@ public class NotificationsWorker extends Worker {
     public Result doWork() {
         com.gl4a.Gl4Application app = com.gl4a.Gl4Application.get();
         java.util.Set<String> logins = app.getAllLogins();
-        if (logins.isEmpty()) return Result.success();
+        long runStart = System.currentTimeMillis();
+        if (logins.isEmpty()) {
+            appendWorkerLog(getApplicationContext(), runStart, "No accounts — skipped", 0, false);
+            return Result.success();
+        }
 
         NotificationManagerCompat nm = NotificationManagerCompat.from(getApplicationContext());
         SharedPreferences prefs = getPrefs(getApplicationContext());
@@ -244,6 +254,8 @@ public class NotificationsWorker extends Worker {
                         .blockingGet();
             } catch (Exception e) {
                 Log.d(TAG, "Failed fetching todos for " + login, e);
+                appendWorkerLog(getApplicationContext(), System.currentTimeMillis(),
+                        "FAILED [" + login + "]: " + e.getClass().getSimpleName(), 0, false);
                 continue;
             }
 
@@ -272,6 +284,10 @@ public class NotificationsWorker extends Worker {
                     }
                 }
 
+                // Always record the successful check time so "Last synced" reflects
+                // the actual last API poll, not just the last notification.
+                prefs.edit().putLong(keyLastCheck(login), System.currentTimeMillis()).apply();
+
                 if (!hasUnseen) continue;
 
                 for (Map.Entry<Long, List<GitLabTodo>> entry : todosByProject.entrySet()) {
@@ -290,7 +306,6 @@ public class NotificationsWorker extends Worker {
                 }
 
                 prefs.edit()
-                        .putLong(keyLastCheck(login), System.currentTimeMillis())
                         .putStringSet(keyShownIds(login), newShown)
                         .apply();
 
@@ -303,7 +318,35 @@ public class NotificationsWorker extends Worker {
             showSummaryNotification(nm, totalUnseen, anyNew);
         }
 
+        appendWorkerLog(getApplicationContext(), runStart,
+                totalUnseen > 0 ? "Notified: " + totalUnseen + " pending" : "OK — no new todos",
+                totalUnseen, anyNew);
         return Result.success();
+    }
+
+    /** Prepends a log entry to KEY_WORKER_LOG, keeping at most MAX_LOG_ENTRIES. */
+    public static void appendWorkerLog(Context ctx, long startMs, String summary,
+            int unseen, boolean anyNew) {
+        SharedPreferences prefs = getPrefs(ctx);
+        String ts = new java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.US)
+                .format(new java.util.Date(startMs));
+        String entry = ts + " | " + summary;
+        String existing = prefs.getString(KEY_WORKER_LOG, "");
+        String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n", -1);
+        StringBuilder sb = new StringBuilder(entry);
+        int kept = 0;
+        for (String line : lines) {
+            if (!line.isEmpty() && kept < MAX_LOG_ENTRIES - 1) {
+                sb.append("\n").append(line);
+                kept++;
+            }
+        }
+        prefs.edit().putString(KEY_WORKER_LOG, sb.toString()).apply();
+    }
+
+    /** Returns the stored worker log string, or empty string if none. */
+    public static String getWorkerLog(Context ctx) {
+        return getPrefs(ctx).getString(KEY_WORKER_LOG, "");
     }
 
     private void showProjectTodoNotification(NotificationManagerCompat nm,

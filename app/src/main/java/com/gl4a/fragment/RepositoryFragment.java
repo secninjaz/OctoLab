@@ -232,7 +232,9 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         final com.gl4a.gitlab.model.GitLabUser ownerUser = mRepository.owner();
         // Use full path-derived owner so nested groups (e.g. "it/int") are included.
         final String owner = ownerFromPath(mRepository);
-        final String name = mRepository.name();
+        // Use path (URL slug) not name() (display name) — display names may contain spaces
+        // which break API calls when used as the project path identifier.
+        final String name = mRepository.path != null ? mRepository.path : mRepository.name();
 
         TextView tvRepoName = mContentView.findViewById(R.id.tv_repo_name);
         IntentSpan repoSpan = new IntentSpan(tvRepoName.getContext(),
@@ -360,7 +362,7 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         }
 
         String owner = ownerFromPath(mRepository);
-        String name = mRepository.name();
+        String name = mRepository.path != null ? mRepository.path : mRepository.name();
         Intent intent = null;
 
         if (id == R.id.tv_contributors_label) {
@@ -409,7 +411,7 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         Context context = getActivity();
         long id = mRepository.id();
         String repoOwner = ownerFromPath(mRepository);
-        String repoName = mRepository.name();
+        String repoName = mRepository.path != null ? mRepository.path : mRepository.name();
         String ref = mRef != null ? mRef : mRepository.defaultBranch();
 
         // GitLab: read README via raw file endpoint

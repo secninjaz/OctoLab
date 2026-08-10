@@ -259,23 +259,23 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
         final GitLabMergeRequestService mrService =
                 ServiceFactory.get(GitLabMergeRequestService.class, bypassCache);
 
-        // Load MR notes (comments, first page) and map each to a TimelineItem.
-        // TODO: implement full pagination once GitLabMergeRequestService.getComments is updated
-        //       to return GitLabPage<GitLabComment>.
-        Single<List<TimelineItem>> commentsSingle = mrService.getComments(projectId, mrIid, "asc", 1, 100)
-                .map(ApiHelpers::throwOnFailure)
-                .map(comments -> {
-                    List<TimelineItem> items = new ArrayList<>();
-                    for (com.gl4a.gitlab.model.GitLabComment c : comments) {
-                        // Include system notes (mentions in commits, state changes) so MR
-                        // timeline matches GitLab web.
-                        items.add(new TimelineItem.TimelineComment(c));
-                    }
-                    return items;
-                })
+        // Load ALL MR notes across pages so the scroll-to-comment works regardless
+        // of how far into the conversation the target note is.
+        return ApiHelpers.PageIterator
+                .<com.gl4a.gitlab.model.GitLabComment>toSingle(
+                        page -> mrService.getComments(projectId, mrIid, "asc", (int) page, 100)
+                                .map(response -> {
+                                    if (!response.isSuccessful() || response.body() == null) {
+                                        return retrofit2.Response.<com.gl4a.gitlab.model.GitLabPage<
+                                                com.gl4a.gitlab.model.GitLabComment>>error(
+                                                response.errorBody(), response.raw());
+                                    }
+                                    return retrofit2.Response.success(ApiHelpers.toPage(response));
+                                }))
+                .compose(com.gl4a.utils.RxUtils.<com.gl4a.gitlab.model.GitLabComment,
+                        TimelineItem>mapList(
+                        c -> new TimelineItem.TimelineComment(c)))
                 .subscribeOn(Schedulers.io());
-
-        return commentsSingle;
     }
 
     // ---- Override IssueFragmentBase API calls to use MR endpoints instead of Issue endpoints ----

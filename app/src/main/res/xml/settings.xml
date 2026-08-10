@@ -88,6 +88,12 @@
             android:title="@string/worker_sync_now_title"
             android:summary="@string/worker_sync_now_summary" />
 
+        <Preference
+            app:iconSpaceReserved="false"
+            android:key="worker_log"
+            android:title="@string/worker_log_title"
+            android:selectable="false" />
+
     </PreferenceCategory>
 
     <PreferenceCategory

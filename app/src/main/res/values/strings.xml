@@ -650,6 +650,7 @@
     <string name="worker_state_unknown">Unknown</string>
     <string name="worker_last_sync_title">Last synced</string>
     <string name="worker_last_sync_never">Never</string>
+    <string name="worker_log_title">Recent runs</string>
     <string name="worker_sync_now_title">Sync now</string>
     <string name="worker_sync_now_summary">Trigger an immediate background poll</string>
     <string name="worker_sync_now_toast">Background sync triggered</string>

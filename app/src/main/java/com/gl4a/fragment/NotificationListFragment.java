@@ -149,8 +149,6 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
         // item.notification is a GitLabTodo
         GitLabTodo todo = item.notification;
 
-        // Navigate using todo.project.id directly to avoid 404 when the token
-        // lacks access to the project namespace via path resolution.
         if (todo.project != null && todo.project.id > 0 && todo.target != null) {
             long projectId = todo.project.id;
             String pns = todo.project.pathWithNamespace != null ? todo.project.pathWithNamespace : "";
@@ -158,21 +156,31 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
             String owner = slash >= 0 ? pns.substring(0, slash) : pns;
             String repo  = slash >= 0 ? pns.substring(slash + 1) : pns;
             markTodoAsDone(todo);
+            // Extract #note_XXXXX from targetUrl so detail view scrolls to the comment.
+            String fragment = todo.targetUrl != null
+                    ? android.net.Uri.parse(todo.targetUrl).getFragment() : null;
+            com.gl4a.utils.IntentUtils.InitialCommentMarker initialComment =
+                    com.gl4a.resolver.LinkParser.markerFromFragment(fragment);
             if ("MergeRequest".equals(todo.type())) {
+                // Pass PAGE_CONVERSATION so the conversation tab is always selected
+                // when navigating to a specific comment, avoiding the MR loading
+                // the default tab and missing the scroll target.
+                int initialPage = initialComment != null
+                        ? com.gl4a.activities.PullRequestActivity.PAGE_CONVERSATION : -1;
                 startActivity(com.gl4a.activities.PullRequestActivity.makeIntent(
-                        getActivity(), owner, repo, todo.target.iid));
+                        getActivity(), owner, repo, todo.target.iid, initialPage, initialComment));
             } else {
                 com.gl4a.gitlab.model.GitLabIssue stub = new com.gl4a.gitlab.model.GitLabIssue();
                 stub.iid = todo.target.iid;
                 stub.title = todo.target.title != null ? todo.target.title : "";
                 stub.projectId = projectId;
                 startActivity(com.gl4a.activities.IssueActivity.makeIntent(
-                        getActivity(), stub, projectId));
+                        getActivity(), owner, repo, projectId, todo.target.iid, initialComment));
             }
             return;
         }
 
-        // Fallback: open in browser (for todos without resolvable project)
+        // Fallback: open in browser
         String url = todo.url();
         if (url != null) {
             com.gl4a.utils.IntentUtils.openInCustomTabOrBrowser(

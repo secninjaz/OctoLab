@@ -249,9 +249,12 @@ public class ContentListContainerFragment extends Fragment implements
             String[] userRepo = mGitModuleMap.get(path).split("/");
             startActivity(RepositoryActivity.makeIntent(getActivity(), userRepo[0], userRepo[1]));
         } else {
+            String pwn = mRepository.pathWithNamespace;
+            int sl = pwn != null && pwn.contains("/") ? pwn.lastIndexOf('/') : -1;
+            String fileOwner = sl >= 0 ? pwn.substring(0, sl) : mRepository.owner().login();
+            String filePath  = mRepository.path != null ? mRepository.path : mRepository.name();
             startActivity(FileViewerActivity.makeIntent(getActivity(),
-                    mRepository.owner().login(), mRepository.name(),
-                    getCurrentRef(), content.path()));
+                    fileOwner, filePath, getCurrentRef(), content.path()));
         }
     }
 

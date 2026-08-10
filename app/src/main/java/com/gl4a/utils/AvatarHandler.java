@@ -119,16 +119,38 @@ public class AvatarHandler {
 
         private void processResult(int requestId, Bitmap bitmap, boolean changed) {
             final Request request = sRequests.get(requestId);
-            if (request != null && bitmap != null) {
-                synchronized (AvatarHandler.class) {
-                    sCache.put(request.id, bitmap);  // always keep LruCache fresh
-                }
-                if (changed) {
-                    for (ViewDelegate view : request.views) {
-                        applyAvatarToView(view, bitmap);  // crossfade only when avatar changed
+            if (request != null) {
+                if (bitmap != null) {
+                    synchronized (AvatarHandler.class) {
+                        sCache.put(request.id, bitmap);
+                    }
+                    if (changed) {
+                        for (ViewDelegate view : request.views) {
+                            applyAvatarToView(view, bitmap);
+                        }
+                    }
+                } else {
+                    // Network failed — apply cached bitmap (LruCache or disk) so views never
+                    // stay on initials when a cached avatar exists from a previous session.
+                    Bitmap fallback;
+                    synchronized (AvatarHandler.class) {
+                        fallback = (sCache != null) ? sCache.get(request.id) : null;
+                    }
+                    if (fallback == null) {
+                        Context ctx = com.gl4a.Gl4Application.get();
+                        fallback = (ctx != null) ? loadAvatarFromDisk(ctx, request.id) : null;
+                        if (fallback != null) {
+                            synchronized (AvatarHandler.class) {
+                                if (sCache != null && sCache.get(request.id) == null) {
+                                    sCache.put(request.id, fallback);
+                                }
+                            }
+                        }
+                    }
+                    if (fallback != null) {
+                        applyDiskPlaceholder(requestId, fallback);
                     }
                 }
-                // If unchanged: views already show the correct disk placeholder — no crossfade.
             }
             sRequests.remove(requestId);
         }

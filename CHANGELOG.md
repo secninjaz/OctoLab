@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-08-10
+
+### Added
+- Settings → Notification Worker: new "Recent runs" log showing the last 20 worker executions with timestamps and outcomes (OK / FAILED with error type) (#128)
+
+### Fixed
+- Tapping a to-do notification now scrolls to the specific comment that triggered it for both issues and MRs; MR notes are now fully paginated so scroll works regardless of comment count (#102)
+- Repo sub-sections (Contributors, Files, Forks, Stars, etc.) and deep links now work for repositories nested more than two groups deep and for repos with spaces in the display name (#125)
+- Deep links for the configured GitLab instance now open in-app for repos at any group nesting depth (#127)
+- Account avatars are now shown from disk cache when the network is unreachable, for both active and inactive accounts in the side panel (#143)
+- Notification workers no longer conflict when multiple app variants (debug, internal, release) are installed on the same device — each variant now uses a unique WorkManager tag (#128)
+- Worker "Last synced" time now reflects every successful API poll, not only polls that found new notifications (#128)
+
 ## [1.3.0] - 2026-08-06
 
 ### Added

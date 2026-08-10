@@ -102,6 +102,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
     private IntentUtils.InitialCommentMarker mInitialComment;
     private boolean mIsCollaborator;
     private boolean mListShown;
+    private int mPendingScrollPosition = -1;
     private ReactionBar.AddReactionMenuHelper mReactionMenuHelper;
     private final ReactionBar.ReactionDetailsCache mReactionDetailsCache =
             new ReactionBar.ReactionDetailsCache(this);
@@ -319,7 +320,12 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
                     itemId = ((TimelineItem.TimelineReview) item).review().id();
                 }
                 if (mInitialComment.matches(itemId, item.getCreatedAt())) {
-                    scrollToAndHighlightPosition(i + 1 /* adjust for header view */);
+                    final int scrollPos = i + 1; /* adjust for header view */
+                    mPendingScrollPosition = scrollPos;
+                    // Also post directly so the scroll fires after setContentShown(true)
+                    // returns and the content_container is guaranteed to be visible.
+                    android.view.View v = getView();
+                    if (v != null) v.post(() -> scrollToAndHighlightPosition(scrollPos));
                     break;
                 }
             }
@@ -354,6 +360,9 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         super.setContentShown(shown);
         mListShown = shown;
         updateCommentSectionVisibility(getView());
+        // mPendingScrollPosition is cleared here as a fallback; primary scroll is
+        // via getView().post() in onAddData() which fires after setContentShown(true).
+        mPendingScrollPosition = -1;
     }
 
     private void updateCommentSectionVisibility(View v) {

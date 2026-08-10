@@ -42,7 +42,9 @@ public class SingleFactory {
     /** URL-encodes "namespace/repo" for use with the GitLab projects/:id path. */
     private static String encodedPath(String repoOwner, String repoName) {
         try {
-            return URLEncoder.encode(repoOwner + "/" + repoName, StandardCharsets.UTF_8.name());
+            // URLEncoder uses form-encoding (space→+) but GitLab path segments need %20.
+            return URLEncoder.encode(repoOwner + "/" + repoName, StandardCharsets.UTF_8.name())
+                    .replace("+", "%20");
         } catch (java.io.UnsupportedEncodingException e) {
             // UTF-8 is always supported
             return repoOwner + "%2F" + repoName;

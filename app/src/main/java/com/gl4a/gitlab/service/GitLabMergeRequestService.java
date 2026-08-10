@@ -109,6 +109,7 @@ public interface GitLabMergeRequestService {
             @Query("per_page") int perPage
     );
 
+
     @POST("projects/{id}/merge_requests/{iid}/notes")
     Single<Response<GitLabComment>> createComment(
             @Path("id") long projectId,

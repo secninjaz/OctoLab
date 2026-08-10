@@ -527,7 +527,18 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
 
     private void updateUserInfo() {
         if (mUserInfo == null) {
-            mAvatarView.setImageDrawable(new AvatarHandler.DefaultAvatarDrawable(mUserLogin, null));
+            // No user profile yet (network failed or still loading).
+            // Use stored avatar URL and userId so the disk cache can show the
+            // last-known avatar instead of falling back to initials.
+            com.gl4a.Gl4Application app = com.gl4a.Gl4Application.get();
+            long userId = app.getUserIdForLogin(mUserLogin);
+            String storedUrl = app.getAvatarUrlForLogin(mUserLogin);
+            if (mAvatarView != null && userId > 0 && storedUrl != null) {
+                AvatarHandler.assignAvatar(mAvatarView, mUserLogin, userId, storedUrl);
+            } else if (mAvatarView != null) {
+                mAvatarView.setImageDrawable(
+                        new AvatarHandler.DefaultAvatarDrawable(mUserLogin, null));
+            }
             return;
         }
         if (mAvatarView != null) {

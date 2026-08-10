@@ -109,34 +109,47 @@ public class LinkParser {
                 return new ParseResult(HomeActivity.makeIntent(activity, R.id.my_gists));
         }
 
-        String user = first;
-        String repo = parts.size() >= 2 ? parts.get(1) : null;
-
-        if (repo == null) {
-            return parseUserLink(activity, uri, user);
+        if (parts.size() == 1) {
+            return parseUserLink(activity, uri, first);
         }
 
-        // GitLab uses "/-/" prefix for resource paths inside a project
-        // parts: [user, repo, "-", action, id, ...]
+        // Find the "/-/" separator at any position to support nested group repos
+        // e.g. [it, int, proxmox, -, issues, 1] → dashIndex=3, projectEnd=3
+        // e.g. [testg, testp, -, issues, 1]     → dashIndex=2, projectEnd=2
         int dashIndex = parts.indexOf("-");
-        if (dashIndex == 2 && parts.size() >= 4) {
-            String action = parts.get(3);
-            String id = parts.size() >= 5 ? parts.get(4) : null;
+
+        // Derive owner and repo from everything before the "-" (or from all parts if no "-").
+        // For nested groups: owner = joined segments 0..end-2, repo = segment end-1.
+        int projectEnd = dashIndex >= 1 ? dashIndex : parts.size();
+        String repo = parts.get(projectEnd - 1);
+        String user = projectEnd >= 2
+                ? android.text.TextUtils.join("/", parts.subList(0, projectEnd - 1))
+                : first;  // single-segment namespace (user profile)
+
+        if (projectEnd == 1) {
+            // Single path segment with no dash — treat as user profile
+            return parseUserLink(activity, uri, first);
+        }
+
+        if (dashIndex >= 1 && parts.size() >= dashIndex + 2) {
+            // Has "/-/" separator: parse resource action
+            String action = parts.get(dashIndex + 1);
+            String id = parts.size() >= dashIndex + 3 ? parts.get(dashIndex + 2) : null;
 
             switch (action) {
                 case "issues":
-                case "work_items": // GitLab 18+ uses /-/work_items/{iid} for issues
+                case "work_items":
                     return parseIssuesLink(activity, uri, user, repo, id, initialCommentFallback);
                 case "merge_requests":
                     return parseMergeRequestLink(activity, uri, parts, user, repo, id,
-                            initialCommentFallback);
+                            dashIndex, initialCommentFallback);
                 case "commit":
                     return parseCommitLink(activity, uri, user, repo, id, initialCommentFallback);
                 case "tree":
                 case "commits":
-                    return parseTreeLink(activity, uri, parts, user, repo, action);
+                    return parseTreeLink(activity, uri, parts, user, repo, action, dashIndex);
                 case "blob":
-                    return parseBlobLink(activity, uri, parts, user, repo);
+                    return parseBlobLink(activity, uri, parts, user, repo, dashIndex);
                 case "releases":
                     return parseReleaseLink(activity, parts, user, repo, id);
                 case "compare":
@@ -149,12 +162,8 @@ public class LinkParser {
             return null;
         }
 
-        // No "-" segment: plain /{user}/{repo}
-        if (parts.size() == 2) {
-            return new ParseResult(RepositoryActivity.makeIntent(activity, user, repo));
-        }
-
-        return null;
+        // No "/-/" separator — plain namespace/repo URL at any depth
+        return new ParseResult(RepositoryActivity.makeIntent(activity, user, repo));
     }
 
     @Nullable
@@ -214,7 +223,7 @@ public class LinkParser {
     @Nullable
     private static ParseResult parseMergeRequestLink(FragmentActivity activity, @NonNull Uri uri,
             List<String> parts, String user, String repo, String id,
-            IntentUtils.InitialCommentMarker initialCommentFallback) {
+            int dashIndex, IntentUtils.InitialCommentMarker initialCommentFallback) {
         if (StringUtils.isBlank(id)) {
             return new ParseResult(IssueListActivity.makeIntent(activity, user, repo, true));
         }
@@ -230,7 +239,9 @@ public class LinkParser {
         }
 
         // Check for diffs sub-page: /-/merge_requests/{iid}/diffs
-        String subPage = parts.size() >= 6 ? parts.get(5) : null;
+        // subPage index = dashIndex + 1 (action) + 1 (iid) + 1 = dashIndex + 3
+        int subPageIndex = dashIndex + 3;
+        String subPage = parts.size() > subPageIndex ? parts.get(subPageIndex) : null;
         int page = parseMergeRequestPage(subPage);
 
         DiffHighlightId diffId = extractDiffId(uri.getFragment(), "diff-");
@@ -282,13 +293,14 @@ public class LinkParser {
 
     @NonNull
     private static ParseResult parseTreeLink(FragmentActivity activity, Uri uri,
-            List<String> parts, String user, String repo, String action) {
-        // parts: [user, repo, "-", "tree"/"commits", ref, ...path...]
+            List<String> parts, String user, String repo, String action, int dashIndex) {
+        // parts: [..., "-", "tree"/"commits", ref, ...path...]
         int page = "tree".equals(action)
                 ? RepositoryActivity.PAGE_FILES
                 : RepositoryActivity.PAGE_COMMITS;
-        String refAndPath = parts.size() >= 5
-                ? TextUtils.join("/", parts.subList(4, parts.size()))
+        int refStart = dashIndex + 2; // dashIndex+1 = action, dashIndex+2 = ref start
+        String refAndPath = parts.size() > refStart
+                ? TextUtils.join("/", parts.subList(refStart, parts.size()))
                 : repo;
         return new ParseResult(new RefPathDisambiguationTask(activity, uri, user, repo, refAndPath,
                 page));
@@ -296,12 +308,13 @@ public class LinkParser {
 
     @Nullable
     private static ParseResult parseBlobLink(FragmentActivity activity, @NonNull Uri uri,
-            List<String> parts, String user, String repo) {
-        // parts: [user, repo, "-", "blob", ref, ...path...]
-        if (parts.size() < 5) {
+            List<String> parts, String user, String repo, int dashIndex) {
+        // parts: [..., "-", "blob", ref, ...path...]
+        int refStart = dashIndex + 2;
+        if (parts.size() <= refStart) {
             return null;
         }
-        String refAndPath = TextUtils.join("/", parts.subList(4, parts.size()));
+        String refAndPath = TextUtils.join("/", parts.subList(refStart, parts.size()));
         return new ParseResult(new RefPathDisambiguationTask(activity, uri, user, repo, refAndPath,
                 uri.getFragment()));
     }
@@ -332,6 +345,11 @@ public class LinkParser {
         }
         return new ParseResult(CompareActivity.makeIntent(activity, user, repo,
                 rangeParts[0], rangeParts[1]));
+    }
+
+    /** Parses a note ID from a URL fragment (e.g. "note_12345" → marker with id 12345). */
+    public static IntentUtils.InitialCommentMarker markerFromFragment(String fragment) {
+        return generateInitialCommentMarkerWithoutFallback(fragment, "note_");
     }
 
     private static IntentUtils.InitialCommentMarker generateInitialCommentMarkerWithoutFallback(

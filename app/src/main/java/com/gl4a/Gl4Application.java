@@ -302,6 +302,11 @@ public class Gl4Application extends Application implements
         return getPrefs().getString(KEY_PREFIX_AVATAR_URL + login, null);
     }
 
+    public long getUserIdForLogin(String login) {
+        if (login == null) return 0L;
+        return getPrefs().getLong(KEY_PREFIX_USER_ID + login, 0L);
+    }
+
     public void updateStoredAvatarUrl(String login, String url) {
         if (login == null || url == null) return;
         String existing = getPrefs().getString(KEY_PREFIX_AVATAR_URL + login, null);

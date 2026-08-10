@@ -186,16 +186,20 @@ public class ContentListFragment extends ListDataBaseFragment<GitLabTreeItem> im
 
         switch (item.getItemId()) {
             case R.id.history: {
-                String owner = mRepository.owner().login();
-                String name = mRepository.name();
+                String pwn = mRepository.pathWithNamespace;
+                int sl = pwn != null && pwn.contains("/") ? pwn.lastIndexOf('/') : -1;
+                String owner = sl >= 0 ? pwn.substring(0, sl) : mRepository.owner().login();
+                String name = mRepository.path != null ? mRepository.path : mRepository.name();
                 Intent intent = CommitHistoryActivity.makeIntent(getActivity(),
                         owner, name, mRef, treeItem.path(), treeItem.type(), true);
                 mFileHistoryLauncher.launch(intent);
                 return true;
             }
             case R.id.download: {
-                String owner = mRepository.owner().login();
-                String name = mRepository.name();
+                String pwn2 = mRepository.pathWithNamespace;
+                int sl2 = pwn2 != null && pwn2.contains("/") ? pwn2.lastIndexOf('/') : -1;
+                String owner = sl2 >= 0 ? pwn2.substring(0, sl2) : mRepository.owner().login();
+                String name = mRepository.path != null ? mRepository.path : mRepository.name();
                 String url = IntentUtils.createRawFileUrl(owner, name, mRef, treeItem.path());
                 DownloadUtils.enqueueDownloadWithPermissionCheck(getBaseActivity(),
                         url, FileUtils.getMimeTypeFor(treeItem.name()),
