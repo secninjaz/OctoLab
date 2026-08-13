@@ -119,13 +119,25 @@ public class IssueEditActivity extends BasePagerActivity implements
 
     public static Intent makeEditIntent(Context context, String repoOwner,
             String repoName, GitLabIssue issue) {
-        return new Intent(context, IssueEditActivity.class)
+        Intent intent = new Intent(context, IssueEditActivity.class)
                 .putExtra(EXTRA_KEY_OWNER, repoOwner)
                 .putExtra(EXTRA_KEY_REPO, repoName)
                 .putExtra(EXTRA_KEY_PROJECT_ID, issue.projectId)
                 .putExtra(EXTRA_KEY_ISSUE_IID, issue.iid)
                 .putExtra(EXTRA_KEY_ISSUE_TITLE, issue.title())
                 .putExtra(EXTRA_KEY_ISSUE_BODY, issue.body());
+        if (issue.assignees != null) {
+            intent.putParcelableArrayListExtra(EXTRA_KEY_ISSUE_ASSIGNEES,
+                    new java.util.ArrayList<>(issue.assignees));
+        }
+        if (issue.labelNames != null) {
+            intent.putParcelableArrayListExtra(EXTRA_KEY_ISSUE_LABELS,
+                    new java.util.ArrayList<>(issue.labelNames));
+        }
+        if (issue.milestone != null) {
+            intent.putExtra(EXTRA_KEY_ISSUE_MILESTONE, issue.milestone);
+        }
+        return intent;
     }
 
     private interface OnAssigneesLoaded {
@@ -196,6 +208,9 @@ public class IssueEditActivity extends BasePagerActivity implements
     private static final String EXTRA_KEY_ISSUE_IID = "issue_iid";
     private static final String EXTRA_KEY_ISSUE_TITLE = "issue_title";
     private static final String EXTRA_KEY_ISSUE_BODY = "issue_body";
+    private static final String EXTRA_KEY_ISSUE_ASSIGNEES = "issue_assignees";
+    private static final String EXTRA_KEY_ISSUE_LABELS = "issue_labels";
+    private static final String EXTRA_KEY_ISSUE_MILESTONE = "issue_milestone";
 
     private static final String STATE_KEY_TITLE = "edit_title";
     private static final String STATE_KEY_BODY = "edit_body";
@@ -319,6 +334,14 @@ public class IssueEditActivity extends BasePagerActivity implements
                 mIssueIid = extras.getInt(EXTRA_KEY_ISSUE_IID, -1);
                 mTitle = extras.getString(EXTRA_KEY_ISSUE_TITLE);
                 mBody = extras.getString(EXTRA_KEY_ISSUE_BODY);
+                // Pre-populate settings with existing issue values
+                List<com.gl4a.gitlab.model.GitLabUser> assignees =
+                        extras.getParcelableArrayList(EXTRA_KEY_ISSUE_ASSIGNEES);
+                if (assignees != null) mAssignees = assignees;
+                List<com.gl4a.gitlab.model.GitLabLabel> labels =
+                        extras.getParcelableArrayList(EXTRA_KEY_ISSUE_LABELS);
+                if (labels != null) mLabels = labels;
+                mMilestone = extras.getParcelable(EXTRA_KEY_ISSUE_MILESTONE);
                 mOriginalTitle = mTitle;
                 mOriginalBody = mBody;
                 mOriginalAssignees = new ArrayList<>(mAssignees);

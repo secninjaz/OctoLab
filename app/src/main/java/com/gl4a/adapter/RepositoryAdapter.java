@@ -24,9 +24,12 @@ import android.view.ViewGroup;
 import android.widget.Filterable;
 import android.widget.TextView;
 
+import android.widget.ImageView;
+
 import com.gl4a.R;
 import com.gl4a.gitlab.model.GitLabProject;
 import com.gl4a.utils.ApiHelpers;
+import com.gl4a.utils.AvatarHandler;
 import com.gl4a.utils.StringUtils;
 import com.vdurmont.emoji.EmojiParser;
 
@@ -46,6 +49,35 @@ public class RepositoryAdapter extends RootAdapter<GitLabProject, RepositoryAdap
 
     @Override
     public void onBindViewHolder(ViewHolder holder, GitLabProject repository) {
+        // Use avatars already embedded in the project response (no extra API calls):
+        // project's own avatar → immediate parent namespace avatar → full hierarchy walk.
+        if (repository.avatarUrl != null && !repository.avatarUrl.isEmpty()) {
+            AvatarHandler.assignAvatarLogo(holder.ivAvatar, repository.name(),
+                    repository.id(), repository.avatarUrl);
+        } else if (repository.namespace != null
+                && repository.namespace.avatarUrl != null
+                && !repository.namespace.avatarUrl.isEmpty()
+                && "group".equals(repository.namespace.kind)) {
+            // Group /uploads/ avatars return 401 without session cookie.
+            // Use the API avatar endpoint which accepts PRIVATE-TOKEN.
+            String groupAvatarUrl = com.gl4a.Gl4Application.get().getApiBaseUrl()
+                    + "groups/" + repository.namespace.id + "/avatar";
+            AvatarHandler.assignAvatarLogo(holder.ivAvatar,
+                    repository.namespace.name != null ? repository.namespace.name : repository.name(),
+                    repository.namespace.id, groupAvatarUrl);
+        } else {
+            // No avatar at project or immediate parent level — show project initials.
+            // Intentionally capped at 2 levels (project → parent group); deeper ancestor
+            // walk was deliberately omitted to keep the repo list fast and predictable.
+            // If a future requirement needs grandparent-and-above fallback, re-enable:
+            //   AvatarHandler.assignAvatarForProject(holder.ivAvatar,
+            //           repository.name(), repository.id());
+            // Note: group /uploads/ avatar URLs return 401 without session cookie.
+            // The API avatar endpoint (api/v4/groups/:id/avatar) must be used instead —
+            // see the fetchProjectAvatarUrl path in AvatarHandler for context.
+            holder.ivAvatar.setImageDrawable(
+                    new AvatarHandler.DefaultAvatarDrawable(repository.name(), null));
+        }
         holder.tvTitle.setText(ApiHelpers.formatRepoName(mContext, repository));
 
         if (!StringUtils.isBlank(repository.description())) {
@@ -80,6 +112,7 @@ public class RepositoryAdapter extends RootAdapter<GitLabProject, RepositoryAdap
             View.OnTouchListener {
         private ViewHolder(View view) {
             super(view);
+            ivAvatar = view.findViewById(R.id.iv_avatar);
             tvTitle = view.findViewById(R.id.tv_title);
             tvDesc = view.findViewById(R.id.tv_desc);
             tvLanguage = view.findViewById(R.id.tv_language);
@@ -93,6 +126,7 @@ public class RepositoryAdapter extends RootAdapter<GitLabProject, RepositoryAdap
             view.findViewById(R.id.scrollView).setOnTouchListener(this);
         }
 
+        private final ImageView ivAvatar;
         private final TextView tvTitle;
         private final TextView tvDesc;
         private final TextView tvLanguage;

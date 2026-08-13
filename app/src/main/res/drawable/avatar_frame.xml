@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Subtle circular frame behind repo/group avatars.
+     Provides contrast so white or near-white logos remain visible in the light theme. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#26000000" />
+</shape>

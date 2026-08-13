@@ -54,6 +54,9 @@ public class AvatarHandler {
         String fallbackUrl;  // Gravatar URL, tried if Avatar API also fails
         boolean apiFirst;    // true → try GitLab Avatar API before url (for email-only lookups)
         long projectId;      // > 0 → fetch avatar via GET /projects/{id} (project avatar path)
+        // true → use rounded-rectangle clip (20% radius) instead of full circle.
+        // Square org/group logos have content at the corners; full circle clips them.
+        boolean isLogo;
         ArrayList<ViewDelegate> views;
     }
     private static final LongSparseArray<Request> sRequests = new LongSparseArray<>();
@@ -107,10 +110,15 @@ public class AvatarHandler {
                 if (sCache == null) return;
                 if (sCache.get(request.id) == null) sCache.put(request.id, diskBitmap);
             }
-            // Direct set — no crossfade; disk bitmap is the last-known state, not an update.
+            // Apply the same logo treatment as processResult so disk-cache hits render
+            // identically to network-loaded bitmaps (fixes first-load circle crop).
+            Bitmap toDisplay = request.isLogo ? fitLogoToSquare(diskBitmap) : diskBitmap;
+            float radius = request.isLogo
+                    ? Math.max(toDisplay.getWidth(), toDisplay.getHeight()) * 0.20f
+                    : Math.max(toDisplay.getWidth() / 2, toDisplay.getHeight() / 2);
             Resources res = request.views.get(0).getContext().getResources();
-            RoundedBitmapDrawable d = RoundedBitmapDrawableFactory.create(res, diskBitmap);
-            d.setCornerRadius(Math.max(diskBitmap.getWidth() / 2, diskBitmap.getHeight() / 2));
+            RoundedBitmapDrawable d = RoundedBitmapDrawableFactory.create(res, toDisplay);
+            d.setCornerRadius(radius);
             d.setAntiAlias(true);
             for (ViewDelegate view : request.views) {
                 view.setDrawable(d);
@@ -126,7 +134,13 @@ public class AvatarHandler {
                     }
                     if (changed) {
                         for (ViewDelegate view : request.views) {
-                            applyAvatarToView(view, bitmap);
+                            if (request.isLogo) {
+                                Bitmap logo = fitLogoToSquare(bitmap);
+                                applyAvatarToView(view, logo, true,
+                                        Math.max(logo.getWidth(), logo.getHeight()) * 0.20f);
+                            } else {
+                                applyAvatarToView(view, bitmap);
+                            }
                         }
                     }
                 } else {
@@ -182,7 +196,15 @@ public class AvatarHandler {
     }
 
     public static void assignAvatar(ImageView view, String userName, long userId, String url) {
-        assignAvatarInternal(new ImageViewDelegate(view), userName, userId, url, null);
+        assignAvatarInternal(new ImageViewDelegate(view), userName, userId, url, null, false);
+    }
+
+    /**
+     * Like {@link #assignAvatar} but uses a rounded-rectangle clip (20% corner radius) instead
+     * of a full circle. Use for project/group logos whose content extends to the image corners.
+     */
+    public static void assignAvatarLogo(ImageView view, String name, long id, String url) {
+        assignAvatarInternal(new ImageViewDelegate(view), name, id, url, null, true);
     }
 
     /**
@@ -205,7 +227,7 @@ public class AvatarHandler {
 
         Bitmap cached = loadBitmapFromCache(view.getContext(), cacheId);
         if (cached != null) {
-            applyAvatarToView(delegate, cached);
+            applyAvatarToView(delegate, cached, false);
             return;
         }
 
@@ -254,7 +276,7 @@ public class AvatarHandler {
 
         Bitmap cached = loadBitmapFromCache(view.getContext(), cacheId);
         if (cached != null) {
-            applyAvatarToView(delegate, cached);
+            applyAvatarToView(delegate, cached, false);
             return;
         }
 
@@ -327,11 +349,22 @@ public class AvatarHandler {
 
     private static void assignAvatarInternal(ViewDelegate view,
             String userName, long userId, String url, String email) {
+        assignAvatarInternal(view, userName, userId, url, email, false);
+    }
+
+    private static void assignAvatarInternal(ViewDelegate view,
+            String userName, long userId, String url, String email, boolean isLogo) {
         removeOldRequest(view);
 
         Bitmap bitmap = loadBitmapFromCache(view.getContext(), userId);
         if (bitmap != null) {
-            applyAvatarToView(view, bitmap);
+            if (isLogo) {
+                Bitmap logo = fitLogoToSquare(bitmap);
+                applyAvatarToView(view, logo, false,
+                        Math.max(logo.getWidth(), logo.getHeight()) * 0.20f);
+            } else {
+                applyAvatarToView(view, bitmap, false);
+            }
             return;
         }
 
@@ -363,6 +396,7 @@ public class AvatarHandler {
         request.url = resolvedUrl;
         request.email = (email != null && !email.trim().isEmpty()) ? email.trim() : null;
         request.fallbackUrl = gravatarFallback;
+        request.isLogo = isLogo;
         request.views = new ArrayList<>();
         request.views.add(view);
         sRequests.put(requestId, request);
@@ -413,36 +447,46 @@ public class AvatarHandler {
         String projectJson = fetchJsonString(client, app.getApiBaseUrl() + "projects/" + projectId);
         if (projectJson == null) return null;
 
-        // Level 1: project's own avatar
-        String avatarUrl = parseJsonString(projectJson, "avatar_url");
-        if (avatarUrl != null) return avatarUrl;
+        try {
+            org.json.JSONObject project = new org.json.JSONObject(projectJson);
 
-        // Level 2: immediate parent namespace (embedded — no extra API call)
-        String nsJson = parseJsonObject(projectJson, "namespace");
-        if (nsJson == null) return null;
+            // Level 1: project's own avatar
+            String avatarUrl = jsonAvatarUrl(project);
+            if (avatarUrl != null) return avatarUrl;
 
-        avatarUrl = parseJsonString(nsJson, "avatar_url");
-        if (avatarUrl != null) return avatarUrl;
+            // Level 2: immediate parent namespace (embedded — no extra API call)
+            org.json.JSONObject ns = project.optJSONObject("namespace");
+            if (ns == null) return null;
 
-        // User namespaces are always root — nothing further to walk.
-        if (!"group".equals(parseJsonString(nsJson, "kind"))) return null;
+            avatarUrl = jsonAvatarUrl(ns);
+            if (avatarUrl != null) return avatarUrl;
 
-        // Levels 3+: walk up ancestor groups via parent_id (bounded to 5 levels)
-        long parentId = parseJsonLong(nsJson, "parent_id");
-        for (int depth = 0; depth < 5 && parentId > 0; depth++) {
-            try {
+            // User namespaces are always root — nothing further to walk.
+            if (!"group".equals(ns.optString("kind", ""))) return null;
+
+            // Levels 3+: walk up ancestor groups via parent_id (bounded to 5 levels)
+            long parentId = ns.optLong("parent_id", 0);
+            for (int depth = 0; depth < 5 && parentId > 0; depth++) {
                 String groupJson = fetchJsonString(client,
                         app.getApiBaseUrl() + "groups/" + parentId);
                 if (groupJson == null) break;
-                avatarUrl = parseJsonString(groupJson, "avatar_url");
+                org.json.JSONObject group = new org.json.JSONObject(groupJson);
+                avatarUrl = jsonAvatarUrl(group);
                 if (avatarUrl != null) return avatarUrl;
-                parentId = parseJsonLong(groupJson, "parent_id");
-            } catch (IOException e) {
-                Log.d(TAG, "Group avatar walk-up stopped at parent_id=" + parentId);
-                break;
+                parentId = group.optLong("parent_id", 0);
             }
+        } catch (org.json.JSONException e) {
+            Log.d(TAG, "JSON parse error in fetchProjectAvatarUrl for id=" + projectId, e);
         }
         return null;
+    }
+
+    /** Returns avatar_url from a JSONObject, or null if absent, JSON null, or empty string. */
+    @Nullable
+    private static String jsonAvatarUrl(org.json.JSONObject obj) {
+        if (obj.isNull("avatar_url")) return null;
+        String v = obj.optString("avatar_url", "");
+        return v.isEmpty() ? null : v;
     }
 
     private static String fetchJsonString(OkHttpClient client, String url) throws IOException {
@@ -625,20 +669,54 @@ public class AvatarHandler {
     }
 
     private static void applyAvatarToView(ViewDelegate view, Bitmap avatar) {
+        applyAvatarToView(view, avatar, true);
+    }
+
+    /**
+     * @param crossfade if false, always sets directly without crossfade transition.
+     *                  Use false for LruCache hits to prevent flicker when a RecyclerView
+     *                  ViewHolder was recycled and shows a different item's placeholder.
+     */
+    private static void applyAvatarToView(ViewDelegate view, Bitmap avatar, boolean crossfade) {
+        // Full circle for user/person avatars (standard profile photo style).
+        applyAvatarToView(view, avatar, crossfade, Math.max(avatar.getWidth() / 2f, avatar.getHeight() / 2f));
+    }
+
+    /**
+     * Fits a bitmap into a square canvas by centering it with transparent padding.
+     * Prevents RoundedBitmapDrawable's CENTER_CROP from cutting portrait-oriented logos.
+     */
+    private static Bitmap fitLogoToSquare(Bitmap src) {
+        // 40% larger canvas → 20% inset on each side — keeps even edge-to-edge logos like
+        // textr clear of the 20% rounded-rectangle corner curves on both themes.
+        int base = Math.max(src.getWidth(), src.getHeight());
+        int size = (int) (base * 1.40f + 0.5f);
+        Bitmap result = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(result);
+        int left = (size - src.getWidth()) / 2;
+        int top = (size - src.getHeight()) / 2;
+        canvas.drawBitmap(src, left, top, null);
+        return result;
+    }
+
+    private static void applyAvatarToView(ViewDelegate view, Bitmap avatar, boolean crossfade,
+            float cornerRadius) {
         Resources res = view.getContext().getResources();
         RoundedBitmapDrawable d = RoundedBitmapDrawableFactory.create(res, avatar);
-        d.setCornerRadius(Math.max(avatar.getWidth() / 2, avatar.getHeight() / 2));
+        d.setCornerRadius(cornerRadius);
         d.setAntiAlias(true);
 
-        Drawable old = view.getDrawable();
-        if (old instanceof DefaultAvatarDrawable) {
-            TransitionDrawable transition = new TransitionDrawable(new Drawable[] { old, d });
-            transition.setCrossFadeEnabled(true);
-            transition.startTransition(res.getInteger(android.R.integer.config_shortAnimTime));
-            view.setDrawable(transition);
-        } else {
-            view.setDrawable(d);
+        if (crossfade) {
+            Drawable old = view.getDrawable();
+            if (old instanceof DefaultAvatarDrawable) {
+                TransitionDrawable transition = new TransitionDrawable(new Drawable[] { old, d });
+                transition.setCrossFadeEnabled(true);
+                transition.startTransition(res.getInteger(android.R.integer.config_shortAnimTime));
+                view.setDrawable(transition);
+                return;
+            }
         }
+        view.setDrawable(d);
     }
 
     private static Request getRequestForId(long id) {

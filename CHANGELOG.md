@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-08-13
+
+### Added
+- Project and group avatars now shown in My Repos and Stars lists — falls back to parent group avatar when the project has no avatar set; group avatar fetched via authenticated API endpoint (#141)
+
+### Fixed
+- Group avatars with white or light-coloured logos are now visible in light theme — subtle oval background provides contrast without a visible border (#141)
+- Group/project logos no longer cropped at corners — rendered as rounded rectangle (20% radius) instead of full circle; non-square logos are padded to a square canvas to prevent centre-crop clipping; disk-cache path now applies the same treatment as the network path (#141)
+- Editing an issue now pre-populates existing assignees, labels, and milestone instead of starting blank (#142)
+
 ## [1.3.1] - 2026-08-10
 
 ### Added
