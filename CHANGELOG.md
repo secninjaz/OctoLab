@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-08-14
+
+### Fixed
+- Project visibility now shown for all visibility states (Private / Internal / Public) in My Repos, Stars, Bookmarks, and the repo detail view — previously only Private was labelled (#145)
+
+### Changed
+- README hyperlinks in dark theme now use a lighter sky blue (#9dc7f1) for better contrast; light theme retains the original blue (#4183C4)
+
 ## [1.3.2] - 2026-08-13
 
 ### Added
