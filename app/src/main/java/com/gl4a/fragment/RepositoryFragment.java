@@ -260,7 +260,16 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         }
 
         OverviewRow privateRow = mContentView.findViewById(R.id.private_row);
-        privateRow.setVisibility(mRepository.isPrivate() ? View.VISIBLE : View.GONE);
+        if ("internal".equals(mRepository.visibility)) {
+            privateRow.setVisibility(View.VISIBLE);
+            privateRow.setText(getString(R.string.repo_type_internal));
+        } else if ("public".equals(mRepository.visibility)) {
+            privateRow.setVisibility(View.VISIBLE);
+            privateRow.setText(getString(R.string.repo_type_public));
+        } else {
+            privateRow.setVisibility(mRepository.isPrivate() ? View.VISIBLE : View.GONE);
+            privateRow.setText(getString(R.string.repo_type_private));
+        }
 
         OverviewRow languageRow = mContentView.findViewById(R.id.language_row);
         // GitLab API does not surface language on project list; hide the row

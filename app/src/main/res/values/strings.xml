@@ -180,6 +180,7 @@
     <string name="repo_type_owner">Owner</string>
     <string name="repo_type_member">Member</string>
     <string name="repo_type_public">Public</string>
+    <string name="repo_type_internal">Internal</string>
     <string name="repo_type_private">Private</string>
     <string name="repo_type_sources">Sources</string>
     <string name="repo_type_forks">Forks</string>

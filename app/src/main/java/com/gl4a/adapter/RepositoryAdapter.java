@@ -97,7 +97,17 @@ public class RepositoryAdapter extends RootAdapter<GitLabProject, RepositoryAdap
         holder.tvStars.setText(String.valueOf(repository.stargazersCount()));
         // GitLab projects do not expose repository size via API; hide the field
         holder.tvSize.setVisibility(View.GONE);
-        holder.tvPrivate.setVisibility(repository.isPrivate() ? View.VISIBLE : View.GONE);
+        if ("internal".equals(repository.visibility)) {
+            holder.tvPrivate.setVisibility(View.VISIBLE);
+            holder.tvPrivate.setText(R.string.repo_type_internal);
+        } else if ("public".equals(repository.visibility)) {
+            holder.tvPrivate.setVisibility(View.VISIBLE);
+            holder.tvPrivate.setText(R.string.repo_type_public);
+        } else {
+            // "private" or null — show Private label (existing behaviour)
+            holder.tvPrivate.setVisibility(repository.isPrivate() ? View.VISIBLE : View.GONE);
+            holder.tvPrivate.setText(R.string.repo_type_private);
+        }
         holder.tvFork.setVisibility(repository.isFork() ? View.VISIBLE : View.GONE);
     }
 
