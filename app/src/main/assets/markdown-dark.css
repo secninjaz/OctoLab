@@ -1,5 +1,9 @@
 @import "markdown-light.css";
 
+a {
+    color: #9dc7f1;
+}
+
 body {
     color: #f0f0f0;
 }
