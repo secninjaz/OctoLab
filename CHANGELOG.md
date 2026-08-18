@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.4] - 2026-08-18
+
+### Fixed
+- WCAG AA colour contrast across the full light theme — toolbar, badges, tabs, diff viewer, dialogs, popup menus, markdown editor (#146, #147, #148)
+- WCAG AA dark theme — Pajamas dark colour palette applied throughout, matching the light-theme rework (#153)
+- MR closed-without-merge now uses a distinct red, separate from issue-closed blue
+- Light-theme surface restored to v1.3.3's warmer off-white (#FFFFF5) — higher contrast than the interim #F0F0F5 — and applied consistently to the nav drawer and toolbar/nav grey, which had drifted to a mismatched cooler tone
+- Notification channel is now created at app startup instead of only from the settings toggle's change listener, which never fired for installs that never touched the toggle (notifications default to enabled) — the channel was never registered, so the OS silently dropped every notification even though the worker reported success
+- In-app to-do list no longer drops the author's name for the "marked as to-do" action
+
 ## [1.3.3] - 2026-08-14
 
 ### Fixed
