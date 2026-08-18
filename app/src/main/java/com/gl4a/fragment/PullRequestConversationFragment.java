@@ -231,7 +231,7 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
         if (mMergeRequest.isMerged()) {
             setHighlightColors(R.attr.colorPullRequestMerged, R.attr.colorPullRequestMergedDark);
         } else if ("closed".equals(mMergeRequest.state())) {
-            setHighlightColors(R.attr.colorIssueClosed, R.attr.colorIssueClosedDark);
+            setHighlightColors(R.attr.colorMergeRequestClosed, R.attr.colorMergeRequestClosedDark);
         } else if (mMergeRequest.isDraft()) {
             setHighlightColors(R.attr.colorPullRequestDraft, R.attr.colorPullRequestDraftDark);
         } else {
@@ -397,7 +397,7 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
         final @AttrRes int highlightColorAttr = mMergeRequest != null && mMergeRequest.isMerged()
                 ? R.attr.colorPullRequestMerged
                 : "closed".equals(mMergeRequest != null ? mMergeRequest.state() : "")
-                        ? R.attr.colorIssueClosed : R.attr.colorIssueOpen;
+                        ? R.attr.colorMergeRequestClosed : R.attr.colorIssueOpen;
 
         // Pass projectId so EditMergeRequestCommentActivity can call the API without a lookup.
         long projectId = mMergeRequest != null ? mMergeRequest.projectId : -1L;

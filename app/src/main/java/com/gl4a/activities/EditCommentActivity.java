@@ -51,10 +51,8 @@ public abstract class EditCommentActivity extends AppCompatActivity implements
             getIntent().removeExtra("body");
         }
 
-        @AttrRes int highlightColorAttr = getIntent().getIntExtra("highlight_color_attr", 0);
-        if (highlightColorAttr != 0) {
-            mEditorSheet.setHighlightColor(highlightColorAttr);
-        }
+        // Use theme primary (nav colour) — state-based green/red is not desired.
+        mEditorSheet.setHighlightColor(androidx.appcompat.R.attr.colorPrimary);
 
         setResult(RESULT_CANCELED);
     }

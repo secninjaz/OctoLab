@@ -39,6 +39,9 @@ public class IssueListFactory extends FragmentFactory {
         mShowingClosed = false;
         mIsPullRequest = pr;
         mPrefs = prefs;
+        // Initialize directly — updateHeaderColor() calls invalidateTabs() which NPEs
+        // because mAdapter is null in the constructor at this point.
+        mHeaderColorAttrs = new int[] { R.attr.colorIssueOpen, R.attr.colorIssueOpenDark };
 
         String lastOrder = mPrefs.getString(getSortOrderPrefKey(), null);
         String lastDir = mPrefs.getString(getSortDirPrefKey(), null);
@@ -174,13 +177,14 @@ public class IssueListFactory extends FragmentFactory {
 
     private void updateHeaderColor() {
         if (mShowingClosed) {
-            // Closed: red
-            mHeaderColorAttrs = new int[] {
-                R.attr.colorIssueClosed, R.attr.colorIssueClosedDark
-            };
+            mHeaderColorAttrs = mIsPullRequest
+                ? new int[] { R.attr.colorMergeRequestClosed, R.attr.colorMergeRequestClosedDark }
+                : new int[] { R.attr.colorIssueClosed, R.attr.colorIssueClosedDark };
         } else {
-            // Open: use app primary orange, not issue-open green
-            mHeaderColorAttrs = null;
+            // Open: green tab indicator (toolbar background stays light grey via BasePagerActivity)
+            mHeaderColorAttrs = new int[] {
+                R.attr.colorIssueOpen, R.attr.colorIssueOpenDark
+            };
         }
         mActivity.invalidateTabs();
     }

@@ -30,8 +30,14 @@ public class RepositoryEventListFragment extends EventListFragment {
 
     @Override
     protected Single<Response<GitLabPage<GitLabEvent>>> loadRawPage(int page, boolean bypassCache) {
-        // GitLab project events: stub with empty page
-        return io.reactivex.Single.just(
-                retrofit2.Response.success(new com.gl4a.utils.ApiHelpers.DummyPage<>()));
+        GitLabUserService service = ServiceFactory.get(GitLabUserService.class, bypassCache);
+        return service.getProjectEvents(mRepository.id(), page, 30)
+                .map(response -> {
+                    if (!response.isSuccessful() || response.body() == null) {
+                        return retrofit2.Response.<GitLabPage<GitLabEvent>>error(
+                                response.errorBody(), response.raw());
+                    }
+                    return retrofit2.Response.success(com.gl4a.utils.ApiHelpers.toPage(response));
+                });
     }
 }

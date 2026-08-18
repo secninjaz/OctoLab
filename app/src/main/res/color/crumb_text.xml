@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:color="#fff" android:state_activated="true" />
-    <item android:color="#b3ffffff" />
+    <!-- Dark text on light grey breadcrumb background — was white (invisible) -->
+    <item android:color="@color/theme_text_primary" android:state_activated="true" />
+    <item android:color="@color/theme_hint" />
 </selector>

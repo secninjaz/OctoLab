@@ -13,7 +13,7 @@ body>:first-child, #content>:first-child {
 }
 
 a {
-    color: #4183C4;
+    color: #1068BF; /* Pajamas blue-600 (5.59:1) — interactive/link colour */
     text-decoration: none;
 }
 

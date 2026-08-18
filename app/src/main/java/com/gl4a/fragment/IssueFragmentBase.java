@@ -264,7 +264,9 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
     @Override
     protected void setHighlightColors(int colorAttrId, int statusBarColorAttrId) {
         super.setHighlightColors(colorAttrId, statusBarColorAttrId);
-        mBottomSheet.setHighlightColor(colorAttrId);
+        // Use primary (theme nav colour) for the editor toolbar — state-based green/red is
+        // not desired; the toolbar should always match the nav background for consistency.
+        mBottomSheet.setHighlightColor(androidx.appcompat.R.attr.colorPrimary);
     }
 
     @Override

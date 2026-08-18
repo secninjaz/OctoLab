@@ -34,7 +34,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
         android:text="@string/try_again"
-        style="@style/Widget.MaterialComponents.Button.TextButton" />
+        style="@style/OctoLab.TextButton" />
 
     <Button
         android:id="@+id/report_button"
@@ -43,7 +43,7 @@
         android:layout_gravity="center_horizontal"
         android:visibility="gone"
         android:text="@string/report_issue"
-        style="@style/Widget.MaterialComponents.Button.TextButton"
+        style="@style/OctoLab.TextButton"
         tools:visibility="visible" />
 
     <View

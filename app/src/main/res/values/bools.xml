@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <bool name="is_dark_theme">false</bool>
+    <!-- Light mode: status bar uses dark icons on light grey background -->
+    <bool name="light_status_bar">true</bool>
 </resources>

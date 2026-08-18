@@ -73,6 +73,11 @@ public class Gl4Application extends Application implements
         // first run so updateNotificationWorker() sees the correct default without the user
         // having to open Settings first.
         androidx.preference.PreferenceManager.setDefaultValues(this, R.xml.settings, false);
+        // Notifications default to enabled, so SettingsFragment's toggle listener — the only
+        // other caller of createNotificationChannels() — never fires for users who don't
+        // manually touch the switch. Without this, the worker posts to a channel that was
+        // never registered and Android silently drops every notification (no crash, no log).
+        NotificationsWorker.createNotificationChannels(this);
         updateNotificationWorker(prefs);
 
         // RxJava 2: swallow UndeliverableException (error arrives after subscriber is disposed,

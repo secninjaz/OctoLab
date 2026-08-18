@@ -116,6 +116,14 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
         mSearchType.setAdapter(new SearchTypeAdapter(mSearchType.getContext(), getActivity()));
         mSearchType.setOnItemSelectedListener(this);
         mSearchType.setSelection(mSelectedSearchType);
+        // android.widget.Spinner doesn't respond to colorControlNormal from AppCompat theme overlays.
+        // Force-tint its background drawable (dropdown arrow) to the dark theme text colour.
+        if (mSearchType.getBackground() != null) {
+            int dark = com.gl4a.utils.UiUtils.resolveColor(requireActivity(), android.R.attr.textColorPrimary);
+            androidx.core.graphics.drawable.DrawableCompat.setTint(
+                    androidx.core.graphics.drawable.DrawableCompat.wrap(
+                            mSearchType.getBackground().mutate()), dark);
+        }
 
         SuggestionAdapter adapter = new SuggestionAdapter(getActivity());
         adapter.setFilterQueryProvider(this);
@@ -394,6 +402,7 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
 
     private static class SearchTypeAdapter extends BaseAdapter implements SpinnerAdapter {
         private final Context mContext;
+        private final Context mPopupContext;
         private final LayoutInflater mInflater;
         private final LayoutInflater mPopupInflater;
 
@@ -405,6 +414,7 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
 
         private SearchTypeAdapter(Context context, Context popupContext) {
             mContext = context;
+            mPopupContext = popupContext;
             mInflater = LayoutInflater.from(context);
             mPopupInflater = LayoutInflater.from(popupContext);
         }
@@ -432,6 +442,11 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
 
             ImageView icon = convertView.findViewById(R.id.icon);
             icon.setImageResource(mResources[position][1]);
+            // Force dark tint — Spinner toolbar context may resolve colorControlNormal as white.
+            // Uses theme_text_primary (#1F1E24) directly for reliability.
+            icon.setColorFilter(
+                    com.gl4a.utils.UiUtils.resolveColor(mPopupContext, android.R.attr.textColorPrimary),
+                    android.graphics.PorterDuff.Mode.SRC_IN);
 
             return convertView;
         }

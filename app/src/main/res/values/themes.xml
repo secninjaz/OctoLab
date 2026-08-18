@@ -2,6 +2,8 @@
     <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
         <item name="android:windowSoftInputMode">adjustResize</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- Status bar icon mode: true=dark icons (light theme), false=light icons (dark theme) -->
+        <item name="android:windowLightStatusBar">@bool/light_status_bar</item>
 
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
@@ -10,20 +12,33 @@
         <item name="preferenceTheme">@style/PreferenceTheme</item>
         <item name="actionMenuTextAppearance">@style/TextAppearance.Widget.ActionBar.Menu</item>
         <item name="actionBarTabStyle">@style/Widget.ActionBar.TabView</item>
+        <!-- Dark text/icons on light grey toolbar — DarkActionBar parent defaults to white -->
+        <item name="actionBarTheme">@style/AppTheme.ToolbarOverlay</item>
+        <item name="actionBarPopupTheme">@style/AppTheme.PopupOverlay</item>
         <item name="overviewRowStyle">@style/OverviewRow</item>
         <item name="cardViewTheme">@style/CardView.DayNight</item>
-        <item name="inlineButtonStyle">@style/Widget.MaterialComponents.Button.TextButton</item>
+        <item name="inlineButtonStyle">@style/OctoLab.TextButton</item>
+        <!-- Apply to all Material buttons (pickers, toolbars) -->
+        <item name="materialButtonStyle">@style/OctoLab.TextButton</item>
+        <!-- Dialog buttons: OK/Cancel/Neutral in AlertDialogs -->
+        <item name="buttonBarPositiveButtonStyle">@style/OctoLab.TextButton</item>
+        <item name="buttonBarNegativeButtonStyle">@style/OctoLab.TextButton</item>
+        <item name="buttonBarNeutralButtonStyle">@style/OctoLab.TextButton</item>
 
         <item name="android:textColorLink">@color/link_text</item>
 
         <item name="colorAccent">@color/accent</item>
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryDark">@color/primary_dark</item>
-        <item name="colorOnPrimary">@android:color/white</item>
+        <!-- Dark icons/text on light grey toolbar (16.5:1) -->
+        <item name="colorOnPrimary">#1F1E24</item>
         <item name="colorSecondary">@color/primary</item>
-        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorOnSecondary">#1F1E24</item>
         <item name="colorIssueOpen">@color/issue_open</item>
         <item name="colorIssueClosed">@color/issue_closed</item>
+        <!-- MR closed without merge = red (different from issue closed = blue) -->
+        <item name="colorMergeRequestClosed">@color/form_error</item>
+        <item name="colorMergeRequestClosedDark">@color/mr_closed_dark</item>
         <item name="colorPullRequestMerged">@color/pr_merged</item>
         <item name="colorPullRequestDraft">@color/pr_draft</item>
         <item name="colorIssueOpenDark">@color/issue_open_dark</item>
@@ -66,14 +81,23 @@
     </style>
 
     <style name="HeaderTheme" parent="Theme.MaterialComponents">
-        <item name="colorPrimary">#FFFFF5</item>
-        <item name="colorSecondary">#FFFFF5</item>
-        <item name="colorControlActivated">#FFFFF5</item>
+        <!-- colorPrimary=link_text so Material cursor and selection handles use visible blue -->
+        <item name="colorPrimary">@color/link_text</item>
+        <item name="colorSecondary">@color/link_text</item>
+        <!-- Cursor/activated control colour — must be visible on light bg -->
+        <item name="colorControlActivated">@color/link_text</item>
+        <!-- AppCompat uses colorAccent for text selection handles (waterdrop) -->
+        <item name="colorAccent">@color/link_text</item>
+        <!-- Null cursor drawable = cursor inherits text colour (#1F1E24 dark) -->
+        <item name="android:textCursorDrawable">@null</item>
         <item name="colorSurface">@android:color/transparent</item>
-        <item name="colorOnSurface">#FFFFF5</item>
+        <!-- colorOnSurface dark: Material TextInputEditText uses this for text colour -->
+        <item name="colorOnSurface">@color/theme_text_primary</item>
         <item name="android:spinnerStyle">@style/Widget.Spinner.ActionBar.Light</item>
         <!-- used by appcompat to tint the spinner background drawable -->
-        <item name="android:colorBackground">#FFFFF5</item>
+        <item name="android:colorBackground">@color/theme_surface</item>
+        <!-- Body and title text must be dark in HeaderTheme — parent may default to white -->
+        <item name="android:textColorPrimary">@color/theme_text_primary</item>
         <!-- Hint and error colours: single source of truth — change theme_hint / form_error. -->
         <item name="android:textColorHint">@color/theme_hint</item>
         <item name="colorError">@color/form_error</item>

@@ -161,8 +161,20 @@ public abstract class BasePagerActivity extends BaseActivity implements
 
     @Override
     protected void transitionHeaderToColor(int colorAttrId, int statusBarColorAttrId) {
-        super.transitionHeaderToColor(colorAttrId, statusBarColorAttrId);
-        mCurrentHeaderColor = UiUtils.resolveColor(this, colorAttrId);
+        // Toolbar background stays at theme primary — only update tab indicator.
+        // When colorAttrId is colorPrimary (default/fallback), keep the dark default indicator
+        // so it stays visible on the light grey toolbar.
+        boolean isPrimaryFallback = colorAttrId == androidx.appcompat.R.attr.colorPrimary
+                || colorAttrId == androidx.appcompat.R.attr.colorPrimaryDark;
+        if (isPrimaryFallback) {
+            mTabs.setSelectedTabIndicatorColor(
+                    androidx.core.content.ContextCompat.getColor(this, R.color.tab_indicator_color));
+        } else {
+            final int indicatorColor = UiUtils.resolveColor(this, colorAttrId);
+            // post() ensures this fires after layout — same as onPageMoved fix.
+            mTabs.post(() -> mTabs.setSelectedTabIndicatorColor(indicatorColor));
+            mCurrentHeaderColor = indicatorColor;
+        }
     }
 
     protected abstract PagerAdapter createAdapter(ViewGroup root);
@@ -200,11 +212,13 @@ public abstract class BasePagerActivity extends BaseActivity implements
     protected void onPageMoved(int position, float fraction) {
         if (mTabHeaderColors != null) {
             int nextIndex = Math.max(0, Math.min(position + 1, mTabHeaderColors.length - 1));
-            int headerColor = UiUtils.mixColors(mTabHeaderColors[position][0],
+            // Only update the tab indicator colour — toolbar background stays as theme primary.
+            // Previously this called setHeaderColor() which changed the entire toolbar background
+            // to the issue/MR state colour (green/red), which is not the desired behaviour.
+            final int indicatorColor = UiUtils.mixColors(mTabHeaderColors[position][0],
                     mTabHeaderColors[nextIndex][0], fraction);
-            int statusBarColor = UiUtils.mixColors(mTabHeaderColors[position][1],
-                    mTabHeaderColors[nextIndex][1], fraction);
-            setHeaderColor(headerColor, statusBarColor);
+            // Post so setSelectedTabIndicatorColor fires after the initial layout pass.
+            mTabs.post(() -> mTabs.setSelectedTabIndicatorColor(indicatorColor));
         }
     }
 

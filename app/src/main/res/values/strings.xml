@@ -124,7 +124,7 @@
     <string name="download_permission_rationale">Permission to write to USB storage or SD card is required in order to download files.</string>
     <string name="load_auth_failure_notice">Your authentication credentials aren\'t valid anymore, please log in again.</string>
     <string name="unset">Unset</string>
-    <string name="copyright_notice">\u00a9 2014 Azwan Adli, Danny Baumann</string>
+    <string name="copyright_notice">\u00a9 2026 SECNINJAZ TECHNOLOGIES</string>
     <string name="actions">Actions</string>
     <string name="created">Created</string>
     <string name="assigned">Assigned</string>

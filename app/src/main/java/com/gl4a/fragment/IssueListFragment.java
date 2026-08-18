@@ -156,7 +156,11 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
 
         switch (mIssueState != null ? mIssueState : "") {
             case ApiHelpers.IssueState.CLOSED:
-                setHighlightColors(R.attr.colorIssueClosed, R.attr.colorIssueClosedDark);
+                if (mIsMR) {
+                    setHighlightColors(R.attr.colorMergeRequestClosed, R.attr.colorMergeRequestClosedDark);
+                } else {
+                    setHighlightColors(R.attr.colorIssueClosed, R.attr.colorIssueClosedDark);
+                }
                 break;
             case ApiHelpers.IssueState.MERGED:
                 setHighlightColors(R.attr.colorPullRequestMerged,

@@ -132,9 +132,15 @@ public class IssueListActivity extends BaseFragmentPagerActivity implements
         R.string.open, R.string.closed, R.string.merged
     };
 
-    private static final int[][] HEADER_COLOR_ATTRS = new int[][] {
+    // Issue tabs: Open(green) | Closed(blue)
+    private static final int[][] ISSUE_HEADER_COLOR_ATTRS = new int[][] {
         { R.attr.colorIssueOpen, R.attr.colorIssueOpenDark },
-        { R.attr.colorIssueClosed, R.attr.colorIssueClosedDark },
+        { R.attr.colorIssueClosed, R.attr.colorIssueClosedDark }
+    };
+    // MR tabs: Open(green) | Closed-unmerged(red) | Merged(purple)
+    private static final int[][] MR_HEADER_COLOR_ATTRS = new int[][] {
+        { R.attr.colorIssueOpen, R.attr.colorIssueOpenDark },
+        { R.attr.colorMergeRequestClosed, R.attr.colorMergeRequestClosedDark },
         { R.attr.colorPullRequestMerged, R.attr.colorPullRequestMergedDark }
     };
 
@@ -273,7 +279,7 @@ public class IssueListActivity extends BaseFragmentPagerActivity implements
 
     @Override
     protected int[][] getTabHeaderColorAttrs() {
-        return HEADER_COLOR_ATTRS;
+        return mIsPullRequest ? MR_HEADER_COLOR_ATTRS : ISSUE_HEADER_COLOR_ATTRS;
     }
 
     @Override

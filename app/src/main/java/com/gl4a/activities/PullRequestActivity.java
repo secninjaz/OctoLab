@@ -383,7 +383,7 @@ public static Intent makeIntent(Context context, String repoOwner, String repoNa
         } else if ("closed".equals(mMergeRequest.state())) {
             stateTextResId = R.string.closed;
             mHeaderColorAttrs = new int[] {
-                R.attr.colorIssueClosed, R.attr.colorIssueClosedDark
+                R.attr.colorMergeRequestClosed, R.attr.colorMergeRequestClosedDark
             };
         } else if (mMergeRequest.isDraft()) {
             stateTextResId = R.string.draft;
@@ -399,6 +399,8 @@ public static Intent makeIntent(Context context, String repoOwner, String repoNa
 
         TextView tvState = mHeader.findViewById(R.id.tv_state);
         tvState.setText(getString(stateTextResId).toUpperCase(Locale.getDefault()));
+        // Colour only the state badge text — toolbar stays at theme primary.
+        tvState.setTextColor(com.gl4a.utils.UiUtils.resolveColor(this, mHeaderColorAttrs[0]));
 
         TextView tvTitle = mHeader.findViewById(R.id.tv_title);
         tvTitle.setText(mMergeRequest.title());

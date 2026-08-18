@@ -209,7 +209,7 @@ public class NotificationAdapter extends
             case "unmergeable":
                 return typeLabel + iidPart + " cannot be merged";
             case "marked":
-                return typeLabel + iidPart + " was marked";
+                return authorName + " marked " + typeLabel + iidPart + " as a to-do";
             case "merge_train_removed":
                 return typeLabel + iidPart + " was removed from the merge train";
             default:

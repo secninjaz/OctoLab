@@ -23,7 +23,8 @@
     </style>
 
     <style name="TextAppearance.Header" parent="TextAppearance.AppCompat.Body1">
-        <item name="android:textColor">@color/abc_primary_text_material_dark</item>
+        <!-- Use theme text primary (dark #1F1E24) — was abc_primary_text_material_dark (white) -->
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
     </style>
 
     <style name="TextAppearance.NotificationEmphasized" parent="android:TextAppearance.Material.Notification.Emphasis" />
@@ -101,6 +102,32 @@
         <item name="errorTextColor">@color/form_error</item>
         <item name="errorIconTint">@color/form_error</item>
         <item name="boxStrokeErrorColor">@color/form_error</item>
+        <!-- Focused stroke uses brand Purple 02p (#7759C2, 5.26:1) via link_text -->
+        <item name="boxStrokeColor">@color/link_text</item>
+    </style>
+
+    <!-- Text buttons (OK/Cancel etc): use brand accent orange instead of colorPrimary (light grey=invisible).
+         Orange (2.84:1) is below AA for normal text but accepted as brand exception per user preference. -->
+    <style name="OctoLab.TextButton" parent="Widget.MaterialComponents.Button.TextButton">
+        <item name="android:textColor">@color/accent</item>
+        <item name="iconTint">@color/accent</item>
+    </style>
+
+    <!-- Popup/overflow menu overlay — light mode uses light (white bg, dark text).
+         Night mode overrides this in values-night/themes.xml to Dark (dark bg, light text). -->
+    <style name="AppTheme.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
+
+    <!-- Toolbar overlay: dark text/icons on light grey primary (16.5:1 WCAG AA).
+         Parent must be Light variant — ActionBar (without Light) inherits DarkActionBar white. -->
+    <!-- Valid parent: ThemeOverlay.AppCompat.Light gives dark text/icons base.
+         Explicit overrides ensure dark colours on light grey toolbar. -->
+    <style name="AppTheme.ToolbarOverlay" parent="ThemeOverlay.AppCompat.Light">
+        <item name="android:textColorPrimary">@color/theme_text_primary</item>
+        <item name="android:textColorSecondary">@color/theme_text_primary</item>
+        <item name="colorControlNormal">@color/theme_text_primary</item>
+        <item name="colorControlHighlight">@color/theme_text_primary</item>
+        <item name="actionMenuTextColor">@color/theme_text_primary</item>
+        <item name="android:actionMenuTextColor">@color/theme_text_primary</item>
     </style>
 
     <style name="CardContainer">

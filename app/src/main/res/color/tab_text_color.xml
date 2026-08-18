@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Dark tabs on light grey toolbar (16.5:1). When toolbar transitions to state colours
+     (green/red via setHighlightColors — original app behaviour), tabs inherit white. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:color="#fff" android:state_selected="true" />
-    <item android:color="#9fff" />
+    <item android:color="#1F1E24" android:state_selected="true" />
+    <item android:color="#5E5C64" /><!-- solid medium grey — more legible on light grey toolbar -->
 </selector>

@@ -5,7 +5,7 @@ a {
 }
 
 body {
-    color: #f0f0f0;
+    color: #DEDEDE; /* Pajamas dark theme text (13.92:1 on #121212) */
 }
 
 blockquote {

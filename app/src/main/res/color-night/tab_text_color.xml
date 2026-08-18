@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark theme: light tab text on dark toolbar -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/theme_text_primary" android:state_selected="true" />
+    <item android:color="@color/theme_hint" />
+</selector>

@@ -1,46 +1,82 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Dark theme: desaturated GitLab orange -->
-    <color name="primary">#9b3c10</color>
-    <color name="primary_dark">#7a2e0c</color>
-    <color name="accent">#d97b1a</color>
+    <!--
+      GitLab Pajamas Design System — Dark Theme (Night Mode)
+      Mirrors the light theme approach from fix/issue-146.
 
-    <color name="link_text">@color/accent</color>
+      Dark palette roles:
+        primary  = Pajamas "Blueberry" dark nav  #2B2838  (white 14.35:1)
+        surface  = near-black #121212
+        text     = light grey #DEDEDE (13.92:1 on #121212)
+        hint     = mid grey #888888 (5.28:1 on #121212)
+        link     = Pajamas blue-200 #9dc7f1 (10.59:1 on #121212)
+        accent   = brand orange #FC6D26 (6.56:1 on #121212) for FAB/badges
+        open     = Pajamas green-400 #4aab6e (6.55:1)
+        closed   = Pajamas red-400 #e0674e (5.55:1)
+    -->
+
+    <!-- Toolbar/nav: Pajamas dark "Blueberry" surface (white text 14.35:1) -->
+    <color name="primary">#2B2838</color>
+    <color name="primary_dark">#1F1E24</color>
+    <!-- Brand orange accent for FAB and badge surfaces -->
+    <color name="accent">#FC6D26</color>
+
+    <!-- Pajamas blue-200 for interactive links on dark background (10.59:1) -->
+    <color name="link_text">#9dc7f1</color>
 
     <color name="label_fg">@color/label_fg_light</color>
 
-    <color name="issue_open">#B84A1E</color>
-    <color name="issue_closed">#7a1a0b</color>
-    <color name="pr_merged">#3d2570</color>
-    <color name="pr_draft">#363940</color>
-    <color name="issue_open_dark">#8F3A15</color>
-    <color name="issue_closed_dark">#601509</color>
-    <color name="pr_merged_dark">#2e1e55</color>
-    <color name="pr_draft_dark">#27292e</color>
+    <!-- Issue/MR state colours — lighter variants for dark background -->
+    <color name="issue_open">#4aab6e</color><!-- Pajamas green-400 (6.55:1) -->
+    <!-- Neutral grey — GitLab closed badge is grey, not red -->
+    <color name="issue_closed">@color/link_text</color><!-- blue link_text for dark (10.59:1) -->
+
+    <!-- Nav header text: white on dark nav (#2B2838, 14.35:1) -->
+    <color name="nav_header_primary_text">#ffffffff</color>
+    <!-- Secondary slightly softer but clearly visible (11.75:1 on #2B2838) -->
+    <color name="nav_header_secondary_text">#DEDEDE</color>
+    <color name="pr_merged">#9475db</color><!-- Pajamas purple-300 -->
+    <color name="pr_draft">#737373</color><!-- neutral grey -->
+    <color name="issue_open_dark">#2DA160</color>
+    <color name="issue_closed_dark">@color/link_text</color><!-- blue secondary progress on dark -->
+    <color name="mr_closed_dark">#e0674e</color><!-- red-400 lighter — status bar tint for closed-unmerged MR on dark bg -->
+    <color name="pr_merged_dark">#6045a8</color>
+    <color name="pr_draft_dark">#5F6670</color>
     <color name="issue_open_button">#1e7e40</color>
-    <color name="issue_closed_button">#b03525</color>
+    <color name="issue_closed_button">@color/link_text</color><!-- blue, matches closed indicator on dark -->
     <color name="pr_merged_button">#6045a8</color>
     <color name="pr_draft_button">#606673</color>
 
-    <color name="fab">#c55520</color>
+    <!-- FAB uses brand orange on dark (6.56:1) -->
+    <color name="fab">#FC6D26</color>
+
+    <!-- Tab indicator and text: LIGHT on dark toolbar (was dark = invisible) -->
+    <color name="tab_indicator_color">#DEDEDE</color>
 
     <color name="scrollbar_thumb">#5dffffff</color>
 
+    <!-- Diff viewer — dark tinted backgrounds -->
     <color name="diff_add">#0d2e18</color>
     <color name="diff_remove">#2e100d</color>
     <color name="diff_add_line_number">#1a4428</color>
     <color name="diff_remove_line_number">#441a15</color>
 
-    <color name="commit_addition">#4aab6e</color>
-    <color name="commit_deletion">#e0674e</color>
+    <!-- Diff text: lighter Pajamas green/red on dark diff backgrounds -->
+    <color name="commit_addition">#4aab6e</color><!-- 6.55:1 on #121212 -->
+    <color name="commit_deletion">#e0674e</color><!-- 5.55:1 on #121212 -->
     <color name="code_background">#30ffffff</color>
 
     <color name="drawer_background">@color/background_floating_material_dark</color>
     <color name="list_background">@android:color/transparent</color>
+    <!-- Pajamas dark surface -->
     <color name="theme_surface">#121212</color>
+    <!-- Pajamas neutral light for body text (13.92:1) -->
     <color name="theme_text_primary">#DEDEDE</color>
+    <!-- Hint: mid-grey (5.28:1 on #121212) -->
     <color name="theme_hint">#888888</color>
+    <!-- Error: Pajamas red-400 lighter for dark (5.87:1) -->
     <color name="form_error">#FF5252</color>
     <color name="icon_foreground">#ccffffff</color>
-    <color name="breadcrumb_background">#7a2e0c</color>
+    <!-- Breadcrumb: consistent with dark nav -->
+    <color name="breadcrumb_background">#2B2838</color>
 </resources>

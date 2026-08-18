@@ -55,8 +55,9 @@ public abstract class LoadingFragmentBase extends Fragment implements
         super.onViewCreated(view, savedInstanceState);
 
         mProgress = view.findViewById(R.id.progress);
-        mProgressColors[0] = UiUtils.resolveColor(mProgress.getContext(), androidx.appcompat.R.attr.colorPrimary);
-        mProgressColors[1] = UiUtils.resolveColor(mProgress.getContext(), androidx.appcompat.R.attr.colorPrimaryDark);
+        // Use link/interactive colour — colorPrimary is now light grey (invisible as progress bar).
+        mProgressColors[0] = UiUtils.resolveColor(mProgress.getContext(), android.R.attr.textColorLink);
+        mProgressColors[1] = UiUtils.resolveColor(mProgress.getContext(), android.R.attr.textColorLink);
         mProgress.setSmoothProgressDrawableColors(mProgressColors);
         updateContentVisibility();
     }

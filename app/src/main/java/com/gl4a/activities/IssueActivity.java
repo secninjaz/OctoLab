@@ -194,8 +194,8 @@ public class IssueActivity extends BaseActivity implements
         int stateColorAttributeId = closed ? R.attr.colorIssueClosed : R.attr.colorIssueOpen;
 
         tvState.setText(getString(stateTextResId).toUpperCase(Locale.getDefault()));
-        transitionHeaderToColor(stateColorAttributeId,
-                closed ? R.attr.colorIssueClosedDark : R.attr.colorIssueOpenDark);
+        // Colour only the OPEN/CLOSED badge text — toolbar stays at theme primary.
+        tvState.setTextColor(com.gl4a.utils.UiUtils.resolveColor(this, stateColorAttributeId));
 
         TextView tvTitle = mHeader.findViewById(R.id.tv_title);
         tvTitle.setText(mIssue.title());
@@ -455,6 +455,13 @@ public class IssueActivity extends BaseActivity implements
                                     }
                                     ActionBar ab = getSupportActionBar();
                                     if (ab != null) ab.setSubtitle(proj.displayName());
+                                    // Owner/repo now resolved — reload true collaborator status.
+                                    // The initial load set mIsCollaborator=false because owner was
+                                    // null; this corrects that so edit/close buttons appear.
+                                    if (!Boolean.TRUE.equals(mIsCollaborator)) {
+                                        mIsCollaborator = null;
+                                        loadCollaboratorStatus(false);
+                                    }
                                 }
                             }, err -> { /* best-effort — subtitle stays blank */ });
                     }

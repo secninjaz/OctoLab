@@ -1,62 +1,108 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- GitLab brand palette: #FC6D26 orange, #E24329 dark-orange, #FCA326 amber -->
-    <color name="primary">#FC6D26</color>
-    <color name="primary_dark">#E24329</color>
-    <color name="accent">#FCA326</color>
+    <!--
+      GitLab Pajamas Design System — Light Theme
+      Source: design.gitlab.com/product-foundations/color
 
-    <color name="link_text">#E24329</color>
+      Semantic colour roles:
+        Blue   = interactive (links, active state, buttons, focus)
+        Green  = success, open, available, done, approved
+        Orange = brand accent (FAB, logo); warning/attention in content
+        Red    = error, destructive, danger
+        Purple = merged/brand celebration state
+        Neutral= surfaces, borders, text hierarchy
+
+      Toolbar/nav: Pajamas charcoal #1F1E24 (GitLab's own dark nav bar)
+      Page surface: #FFFFFF (pure white, Pajamas neutral)
+    -->
+
+    <!-- Navigation / toolbar background — light grey (matches GitLab light nav theme).
+         Warm-toned to match theme_surface's #FFFFF5 cast (was the cooler #F2F2F5/#E5E5EA,
+         which read as a mismatched bluish white next to the warm content surface). -->
+    <!-- Dark icons on #F2F2E9: dark #1F1E24 = 14.7:1 ✅ -->
+    <color name="primary">#F2F2E9</color>
+    <color name="primary_dark">#E5E5DC</color>
+    <!-- Orange kept as accent only (FAB, brand logo, orange badge) -->
+    <color name="accent">#FC6D26</color>
+
+    <!-- Pajamas blue-600 #1068BF: interactive/link colour (5.59:1 on white) -->
+    <color name="link_text">#1068BF</color>
 
     <color name="label_fg_dark">#ff000000</color>
     <color name="label_fg_light">#fff3f3f3</color>
     <color name="label_fg">@color/label_fg_dark</color>
 
-    <!-- Issue / MR state colors -->
-    <color name="issue_open">#FC6D26</color>
-    <color name="issue_closed">#dd2b0e</color>
-    <color name="pr_merged">#6e49cb</color>
-    <color name="pr_draft">#6e7781</color>
-    <color name="issue_open_dark">#E24329</color>
-    <color name="issue_closed_dark">#c0280f</color>
-    <color name="pr_merged_dark">#5b3ab3</color>
-    <color name="pr_draft_dark">#5f6670</color>
-    <color name="issue_open_button">#2da160</color>
-    <color name="issue_closed_button">#ec5941</color>
-    <color name="pr_merged_button">#9475db</color>
-    <color name="pr_draft_button">#98a4b3</color>
+    <!--
+      Issue / MR state colours — Pajamas semantic:
+        Open issue   = green  (success/available — Pajamas green-500)
+        Closed issue = neutral (grey — resolved/inactive)
+        Open MR      = blue   (in-progress — Pajamas blue)
+        Merged MR    = purple (brand celebration — Pajamas purple)
+        Draft MR     = grey   (inactive)
+    -->
+    <color name="issue_open">#108548</color><!-- Pajamas green-500 (open/available) -->
+    <!-- Closed state: red/danger — GitLab uses red "Closed" for both issues and MRs closed without merge -->
+    <color name="issue_closed">@color/link_text</color><!-- GitLab uses blue for closed (5.59:1) -->
+    <color name="pr_merged">#6B4FBB</color><!-- Pajamas purple (merged/celebrated) -->
+    <color name="pr_draft">#6E7781</color><!-- neutral grey (draft) -->
+    <color name="issue_open_dark">#217645</color><!-- green-600 for dark variant -->
+    <color name="issue_closed_dark">#0B5CAD</color><!-- blue-700 — secondary progress on closed (5.87:1) -->
+    <color name="mr_closed_dark">#AE1800</color><!-- red-600 — status bar tint when viewing closed-unmerged MR -->
+    <color name="pr_merged_dark">#5943B6</color><!-- purple-600 -->
+    <color name="pr_draft_dark">#5F6670</color>
 
+    <!-- Button accent colours for issue/MR action buttons -->
+    <color name="issue_open_button">#108548</color><!-- green-500 -->
+    <color name="issue_closed_button">@color/link_text</color><!-- blue, matches closed indicator -->
+    <color name="pr_merged_button">#6B4FBB</color><!-- purple -->
+    <color name="pr_draft_button">#737373</color><!-- neutral -->
+
+    <!-- FAB uses orange accent (brand, attention-grabbing action) -->
     <color name="fab">#FC6D26</color>
 
-    <color name="tab_indicator_color">#fff</color>
+    <!-- White on charcoal #1F1E24 = 18.24:1 — tabs and toolbar text always white -->
+    <color name="tab_indicator_color">#1F1E24</color><!-- dark on light grey toolbar -->
     <color name="drawer_scrim">#60000000</color>
-
     <color name="scrollbar_thumb">#5d000000</color>
 
-    <color name="nav_header_primary_text">#ffffffff</color>
-    <color name="nav_header_secondary_text">#b3ffffff</color>
+    <!-- Nav header: dark text/icons on light grey primary (16.5:1) -->
+    <color name="nav_header_primary_text">#1F1E24</color>
+    <color name="nav_header_secondary_text">#1F1E24</color><!-- same as primary — ensure max visibility on light nav -->
 
-    <color name="diff_add">#ecfdf0</color>
-    <color name="diff_remove">#fdf0ec</color>
+    <!-- Diff viewer backgrounds (tinted) -->
+    <color name="diff_add">#ecfdf0</color><!-- green-50 equivalent -->
+    <color name="diff_remove">#FCECEA</color><!-- Pajamas red-50 -->
     <color name="diff_add_line_number">#d3f5dc</color>
-    <color name="diff_remove_line_number">#f5d3c9</color>
+    <color name="diff_remove_line_number">#fad8d3</color>
     <color name="diff_default_background">#14aaaaaa</color>
     <color name="diff_default_line_number_background">#30aaaaaa</color>
 
-    <color name="commit_addition">#108548</color>
-    <color name="commit_deletion">#dd2b0e</color>
+    <!-- Diff text: Pajamas green-500 / red-500 on their tinted backgrounds -->
+    <color name="commit_addition">#108548</color><!-- green-500 (4.70:1 on white) -->
+    <color name="commit_deletion">#DD2B0E</color><!-- red-500 (4.74:1 on white) -->
     <color name="code_background">#30aaaaaa</color>
 
-    <color name="drawer_background">@color/background_floating_material_light</color>
+    <!-- Was @color/background_floating_material_light (AOSP pure #FFFFFF) — clashed
+         with the warm off-white theme_surface everywhere else. -->
+    <color name="drawer_background">@color/theme_surface</color>
+    <!-- Warm off-white / paper white (restored from v1.3.3) — avoids eye strain, matches
+         GitLab light content area. Slightly higher WCAG contrast than the #F0F0F5 grey
+         tried afterward: theme_hint, form_error and issue_open all cross into full-text
+         AA (4.5:1) against this tone, vs. large-text-only AA against #F0F0F5. -->
     <color name="list_background">#FFFFF5</color>
     <color name="theme_surface">#FFFFF5</color>
-    <color name="theme_text_primary">#222222</color>
-    <color name="theme_hint">#888888</color>
-    <color name="form_error">#C62828</color>
+    <!-- Pajamas neutral-950 for body text (18.24:1 on white) -->
+    <color name="theme_text_primary">#1F1E24</color>
+    <!-- Pajamas neutral gray for hint/placeholder (4.74:1 on white) -->
+    <color name="theme_hint">#737373</color>
+    <!-- Pajamas red-500 for form errors (4.74:1 on white) -->
+    <color name="form_error">#DD2B0E</color>
     <color name="icon_foreground">#99343434</color>
-    <color name="breadcrumb_background">#E24329</color>
+    <!-- Breadcrumb uses primary light grey (consistent with nav) -->
+    <color name="breadcrumb_background">#E5E5DC</color>
+    <!-- crumb_text defined in res/color/crumb_text.xml (state list) -->
 
     <color name="octodroid">#FC6D26</color>
-    <!-- Equal to primary, but not overridden in night mode -->
     <color name="launcher_bg">#FC6D26</color>
     <color name="launcher_background">#1E1E2E</color>
 </resources>

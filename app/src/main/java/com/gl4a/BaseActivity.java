@@ -754,9 +754,10 @@ public abstract class BaseActivity extends AppCompatActivity implements
         mSwipeLayout = findViewById(R.id.swipe_container);
         if (canSwipeToRefresh()) {
             mSwipeLayout.setOnRefreshListener(this);
+            // Use accent (brand orange) for pull-to-refresh — colorPrimary is now light grey (invisible).
             mSwipeLayout.setColorSchemeColors(
-                    UiUtils.resolveColor(this, androidx.appcompat.R.attr.colorPrimary), 0,
-                    UiUtils.resolveColor(this, androidx.appcompat.R.attr.colorPrimaryDark), 0
+                    UiUtils.resolveColor(this, R.attr.colorFab),
+                    UiUtils.resolveColor(this, androidx.appcompat.R.attr.colorAccent)
             );
         }
 
@@ -887,8 +888,9 @@ public abstract class BaseActivity extends AppCompatActivity implements
             return;
         }
         mProgress = findViewById(R.id.progress);
-        mProgressColors[0] = UiUtils.resolveColor(this, androidx.appcompat.R.attr.colorPrimary);
-        mProgressColors[1] = UiUtils.resolveColor(this, androidx.appcompat.R.attr.colorPrimaryDark);
+        // Use link/interactive colour for progress bar — colorPrimary is now light grey (invisible).
+        mProgressColors[0] = UiUtils.resolveColor(this, android.R.attr.textColorLink);
+        mProgressColors[1] = UiUtils.resolveColor(this, android.R.attr.textColorLink);
         mProgress.setSmoothProgressDrawableColors(mProgressColors);
 
         mCoordinatorLayout = findViewById(R.id.coordinator_layout);
