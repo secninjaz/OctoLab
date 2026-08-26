@@ -1,1 +1,1 @@
-Provides access to GitHub and lets you stay connected with your network
+Native Android client for GitLab, including self-hosted instances

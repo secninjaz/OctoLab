@@ -428,6 +428,10 @@ public class FileViewerActivity extends WebViewerActivity
         String instanceUrl = com.gl4a.Gl4Application.get().getInstanceUrl();
         // Strip leading ./
         if (relativePath.startsWith("./")) relativePath = relativePath.substring(2);
+        // Strip a leading / (root-relative src, e.g. src="/logo.svg") — GitLab's repository
+        // file API paths are already relative to repo root, so an unstripped leading slash
+        // doubles up as %2F and produces a path GitLab can't resolve, breaking the image.
+        if (relativePath.startsWith("/")) relativePath = relativePath.substring(1);
         return instanceUrl + "/api/v4/projects/"
                 + android.net.Uri.encode(mRepoOwner) + "%2F"
                 + android.net.Uri.encode(mRepoName)

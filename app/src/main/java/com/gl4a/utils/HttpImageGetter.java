@@ -589,8 +589,11 @@ public class HttpImageGetter {
                                         return;
                                     }
                                 }
-                                info.encode(mContext, html);
-                                info.apply(info.mHtml);
+                                // Instance-hosted images are already embedded as data URIs
+                                // above; anything else (external URLs) is still a plain <img
+                                // src="..."> here, so it needs the async loader to actually
+                                // fetch it — encode() alone leaves it stuck on the placeholder.
+                                info.encodeAndLoadImages(mContext, html);
                             }
                         },
                         error -> mMarkdownApiInProgress.remove(id)

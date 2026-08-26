@@ -11,7 +11,6 @@ import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.Paint;
 import android.graphics.Rect;
@@ -265,7 +264,7 @@ public class AvatarHandler {
      */
     public static void assignAvatarForProject(ImageView view, String projectName, long projectId) {
         if (projectId <= 0) {
-            view.setImageDrawable(new DefaultAvatarDrawable(projectName, null));
+            view.setImageDrawable(new DefaultAvatarDrawable(projectName, null, true));
             return;
         }
         // Use a large negative offset so project IDs don't collide with user IDs in the cache.
@@ -276,11 +275,14 @@ public class AvatarHandler {
 
         Bitmap cached = loadBitmapFromCache(view.getContext(), cacheId);
         if (cached != null) {
-            applyAvatarToView(delegate, cached, false);
+            // Project avatar — rounded-square clip (20% radius), matching RepositoryAdapter.
+            Bitmap logo = fitLogoToSquare(cached);
+            applyAvatarToView(delegate, logo, false,
+                    Math.max(logo.getWidth(), logo.getHeight()) * 0.20f);
             return;
         }
 
-        view.setImageDrawable(new DefaultAvatarDrawable(projectName, projectId));
+        view.setImageDrawable(new DefaultAvatarDrawable(projectName, projectId, true));
 
         Request existing = getRequestForId(cacheId);
         if (existing != null) {
@@ -293,6 +295,7 @@ public class AvatarHandler {
         request.id = cacheId;
         request.projectId = projectId;
         request.apiFirst = true; // worker checks projectId > 0 and uses project path
+        request.isLogo = true; // project avatar — rounded-square, not a full circle
         request.views = new ArrayList<>();
         request.views.add(delegate);
         sRequests.put(requestId, request);
@@ -368,7 +371,7 @@ public class AvatarHandler {
             return;
         }
 
-        view.setDrawable(new DefaultAvatarDrawable(userName, userId));
+        view.setDrawable(new DefaultAvatarDrawable(userName, userId, isLogo));
         if (userId <= 0) {
             return;
         }
@@ -927,42 +930,76 @@ public class AvatarHandler {
     }
 
     public static class DefaultAvatarDrawable extends Drawable {
-        private static final @ColorInt int[] COLOR_PALETTE = {
-            0xffdb4437, 0xffe91e63, 0xff9c27b0, 0xff673ab7,
-            0xff3f51b5, 0xff4285f4, 0xff039be5, 0xff0097a7,
-            0xff009688, 0xff0f9d58, 0xff689f38, 0xffef6c00,
-            0xffff5722, 0xff757575
+        // GitLab's own identicon palette (design.gitlab.com "Avatar" component), reproduced
+        // from gitlab-ui's design tokens (--gl-avatar-fallback-background/text-color-*:
+        // red, purple, blue, green, orange, neutral). Index 2 duplicates index 1 (purple) —
+        // GitLab did this on purpose when retiring indigo for contrast reasons, rather than
+        // shrinking the array, since that would reshuffle which color every existing
+        // identicon gets (same reasoning applies here, so the duplicate is kept as-is).
+        // GitLab's tokens are semi-transparent overlays meant to blend with the page
+        // background; these are pre-composited against this app's actual theme_surface
+        // colors (#FFFFF5 light / #121212 dark) into opaque equivalents, then WCAG-AA
+        // verified (>=4.5:1) against the paired text token for each theme.
+        private static final @ColorInt int[] BG_PALETTE_LIGHT = {
+            0xfffeede3, 0xfff3eff4, 0xfff3eff4, 0xffe8f2f4, 0xffe5f5e3, 0xfffaefd6, 0xfff0f0e9
+        };
+        private static final @ColorInt int[] BG_PALETTE_DARK = {
+            0xff4a3936, 0xff3e3a48, 0xff3e3a48, 0xff333d47, 0xff304036, 0xff453b29, 0xff3b3b3c
+        };
+        private static final @ColorInt int[] TEXT_PALETTE_LIGHT = {
+            0xff812713, 0xff493c83, 0xff493c83, 0xff284779, 0xff225131, 0xff693c14, 0xff3a383f
+        };
+        private static final @ColorInt int[] TEXT_PALETTE_DARK = {
+            0xfffcb5aa, 0xffcbbbf2, 0xffcbbbf2, 0xff9dc7f1, 0xff91d4a8, 0xffe9be74, 0xffbfbfc3
         };
         private static final float LETTER_TO_TILE_RATIO = 0.67f;
 
         private final Paint mPaint;
         private final @ColorInt int mColor;
+        private final @ColorInt int mTextColor;
         private final char[] mLetter = new char[1];
+        private final boolean mIsLogo;
         private final UserNameState mState;
         private static final Rect sRect = new Rect();
+        private static final android.graphics.RectF sRectF = new android.graphics.RectF();
 
         public DefaultAvatarDrawable(String userName, Object identifier) {
-            mState = new UserNameState(userName, identifier);
+            this(userName, identifier, false);
+        }
+
+        /**
+         * @param isLogo true draws a rounded-square placeholder (20% radius) matching the
+         *                shape project/group logos use once loaded, instead of a full circle.
+         */
+        public DefaultAvatarDrawable(String userName, Object identifier, boolean isLogo) {
+            mIsLogo = isLogo;
+            mState = new UserNameState(userName, identifier, isLogo);
 
             mPaint = new Paint();
             mPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             mPaint.setTextAlign(Paint.Align.CENTER);
             mPaint.setAntiAlias(true);
 
+            boolean darkTheme = com.gl4a.Gl4Application.get().getResources()
+                    .getBoolean(com.gl4a.R.bool.is_dark_theme);
+            @ColorInt int[] bgPalette = darkTheme ? BG_PALETTE_DARK : BG_PALETTE_LIGHT;
+            @ColorInt int[] textPalette = darkTheme ? TEXT_PALETTE_DARK : TEXT_PALETTE_LIGHT;
+
             final int colorIndex;
             if (TextUtils.isEmpty(userName)) {
                 mLetter[0] = '?';
                 if (mState.mIdentifier != null) {
-                    colorIndex = Math.abs(mState.mIdentifier.hashCode()) % COLOR_PALETTE.length;
+                    colorIndex = Math.abs(mState.mIdentifier.hashCode()) % bgPalette.length;
                 } else {
-                    colorIndex = (int) (Math.random() * COLOR_PALETTE.length);
+                    colorIndex = (int) (Math.random() * bgPalette.length);
                 }
             } else {
                 mLetter[0] = Character.toUpperCase(userName.charAt(0));
-                colorIndex = Math.abs(userName.hashCode()) % COLOR_PALETTE.length;
+                colorIndex = Math.abs(userName.hashCode()) % bgPalette.length;
             }
 
-            mColor = COLOR_PALETTE[colorIndex];
+            mColor = bgPalette[colorIndex];
+            mTextColor = textPalette[colorIndex];
         }
 
         @Nullable
@@ -981,11 +1018,17 @@ public class AvatarHandler {
             mPaint.setColor(mColor);
 
             final int minDimension = Math.min(bounds.width(), bounds.height());
-            canvas.drawCircle(bounds.centerX(), bounds.centerY(), minDimension / 2, mPaint);
+            if (mIsLogo) {
+                sRectF.set(bounds);
+                float radius = minDimension * 0.20f;
+                canvas.drawRoundRect(sRectF, radius, radius, mPaint);
+            } else {
+                canvas.drawCircle(bounds.centerX(), bounds.centerY(), minDimension / 2, mPaint);
+            }
 
             mPaint.setTextSize(LETTER_TO_TILE_RATIO * minDimension);
             mPaint.getTextBounds(mLetter, 0, 1, sRect);
-            mPaint.setColor(Color.WHITE);
+            mPaint.setColor(mTextColor);
 
             canvas.drawText(mLetter, 0, 1, bounds.centerX(),
                     bounds.centerY() - sRect.exactCenterY(),
@@ -1010,16 +1053,18 @@ public class AvatarHandler {
         private static class UserNameState extends ConstantState {
             private final String mUserName;
             private final Object mIdentifier;
+            private final boolean mIsLogo;
 
-            public UserNameState(String userName, Object identifier) {
+            public UserNameState(String userName, Object identifier, boolean isLogo) {
                 mUserName = userName;
                 mIdentifier = identifier;
+                mIsLogo = isLogo;
             }
 
             @NonNull
             @Override
             public Drawable newDrawable() {
-                return new DefaultAvatarDrawable(mUserName, mIdentifier);
+                return new DefaultAvatarDrawable(mUserName, mIdentifier, mIsLogo);
             }
 
             @Override

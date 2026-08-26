@@ -76,7 +76,7 @@ public class RepositoryAdapter extends RootAdapter<GitLabProject, RepositoryAdap
             // The API avatar endpoint (api/v4/groups/:id/avatar) must be used instead —
             // see the fetchProjectAvatarUrl path in AvatarHandler for context.
             holder.ivAvatar.setImageDrawable(
-                    new AvatarHandler.DefaultAvatarDrawable(repository.name(), null));
+                    new AvatarHandler.DefaultAvatarDrawable(repository.name(), null, true));
         }
         holder.tvTitle.setText(ApiHelpers.formatRepoName(mContext, repository));
 

@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Subtle circular frame behind repo/group avatars.
+<!-- Subtle rounded-square frame behind repo/group avatars (row_repo.xml is exclusively
+     project/group logos, never user avatars — matches the 20% corner radius used for the
+     actual logo image itself; used to be an oval, which showed as a circular halo behind
+     the rounded-square logo once #158 changed the image shape but left this background as-is.
      Provides contrast so white or near-white logos remain visible in the light theme. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="oval">
+    android:shape="rectangle">
     <solid android:color="#26000000" />
+    <corners android:radius="8dp" />
 </shape>

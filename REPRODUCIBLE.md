@@ -4,6 +4,8 @@ OctoLab aims to produce reproducible builds: anyone building from the same sourc
 
 The signing key remains private. No key sharing is required for verification.
 
+Every tagged release now verifies this automatically: the `verify:reproducible` CI job rebuilds the APK from a fresh checkout with `--no-build-cache`, strips `META-INF/` from both the freshly-built and the `build:release` artifact, and fails the pipeline (blocking `security:gate`, and therefore publishing) if the remaining content differs. The manual steps below are for independent third-party verification of a published release.
+
 ## Requirements
 
 - JDK 21 (Temurin recommended)
@@ -70,7 +72,7 @@ See [SECURITY.md](SECURITY.md) for full certificate details.
 | Deterministic `versionCode` / `versionName` | ✅ |
 | `apksigner` v2/v3 scheme (no timestamp in signature) | ✅ |
 | Signing certificate fingerprint published | ✅ |
-| Byte-for-byte unsigned APK verified | 🔄 Not yet formally tested — contributions welcome |
+| Byte-for-byte unsigned APK verified | ✅ Automated in CI (`verify:reproducible`), gates every release |
 
 ## References
 

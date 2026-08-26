@@ -217,6 +217,55 @@ build:release:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
 
 # ─────────────────────────────────────────────
+# REPRODUCIBLE BUILDS (#64) — rebuild from source in a fresh checkout and
+# compare the unsigned APK content against build:release's artifact. Only
+# META-INF/ (the signature) is allowed to differ — the standard used by
+# F-Droid and reproducible-builds.org (signing stays private; content
+# equality is what's verified).
+# ─────────────────────────────────────────────
+verify:reproducible:
+  stage: security
+  image: eclipse-temurin:21-jdk-jammy
+  tags:
+    - docker
+  needs:
+    - job: build:release
+      artifacts: true
+  before_script:
+    - !reference [.android_sdk_setup, before_script]
+    - echo "${KEYSTORE_BASE64}" | base64 -d > octolab-release.jks
+    - printf 'STORE_FILE=%s/octolab-release.jks\nSTORE_PASSWORD=%s\nKEY_ALIAS=%s\nKEY_PASSWORD=%s\nSTORE_TYPE=JKS\n' \
+        "$CI_PROJECT_DIR" "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > signing.properties
+    - echo "ClientId=\"${CLIENT_ID}\"" > app/client.properties
+    - echo "ClientSecret=\"${CLIENT_SECRET}\"" >> app/client.properties
+  script:
+    - chmod +x ./gradlew
+    - BASE_VERSION=$(echo "${CI_COMMIT_TAG}" | sed 's/^v//' | sed 's/-.*//')
+    - sed -i "s/versionName \"[^\"]*\"/versionName \"${BASE_VERSION}\"/" app/build.gradle
+    - mv app/build/outputs/apk/internal/release/app-internal-release.apk /tmp/published.apk
+    - ./gradlew clean assembleInternalRelease --no-daemon --no-build-cache
+    - |
+      mkdir -p /tmp/a /tmp/b
+      unzip -q /tmp/published.apk -d /tmp/a && rm -rf /tmp/a/META-INF
+      unzip -q app/build/outputs/apk/internal/release/app-internal-release.apk -d /tmp/b && rm -rf /tmp/b/META-INF
+      if diff -rq /tmp/a /tmp/b; then
+        echo "REPRODUCIBLE ✓ — unsigned APK content is byte-for-byte identical across independent builds"
+      else
+        echo "ERROR: rebuilt APK content differs from the published build — not reproducible"
+        exit 1
+      fi
+  after_script:
+    - rm -f octolab-release.jks signing.properties app/client.properties
+  cache:
+    key: android-gradle-v1
+    paths:
+      - /opt/android-sdk
+      - /root/.gradle/caches
+      - /root/.gradle/wrapper
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
+
+# ─────────────────────────────────────────────
 # SECURITY — DAST API (custom, lightweight curl check)
 # SAST, Secret Detection, Dependency Scanning come from templates above
 # ─────────────────────────────────────────────
@@ -370,6 +419,8 @@ security:gate:
   needs:
     - job: mobsf:static
       artifacts: false
+    - job: verify:reproducible
+      artifacts: false
   before_script:
     - apk add --no-cache curl python3
   script:
@@ -386,6 +437,7 @@ security:gate:
       fi
       echo "Main pipeline security scans verified ✓"
       echo "MobSF static scan passed ✓"
+      echo "Reproducible build verified ✓"
       echo "All security checks passed — release is safe to publish."
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
