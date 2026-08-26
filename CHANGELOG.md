@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.5] - 2026-08-26
+
+### Fixed
+- Root-relative image paths (`src="/logo.svg"`) in markdown files opened from the Files section were 404ing instead of loading
+- External image URLs in issue/MR descriptions and comments now load instead of getting stuck on the loading placeholder forever (#150)
+- Project/group avatars now render as rounded-square consistently — the real logo image, the initials placeholder, and the row's background frame all agree (#158)
+- Avatar initials-tile palette (background and text) now matches GitLab's own identicon colours instead of an ad-hoc Material palette, WCAG AA verified in both themes (#158)
+
+### Added
+- `verify:reproducible` CI job, gates release on it (#64)
+
+### Changed
+- F-Droid store listing metadata (title, description, icon, screenshots) replaced with real OctoLab content — was unedited OctoDroid/gh4a placeholder content (#57)
+
 ## [1.3.4] - 2026-08-18
 
 ### Fixed
