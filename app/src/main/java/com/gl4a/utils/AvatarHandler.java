@@ -325,6 +325,32 @@ public class AvatarHandler {
         return bitmap;
     }
 
+    /**
+     * Synchronously resolves a project's avatar for contexts outside the async View-based
+     * pipeline (e.g. notifications) — reuses the exact same URL resolution (including the
+     * parent-namespace fallback walk) and fetch logic as the in-app path
+     * (assignAvatarForProject), so a project showing a real logo or an inherited group logo
+     * in-app shows the same thing in a notification, not just its own possibly-unset avatar.
+     * Falls back to the same colored initials-tile placeholder when nothing is set anywhere
+     * in the hierarchy. Performs blocking network I/O — call from a background thread only.
+     */
+    public static Bitmap loadProjectAvatarSynchronously(String projectName, long projectId,
+            int placeholderSizePx) {
+        if (projectId > 0) {
+            try {
+                String url = fetchProjectAvatarUrl(projectId);
+                if (url != null) {
+                    Bitmap bitmap = fetchBitmap(url);
+                    if (bitmap != null) {
+                        return fitLogoToSquare(bitmap);
+                    }
+                }
+            } catch (IOException e) {
+                Log.d(TAG, "loadProjectAvatarSynchronously failed for id=" + projectId, e);
+            }
+        }
+        return renderProjectPlaceholder(projectName, projectId, placeholderSizePx);
+    }
     public static void assignAvatar(Context context, MenuItem item,
             String userName, long userId) {
         // Look up the stored avatar URL so inactive accounts can also do a network fetch

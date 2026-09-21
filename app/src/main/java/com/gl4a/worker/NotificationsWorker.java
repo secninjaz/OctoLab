@@ -393,18 +393,13 @@ public class NotificationsWorker extends Worker {
                 .setAutoCancel(true)
                 .setContentText(text);
 
-        // Set project avatar as the large icon so users can identify the project at a glance.
-        // Most projects have no uploaded avatar at all (avatar_url is null) — in-app this
-        // falls back to a colored initials tile (AvatarHandler.DefaultAvatarDrawable)
-        // instead of leaving the space blank, so do the same here.
-        String projectAvatarUrl = first.project != null ? first.project.avatarUrl : null;
-        android.graphics.Bitmap projectIcon = loadProjectIcon(projectAvatarUrl, projectId);
-        if (projectIcon == null) {
-            int iconSizePx = context.getResources()
-                    .getDimensionPixelSize(android.R.dimen.notification_large_icon_width);
-            projectIcon = AvatarHandler.renderProjectPlaceholder(projectName, projectId, iconSizePx);
-        }
-        builder.setLargeIcon(projectIcon);
+        // Set project avatar as the large icon so users can identify the project at a glance —
+        // same resolution AvatarHandler uses in-app (own avatar, else inherited from a parent
+        // group, else the colored initials tile), not a separate reimplementation.
+        int iconSizePx = context.getResources()
+                .getDimensionPixelSize(android.R.dimen.notification_large_icon_width);
+        builder.setLargeIcon(
+                AvatarHandler.loadProjectAvatarSynchronously(projectName, projectId, iconSizePx));
 
         boolean hasNewTodo = false;
         NotificationCompat.InboxStyle inbox = new NotificationCompat.InboxStyle()
@@ -481,50 +476,6 @@ public class NotificationsWorker extends Worker {
         return new NotificationCompat.Builder(getApplicationContext(), CHANNEL_GITLAB_NOTIFICATIONS)
                 .setSmallIcon(R.drawable.notification)
                 .setColor(ContextCompat.getColor(getApplicationContext(), R.color.octodroid));
-    }
-
-    /**
-     * Fetches the project avatar for use as setLargeIcon.
-     * The Todos API project sub-object omits avatar_url, so we fall back to
-     * GET /projects/{id} which always includes it.
-     */
-    private static android.graphics.Bitmap loadProjectIcon(String avatarUrl, long projectId) {
-        String url = avatarUrl;
-        if ((url == null || url.isEmpty()) && projectId > 0) {
-            // Resolve avatar_url via the full project endpoint.
-            try {
-                String apiUrl = com.gl4a.Gl4Application.get().getApiBaseUrl()
-                        + "projects/" + projectId;
-                okhttp3.OkHttpClient api = com.gl4a.ServiceFactory.getImageHttpClient();
-                okhttp3.Request req = new okhttp3.Request.Builder().url(apiUrl).build();
-                try (okhttp3.Response resp = api.newCall(req).execute()) {
-                    if (resp.isSuccessful() && resp.body() != null) {
-                        String json = resp.body().string();
-                        int idx = json.indexOf("\"avatar_url\":\"");
-                        if (idx >= 0) {
-                            int start = idx + 14;
-                            int end = json.indexOf("\"", start);
-                            if (end > start) {
-                                url = json.substring(start, end)
-                                        .replace("\\/", "/");
-                            }
-                        }
-                    }
-                }
-            } catch (Exception ignored) {}
-        }
-        if (url == null || url.isEmpty() || url.equals("null")) return null;
-        try {
-            okhttp3.OkHttpClient client = com.gl4a.ServiceFactory.getImageHttpClient();
-            okhttp3.Request req = new okhttp3.Request.Builder().url(url).build();
-            try (okhttp3.Response resp = client.newCall(req).execute()) {
-                if (!resp.isSuccessful() || resp.body() == null) return null;
-                byte[] data = resp.body().bytes();
-                return android.graphics.BitmapFactory.decodeByteArray(data, 0, data.length);
-            }
-        } catch (Exception ignored) {
-            return null;
-        }
     }
 
     /** Maps raw GitLab Todos API action_name values to natural English. */
