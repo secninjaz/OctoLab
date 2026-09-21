@@ -688,12 +688,15 @@ public class AvatarHandler {
     /**
      * Fits a bitmap into a square canvas by centering it with transparent padding.
      * Prevents RoundedBitmapDrawable's CENTER_CROP from cutting portrait-oriented logos.
+     * Square sources are returned unchanged so they fill the rounded-square frame edge-to-edge
+     * with no padding — a previous fixed 20% inset here made every logo look shrunk inside
+     * its frame (#158).
      */
     private static Bitmap fitLogoToSquare(Bitmap src) {
-        // 40% larger canvas → 20% inset on each side — keeps even edge-to-edge logos like
-        // textr clear of the 20% rounded-rectangle corner curves on both themes.
-        int base = Math.max(src.getWidth(), src.getHeight());
-        int size = (int) (base * 1.40f + 0.5f);
+        int size = Math.max(src.getWidth(), src.getHeight());
+        if (src.getWidth() == size && src.getHeight() == size) {
+            return src;
+        }
         Bitmap result = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(result);
         int left = (size - src.getWidth()) / 2;
