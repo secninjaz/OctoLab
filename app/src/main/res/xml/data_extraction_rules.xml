@@ -1,16 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Android 12+ (API 31+) ignores fullBackupContent and requires this file instead.
-  The encrypted token store (Gh4a-secure-pref) is excluded on top of being
-  Keystore-encrypted: its key is device-bound and would not decrypt after a
-  cloud restore or device transfer anyway, so excluding it avoids restoring a
-  useless/unreadable file.
+  Android 12+ (API 31+) ignores fullBackupContent (backup_descriptor.xml) entirely,
+  and device-to-device transfer was never covered by fullBackupContent at any API
+  level — dataExtractionRules is now the only mechanism for either domain, so it
+  must mirror backup_descriptor.xml's allowlist rather than default to including
+  everything. Only the three items named here are eligible; the encrypted token
+  store (Gh4a-secure-pref) is excluded by omission, same as backup_descriptor.xml
+  always excluded it by never naming it. Its key is Keystore-device-bound anyway
+  and wouldn't decrypt after a restore/transfer, so there'd be no benefit even if
+  it were included.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <exclude domain="sharedpref" path="Gh4a-secure-pref.xml" />
+        <include domain="sharedpref" path="Gh4a-pref.xml" />
+        <include domain="database" path="gh4adb.db" />
+        <include domain="database" path="suggestions.db" />
     </cloud-backup>
     <device-transfer>
-        <exclude domain="sharedpref" path="Gh4a-secure-pref.xml" />
+        <include domain="sharedpref" path="Gh4a-pref.xml" />
+        <include domain="database" path="gh4adb.db" />
+        <include domain="database" path="suggestions.db" />
     </device-transfer>
 </data-extraction-rules>
