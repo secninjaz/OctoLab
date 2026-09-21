@@ -50,6 +50,14 @@ public class AvatarHandler {
     // perfectly flush against the frame (which reads as the two shapes merging).
     private static final float LOGO_INSET_DP = 1f;
 
+    // Same hairline gap as LOGO_INSET_DP, but as a fraction of the logo's own resolution —
+    // fitLogoToSquare() builds an intermediate bitmap at the SOURCE image's native size (which
+    // can be far larger than the ~40dp it's ultimately displayed at, e.g. a 730px-wide fetched
+    // logo), and that bitmap gets scaled down afterward by RoundedBitmapDrawable/ImageView. A
+    // fixed pixel/dp inset baked into the oversized source washes out to sub-pixel once scaled
+    // down — same reason the corner radius below is also a percentage (0.20f), not a fixed dp.
+    private static final float LOGO_INSET_FRACTION = 0.025f;
+
     private static LruCache<Long, Bitmap> sCache;
     private static int sNextRequestId = 1;
 
@@ -699,14 +707,15 @@ public class AvatarHandler {
      * previous fixed 20% inset here made every logo look shrunk inside its frame (#158).
      */
     private static Bitmap fitLogoToSquare(Bitmap src) {
-        // Same hairline inset DefaultAvatarDrawable's placeholder uses (LOGO_INSET_DP), so a
-        // loaded logo and its own placeholder look consistent. Applied on every source, square
-        // or not — a square source previously returned unchanged (flush to the frame); a wide
-        // or tall source is only padded on its shorter axis to become square, which still
-        // leaves its longer axis flush unless the canvas itself is inset too.
-        int inset = Math.round(com.gl4a.Gl4Application.get().getResources()
-                .getDisplayMetrics().density * LOGO_INSET_DP);
-        int size = Math.max(src.getWidth(), src.getHeight()) + inset * 2;
+        // Hairline inset (LOGO_INSET_FRACTION, not the fixed-dp LOGO_INSET_DP — see its
+        // comment) so a loaded logo and its own initials-tile placeholder look consistent.
+        // Applied on every source, square or not — a square source previously returned
+        // unchanged (flush to the frame); a wide or tall source is only padded on its shorter
+        // axis to become square, which still leaves its longer axis flush unless the canvas
+        // itself is inset too.
+        int contentSize = Math.max(src.getWidth(), src.getHeight());
+        int inset = Math.round(contentSize * LOGO_INSET_FRACTION);
+        int size = contentSize + inset * 2;
         Bitmap result = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(result);
         int left = (size - src.getWidth()) / 2;
