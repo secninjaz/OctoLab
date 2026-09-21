@@ -394,11 +394,17 @@ public class NotificationsWorker extends Worker {
                 .setContentText(text);
 
         // Set project avatar as the large icon so users can identify the project at a glance.
+        // Most projects have no uploaded avatar at all (avatar_url is null) — in-app this
+        // falls back to a colored initials tile (AvatarHandler.DefaultAvatarDrawable)
+        // instead of leaving the space blank, so do the same here.
         String projectAvatarUrl = first.project != null ? first.project.avatarUrl : null;
         android.graphics.Bitmap projectIcon = loadProjectIcon(projectAvatarUrl, projectId);
-        if (projectIcon != null) {
-            builder.setLargeIcon(projectIcon);
+        if (projectIcon == null) {
+            int iconSizePx = context.getResources()
+                    .getDimensionPixelSize(android.R.dimen.notification_large_icon_width);
+            projectIcon = AvatarHandler.renderProjectPlaceholder(projectName, projectId, iconSizePx);
         }
+        builder.setLargeIcon(projectIcon);
 
         boolean hasNewTodo = false;
         NotificationCompat.InboxStyle inbox = new NotificationCompat.InboxStyle()
