@@ -962,6 +962,7 @@ public class AvatarHandler {
         private final @ColorInt int mTextColor;
         private final char[] mLetter = new char[1];
         private final boolean mIsLogo;
+        private final float mLogoInset;
         private final UserNameState mState;
         private static final Rect sRect = new Rect();
         private static final android.graphics.RectF sRectF = new android.graphics.RectF();
@@ -983,8 +984,12 @@ public class AvatarHandler {
             mPaint.setTextAlign(Paint.Align.CENTER);
             mPaint.setAntiAlias(true);
 
-            boolean darkTheme = com.gl4a.Gl4Application.get().getResources()
-                    .getBoolean(com.gl4a.R.bool.is_dark_theme);
+            Resources resources = com.gl4a.Gl4Application.get().getResources();
+            // Hairline inset so the tile doesn't render perfectly flush against the row's
+            // rounded-square frame background (avatar_frame.xml) — without it the two
+            // rounded-rects visually merge into one hard edge with no framing at all.
+            mLogoInset = resources.getDisplayMetrics().density;
+            boolean darkTheme = resources.getBoolean(com.gl4a.R.bool.is_dark_theme);
             @ColorInt int[] bgPalette = darkTheme ? BG_PALETTE_DARK : BG_PALETTE_LIGHT;
             @ColorInt int[] textPalette = darkTheme ? TEXT_PALETTE_DARK : TEXT_PALETTE_LIGHT;
 
@@ -1022,7 +1027,8 @@ public class AvatarHandler {
 
             final int minDimension = Math.min(bounds.width(), bounds.height());
             if (mIsLogo) {
-                sRectF.set(bounds);
+                sRectF.set(bounds.left + mLogoInset, bounds.top + mLogoInset,
+                        bounds.right - mLogoInset, bounds.bottom - mLogoInset);
                 float radius = minDimension * 0.20f;
                 canvas.drawRoundRect(sRectF, radius, radius, mPaint);
             } else {
