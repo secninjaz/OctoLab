@@ -25,13 +25,6 @@
     <!-- Orange kept as accent only (FAB, brand logo, orange badge) -->
     <color name="accent">#FC6D26</color>
 
-    <!-- Fixed (not day/night-qualified) dark panel for the pre-login welcome screen
-         (main.xml) — its logo (octolab_bg.xml) and text are hardcoded white by design,
-         so the backdrop must stay dark regardless of theme. Was ?attr/colorPrimary,
-         which used to be dark but is now the light toolbar-neutral tone above,
-         making the white logo/text invisible in light theme (#158-style regression). -->
-    <color name="login_hero_background">#2B2838</color>
-
     <!-- Pajamas blue-600 #1068BF: interactive/link colour (5.59:1 on white) -->
     <color name="link_text">#1068BF</color>
 
