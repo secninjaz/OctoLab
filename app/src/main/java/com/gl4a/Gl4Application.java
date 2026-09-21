@@ -30,6 +30,7 @@ public class Gl4Application extends Application implements
 
     private static Gl4Application sInstance;
     private PrettyTime mPt;
+    private com.gl4a.utils.SecureTokenStore mTokenStore;
 
     private static final int THEME_DARK = 0;
     private static final int THEME_LIGHT = 1;
@@ -38,9 +39,7 @@ public class Gl4Application extends Application implements
     private static final String KEY_VERSION = "version";
     private static final String KEY_ACTIVE_LOGIN = "active_login";
     private static final String KEY_ALL_LOGINS = "logins";
-    private static final String KEY_PREFIX_TOKEN = "token_";
     private static final String KEY_PREFIX_USER_ID = "user_id_";
-    private static final String KEY_PREFIX_TOKEN_TYPE = "token_type_";
 
     public static final String TOKEN_TYPE_PAT = "pat";
     public static final String TOKEN_TYPE_OAUTH = "oauth";
@@ -57,6 +56,11 @@ public class Gl4Application extends Application implements
         int prefsVersion = prefs.getInt(KEY_VERSION, 0);
         if (prefsVersion < 1) {
             prefs.edit().putInt(KEY_VERSION, 1).apply();
+        }
+
+        mTokenStore = new com.gl4a.utils.SecureTokenStore(this);
+        for (String login : getAllLogins()) {
+            mTokenStore.migrateIfNeeded(prefs, login);
         }
 
         prefs.registerOnSharedPreferenceChangeListener(this);
@@ -187,7 +191,7 @@ public class Gl4Application extends Application implements
 
     public String getAuthToken() {
         String login = getAuthLogin();
-        return login != null ? getPrefs().getString(KEY_PREFIX_TOKEN + login, null) : null;
+        return login != null ? mTokenStore.getToken(login) : null;
     }
 
     public void addAccount(GitLabUser user, String token, String tokenType) {
@@ -197,11 +201,10 @@ public class Gl4Application extends Application implements
         logins.add(login);
         // Snapshot the current instance URL into this account's per-account slot
         String currentUrl = getPrefs().getString(KEY_INSTANCE_URL, DEFAULT_INSTANCE);
+        mTokenStore.putToken(login, token, tokenType);
         prefs.edit()
                 .putString(KEY_ACTIVE_LOGIN, login)
                 .putStringSet(KEY_ALL_LOGINS, logins)
-                .putString(KEY_PREFIX_TOKEN + login, token)
-                .putString(KEY_PREFIX_TOKEN_TYPE + login, tokenType)
                 .putLong(KEY_PREFIX_USER_ID + login, user.id())
                 .putString(KEY_PREFIX_INSTANCE_URL + login, currentUrl)
                 .putString(KEY_PREFIX_AVATAR_URL + login, user.avatarUrl())
@@ -223,10 +226,10 @@ public class Gl4Application extends Application implements
     public String getAuthTokenType() {
         String login = getAuthLogin();
         if (login == null) return TOKEN_TYPE_PAT;
-        String type = getPrefs().getString(KEY_PREFIX_TOKEN_TYPE + login, null);
+        String type = mTokenStore.getTokenType(login);
         // If no type stored, sniff: OAuth2 tokens are longer (40+ chars), PATs have glpat- prefix
         if (type == null) {
-            String token = getPrefs().getString(KEY_PREFIX_TOKEN + login, "");
+            String token = mTokenStore.getToken(login);
             type = (token != null && (token.startsWith("glpat-") || token.startsWith("glgat-")
                     || token.startsWith("gldt-") || token.startsWith("glsoat-")))
                     ? TOKEN_TYPE_PAT : TOKEN_TYPE_OAUTH;
@@ -256,14 +259,11 @@ public class Gl4Application extends Application implements
         if (login == null) return;
         Set<String> logins = StringUtils.getEditableStringSetFromPrefs(getPrefs(), KEY_ALL_LOGINS);
         logins.remove(login);
+        mTokenStore.removeToken(login);
         getPrefs().edit()
                 .putString(KEY_ACTIVE_LOGIN, logins.size() > 0 ? logins.iterator().next() : null)
                 .putStringSet(KEY_ALL_LOGINS, logins)
-                .remove(KEY_PREFIX_TOKEN + login)
                 .remove(KEY_PREFIX_USER_ID + login)
-                // Fix: also remove token_type so that a re-login with a different type does not
-                // inherit the stale value and send the wrong Authorization header.
-                .remove(KEY_PREFIX_TOKEN_TYPE + login)
                 .apply();
         ServiceFactory.invalidateCache();
         NotificationsWorker.cancel(this);
@@ -280,14 +280,14 @@ public class Gl4Application extends Application implements
     }
 
     public String getTokenForLogin(String login) {
-        return login != null ? getPrefs().getString(KEY_PREFIX_TOKEN + login, null) : null;
+        return mTokenStore.getToken(login);
     }
 
     public String getTokenTypeForLogin(String login) {
         if (login == null) return TOKEN_TYPE_PAT;
-        String type = getPrefs().getString(KEY_PREFIX_TOKEN_TYPE + login, null);
+        String type = mTokenStore.getTokenType(login);
         if (type == null) {
-            String token = getPrefs().getString(KEY_PREFIX_TOKEN + login, "");
+            String token = mTokenStore.getToken(login);
             type = (token != null && (token.startsWith("glpat-") || token.startsWith("glgat-")
                     || token.startsWith("gldt-") || token.startsWith("glsoat-")))
                     ? TOKEN_TYPE_PAT : TOKEN_TYPE_OAUTH;
