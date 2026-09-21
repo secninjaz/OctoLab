@@ -309,6 +309,22 @@ public class AvatarHandler {
         sWorkerHandler.obtainMessage(MSG_LOAD, requestId, 0, (Object) null).sendToTarget();
     }
 
+    /**
+     * Renders the same rounded-square colored initials tile used in-app as a project's
+     * placeholder logo, as a plain Bitmap — for contexts like notifications that need a
+     * raw Bitmap (NotificationCompat.Builder#setLargeIcon) rather than a View to apply
+     * a Drawable to. Most projects have no uploaded avatar, so this is the common case,
+     * not just a network-failure fallback.
+     */
+    public static Bitmap renderProjectPlaceholder(String projectName, long projectId, int sizePx) {
+        DefaultAvatarDrawable drawable = new DefaultAvatarDrawable(projectName,
+                projectId > 0 ? projectId : null, true);
+        Bitmap bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        drawable.setBounds(0, 0, sizePx, sizePx);
+        drawable.draw(new Canvas(bitmap));
+        return bitmap;
+    }
+
     public static void assignAvatar(Context context, MenuItem item,
             String userName, long userId) {
         // Look up the stored avatar URL so inactive accounts can also do a network fetch
