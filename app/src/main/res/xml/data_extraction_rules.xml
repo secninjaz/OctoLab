@@ -5,20 +5,20 @@
   level — dataExtractionRules is now the only mechanism for either domain, so it
   must mirror backup_descriptor.xml's allowlist rather than default to including
   everything. Only the three items named here are eligible; the encrypted token
-  store (Gh4a-secure-pref) is excluded by omission, same as backup_descriptor.xml
+  store (Gl4a-secure-pref) is excluded by omission, same as backup_descriptor.xml
   always excluded it by never naming it. Its key is Keystore-device-bound anyway
   and wouldn't decrypt after a restore/transfer, so there'd be no benefit even if
   it were included.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <include domain="sharedpref" path="Gh4a-pref.xml" />
-        <include domain="database" path="gh4adb.db" />
+        <include domain="sharedpref" path="Gl4a-pref.xml" />
+        <include domain="database" path="gl4adb.db" />
         <include domain="database" path="suggestions.db" />
     </cloud-backup>
     <device-transfer>
-        <include domain="sharedpref" path="Gh4a-pref.xml" />
-        <include domain="database" path="gh4adb.db" />
+        <include domain="sharedpref" path="Gl4a-pref.xml" />
+        <include domain="database" path="gl4adb.db" />
         <include domain="database" path="suggestions.db" />
     </device-transfer>
 </data-extraction-rules>

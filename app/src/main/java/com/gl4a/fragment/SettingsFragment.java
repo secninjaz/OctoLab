@@ -40,7 +40,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         void onThemeChanged();
     }
 
-    public static final String PREF_NAME = "Gh4a-pref";
+    public static final String PREF_NAME = "Gl4a-pref";
 
     public static final String KEY_THEME = "theme";
     public static final String KEY_START_PAGE = "start_page";
@@ -308,9 +308,9 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
             findViewById(R.id.btn_by_email).setOnClickListener(this);
 
             // Opens GitHub issues — available regardless of login state
-            findViewById(R.id.btn_by_gh4a).setOnClickListener(this);
+            findViewById(R.id.btn_by_gl4a).setOnClickListener(this);
 
-            findViewById(R.id.btn_gh4a).setOnClickListener(this);
+            findViewById(R.id.btn_gl4a).setOnClickListener(this);
         }
 
         @Override
@@ -328,11 +328,11 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                 Intent chooserIntent = Intent.createChooser(sendIntent,
                         context.getString(R.string.send_email_title));
                 context.startActivity(chooserIntent);
-            } else if (id == R.id.btn_by_gh4a) {
+            } else if (id == R.id.btn_by_gl4a) {
                 Intent intent = new Intent(Intent.ACTION_VIEW,
                         Uri.parse(context.getString(R.string.my_web) + "/issues"));
                 context.startActivity(intent);
-            } else if (id == R.id.btn_gh4a) {
+            } else if (id == R.id.btn_gl4a) {
                 Intent intent = new Intent(Intent.ACTION_VIEW,
                         Uri.parse(context.getString(R.string.my_web)));
                 context.startActivity(intent);

@@ -16,6 +16,7 @@ import com.tspoon.traceur.Traceur;
 import org.ocpsoft.prettytime.PrettyTime;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import androidx.annotation.NonNull;
@@ -36,6 +37,9 @@ public class Gl4Application extends Application implements
     private static final int THEME_LIGHT = 1;
     private static final int THEME_SYSTEM = 2;
 
+    // Pre-GitLab-port name, still the live file on upgrading installs. migrateLegacyPrefsIfNeeded()
+    // moves everything into SettingsFragment.PREF_NAME ("Gl4a-pref") on first launch post-upgrade.
+    private static final String LEGACY_PREF_NAME = "Gh4a-pref";
     private static final String KEY_VERSION = "version";
     private static final String KEY_ACTIVE_LOGIN = "active_login";
     private static final String KEY_ALL_LOGINS = "logins";
@@ -51,6 +55,8 @@ public class Gl4Application extends Application implements
     public void onCreate() {
         super.onCreate();
         sInstance = this;
+
+        migrateLegacyPrefsIfNeeded();
 
         SharedPreferences prefs = getPrefs();
         int prefsVersion = prefs.getInt(KEY_VERSION, 0);
@@ -271,6 +277,42 @@ public class Gl4Application extends Application implements
 
     private SharedPreferences getPrefs() {
         return getSharedPreferences(SettingsFragment.PREF_NAME, MODE_PRIVATE);
+    }
+
+    /**
+     * One-time migration for installs upgrading from a version that used the old
+     * "Gh4a-pref" file name. Copies every entry into the current file and clears the
+     * legacy one — leaving it in place with its contents intact would re-orphan a
+     * plaintext copy of the access token that SecureTokenStore's migration (below)
+     * is specifically meant to get rid of.
+     */
+    private void migrateLegacyPrefsIfNeeded() {
+        SharedPreferences newPrefs = getPrefs();
+        if (newPrefs.contains(KEY_VERSION)) return;
+        SharedPreferences legacyPrefs = getSharedPreferences(LEGACY_PREF_NAME, MODE_PRIVATE);
+        Map<String, ?> all = legacyPrefs.getAll();
+        if (all.isEmpty()) return;
+        SharedPreferences.Editor editor = newPrefs.edit();
+        for (Map.Entry<String, ?> entry : all.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            if (value instanceof String) {
+                editor.putString(key, (String) value);
+            } else if (value instanceof Boolean) {
+                editor.putBoolean(key, (Boolean) value);
+            } else if (value instanceof Integer) {
+                editor.putInt(key, (Integer) value);
+            } else if (value instanceof Long) {
+                editor.putLong(key, (Long) value);
+            } else if (value instanceof Float) {
+                editor.putFloat(key, (Float) value);
+            } else if (value instanceof Set) {
+                //noinspection unchecked
+                editor.putStringSet(key, (Set<String>) value);
+            }
+        }
+        editor.apply();
+        legacyPrefs.edit().clear().apply();
     }
 
     // --- Per-account helpers used by NotificationsWorker ---

@@ -10,14 +10,39 @@ import android.database.sqlite.SQLiteOpenHelper;
 import java.net.URISyntaxException;
 
 public class DbHelper extends SQLiteOpenHelper {
-    private static final String DATABASE_NAME = "gh4adb.db";
+    private static final String DATABASE_NAME = "gl4adb.db";
+    // Pre-GitLab-port name, still the live file on upgrading installs.
+    private static final String LEGACY_DATABASE_NAME = "gh4adb.db";
     private static final int DATABASE_VERSION = 5;
 
     static final String BOOKMARKS_TABLE = "bookmarks";
     static final String SUGGESTIONS_TABLE = "suggestions";
 
     public DbHelper(Context context) {
-        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+        super(context, migrateLegacyDatabaseIfNeeded(context), null, DATABASE_VERSION);
+    }
+
+    /**
+     * One-time migration for installs upgrading from a version that used the old
+     * "gh4adb.db" file name — renames the file (and its WAL/SHM/journal sidecars,
+     * if present) in place rather than opening it under a new name, so bookmarks
+     * and suggestion history survive the rename.
+     */
+    private static String migrateLegacyDatabaseIfNeeded(Context context) {
+        java.io.File newDb = context.getDatabasePath(DATABASE_NAME);
+        if (!newDb.exists()) {
+            java.io.File oldDb = context.getDatabasePath(LEGACY_DATABASE_NAME);
+            if (oldDb.exists()) {
+                oldDb.renameTo(newDb);
+                for (String suffix : new String[] { "-wal", "-shm", "-journal" }) {
+                    java.io.File oldSidecar = new java.io.File(oldDb.getPath() + suffix);
+                    if (oldSidecar.exists()) {
+                        oldSidecar.renameTo(new java.io.File(newDb.getPath() + suffix));
+                    }
+                }
+            }
+        }
+        return DATABASE_NAME;
     }
 
     @Override
