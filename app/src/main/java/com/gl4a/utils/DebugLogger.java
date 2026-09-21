@@ -38,7 +38,7 @@ public class DebugLogger {
     }
 
     public void init(Context context) {
-        SharedPreferences prefs = context.getSharedPreferences("Gh4a-pref", Context.MODE_PRIVATE);
+        SharedPreferences prefs = context.getSharedPreferences("Gl4a-pref", Context.MODE_PRIVATE);
         mEnabled = prefs.getBoolean(PREF_KEY_ENABLED, false);
     }
 

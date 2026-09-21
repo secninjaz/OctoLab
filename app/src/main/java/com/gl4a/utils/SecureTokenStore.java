@@ -17,7 +17,7 @@ import java.security.GeneralSecurityException;
  */
 public class SecureTokenStore {
 
-    private static final String FILE_NAME = "Gh4a-secure-pref";
+    private static final String FILE_NAME = "Gl4a-secure-pref";
     private static final String KEY_PREFIX_TOKEN = "token_";
     private static final String KEY_PREFIX_TOKEN_TYPE = "token_type_";
 
