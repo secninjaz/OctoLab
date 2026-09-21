@@ -43,6 +43,13 @@ public class AvatarHandler {
 
     private static final int MAX_CACHED_IMAGE_SIZE = 60; /* dp - maximum gravatar view size used */
 
+    // Hairline gap (dp) kept between a project/group logo tile and its surrounding
+    // rounded-square frame (avatar_frame.xml) — shared by both the real-logo path
+    // (fitLogoToSquare) and the initials-tile placeholder (DefaultAvatarDrawable) so
+    // a loaded logo and its own placeholder look consistent, and neither renders
+    // perfectly flush against the frame (which reads as the two shapes merging).
+    private static final float LOGO_INSET_DP = 1f;
+
     private static LruCache<Long, Bitmap> sCache;
     private static int sNextRequestId = 1;
 
@@ -730,15 +737,18 @@ public class AvatarHandler {
     /**
      * Fits a bitmap into a square canvas by centering it with transparent padding.
      * Prevents RoundedBitmapDrawable's CENTER_CROP from cutting portrait-oriented logos.
-     * Square sources are returned unchanged so they fill the rounded-square frame edge-to-edge
-     * with no padding — a previous fixed 20% inset here made every logo look shrunk inside
-     * its frame (#158).
+     * Only pads by a hairline (LOGO_INSET_DP) beyond what's needed to become square — a
+     * previous fixed 20% inset here made every logo look shrunk inside its frame (#158).
      */
     private static Bitmap fitLogoToSquare(Bitmap src) {
-        int size = Math.max(src.getWidth(), src.getHeight());
-        if (src.getWidth() == size && src.getHeight() == size) {
-            return src;
-        }
+        // Same hairline inset DefaultAvatarDrawable's placeholder uses (LOGO_INSET_DP), so a
+        // loaded logo and its own placeholder look consistent. Applied on every source, square
+        // or not — a square source previously returned unchanged (flush to the frame); a wide
+        // or tall source is only padded on its shorter axis to become square, which still
+        // leaves its longer axis flush unless the canvas itself is inset too.
+        int inset = Math.round(com.gl4a.Gl4Application.get().getResources()
+                .getDisplayMetrics().density * LOGO_INSET_DP);
+        int size = Math.max(src.getWidth(), src.getHeight()) + inset * 2;
         Bitmap result = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(result);
         int left = (size - src.getWidth()) / 2;
@@ -1030,7 +1040,7 @@ public class AvatarHandler {
             // Hairline inset so the tile doesn't render perfectly flush against the row's
             // rounded-square frame background (avatar_frame.xml) — without it the two
             // rounded-rects visually merge into one hard edge with no framing at all.
-            mLogoInset = resources.getDisplayMetrics().density;
+            mLogoInset = resources.getDisplayMetrics().density * LOGO_INSET_DP;
             boolean darkTheme = resources.getBoolean(com.gl4a.R.bool.is_dark_theme);
             @ColorInt int[] bgPalette = darkTheme ? BG_PALETTE_DARK : BG_PALETTE_LIGHT;
             @ColorInt int[] textPalette = darkTheme ? TEXT_PALETTE_DARK : TEXT_PALETTE_LIGHT;
