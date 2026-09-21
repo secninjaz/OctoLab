@@ -46,13 +46,15 @@
 
             <Button
                 android:id="@+id/login_button"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="4dp"
                 android:padding="8dp"
                 android:text="@string/login"
                 android:textColor="@color/accent"
-                app:backgroundTint="@android:color/white" />
+                app:strokeColor="@color/accent"
+                app:strokeWidth="1dp" />
 
         </LinearLayout>
 
