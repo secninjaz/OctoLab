@@ -8,6 +8,7 @@ import androidx.security.crypto.MasterKey;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.util.Map;
 
 /**
  * Keystore-backed encrypted storage for GitLab access tokens. Kept in its own
@@ -18,6 +19,10 @@ import java.security.GeneralSecurityException;
 public class SecureTokenStore {
 
     private static final String FILE_NAME = "Gl4a-secure-pref";
+    // This class's own original name, used by every build before the Gh4a->Gl4a naming
+    // cleanup — including test builds already installed and logged into during that
+    // cleanup's own testing cycle. Not just a hypothetical "pre-release" name.
+    private static final String LEGACY_FILE_NAME = "Gh4a-secure-pref";
     private static final String KEY_PREFIX_TOKEN = "token_";
     private static final String KEY_PREFIX_TOKEN_TYPE = "token_type_";
 
@@ -25,8 +30,9 @@ public class SecureTokenStore {
 
     public SecureTokenStore(Context context) {
         SharedPreferences prefs;
+        MasterKey masterKey = null;
         try {
-            MasterKey masterKey = new MasterKey.Builder(context)
+            masterKey = new MasterKey.Builder(context)
                     .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                     .build();
             prefs = EncryptedSharedPreferences.create(
@@ -42,6 +48,37 @@ public class SecureTokenStore {
             prefs = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE);
         }
         mPrefs = prefs;
+        migrateLegacyFileIfNeeded(context, masterKey);
+    }
+
+    /**
+     * One-time migration for installs upgrading from before this class was renamed
+     * from Gh4a-secure-pref to Gl4a-secure-pref. Opens the old file with the same
+     * Keystore master key (a MasterKey isn't tied to one specific file) and moves
+     * every entry across.
+     */
+    private void migrateLegacyFileIfNeeded(Context context, MasterKey masterKey) {
+        if (masterKey == null || !mPrefs.getAll().isEmpty()) return;
+        try {
+            SharedPreferences legacyPrefs = EncryptedSharedPreferences.create(
+                    context,
+                    LEGACY_FILE_NAME,
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM);
+            Map<String, ?> all = legacyPrefs.getAll();
+            if (all.isEmpty()) return;
+            SharedPreferences.Editor editor = mPrefs.edit();
+            for (Map.Entry<String, ?> entry : all.entrySet()) {
+                if (entry.getValue() instanceof String) {
+                    editor.putString(entry.getKey(), (String) entry.getValue());
+                }
+            }
+            editor.apply();
+            legacyPrefs.edit().clear().apply();
+        } catch (GeneralSecurityException | IOException e) {
+            // Legacy file inaccessible/corrupt — nothing to migrate; user re-logs in.
+        }
     }
 
     public String getToken(String login) {
