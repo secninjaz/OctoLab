@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.6] - 2026-09-21
+
+### Security
+- GitLab access tokens now stored Keystore-encrypted (AES/GCM), replacing plaintext SharedPreferences that were also a backup candidate
+- Backup and device-transfer scope corrected to an explicit allowlist (only named files are ever eligible)
+- `WRITE_EXTERNAL_STORAGE` scoped to API ≤28 — a no-op on modern targetSdk, still declared unconditionally before
+- F-Droid store listing now explains the `REQUEST_INSTALL_PACKAGES` permission
+- Legacy `gh4a`-era internal file names (SharedPreferences, SQLite database, encrypted token store) renamed to match the app's actual package, with upgrade migrations so existing installs don't lose settings or get logged out
+
+### Fixed
+- Square project logos no longer padded inside their frame — extended to logos of any aspect ratio and the initials-tile placeholder, both now keep a consistent hairline inset instead of rendering flush or shrunk (#158)
+- Pre-login welcome screen now properly adapts to light/dark theme instead of always rendering with a dark backdrop
+- Login button has a visible border instead of blending into its background
+- Notification project icons no longer blank for projects without an uploaded avatar — reuse the same resolution used in-app, including inherited group logos, falling back to the colored initials tile (#160)
+- Notification status-bar icon was invisible on all themes (regressed by an August theme-audit commit that swapped its fixed white fill for a theme-relative attribute status-bar icons don't resolve)
+
 ## [1.3.5] - 2026-08-26
 
 ### Fixed
