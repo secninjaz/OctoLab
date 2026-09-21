@@ -32,6 +32,8 @@ Other
 
 No tracking, no analytics, no proprietary services.
 
+OctoLab requests the "install packages" permission solely to let you install release APKs you choose to download from a project's Releases page within the app — it is never used automatically or in the background.
+
 OctoLab began as a GitLab-focused fork of Octodroid (gh4a), an open-source GitHub client, and is maintained by SecNinjaz.
 
 Source code: https://github.com/secninjaz/OctoLab
