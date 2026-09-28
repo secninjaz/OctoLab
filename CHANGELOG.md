@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.7] - 2026-09-28
+
+### Added
+- Reactions on commit comments (via GraphQL; GitLab's REST API has no award-emoji endpoint for commit notes), matching issue/MR comment behaviour (#159)
+- Internal and public repos show GitLab's own visibility icons (shield, globe) in the repo list and overview (#145)
+
+### Fixed
+- Links for another instance you are logged in to now open in-app with the matching account — switching automatically for one match, or asking when several match — both from other apps and when tapped inside the app, instead of opening in the browser (#163)
+- Pressing Back after a link switched accounts reloaded the previous screen with the wrong account (404); the previous screen's account is now restored (#163)
+- Manual account switching from the drawer did nothing once display names were shown as "Name (@login)" (#161)
+- Account display names are cached, and avatars for accounts on other instances load correctly
+- Fast scrolling on issues/MRs showed reactions from other comments; reactions now load with the timeline in one GraphQL query instead of per row (#162)
+- Internal and public repos no longer show the private-repo lock icon (#145)
+- Fresh installs no longer create an empty legacy keystore file
+
 ## [1.3.6] - 2026-09-21
 
 ### Security
