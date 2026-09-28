@@ -170,45 +170,32 @@ class CommentViewHolder
 
         ivMenu.setTag(item);
 
-        // Pre-warm the reaction details cache so icons are ready before the user opens
-        // the three-dot > Add reaction submenu. Starts a fetch if cache is cold; no-op
-        // if cache already has data for this comment.
-        if (mReactionMenuHelper != null) {
+        java.util.Set<String> viewerReacted = item.comment().viewerReactedContents();
+        // Reaction details (with IDs, needed to remove a reaction) are only fetched when the
+        // user opens the menu, unless the timeline load could not provide reactions (#162).
+        if (mReactionMenuHelper != null && viewerReacted == null) {
             mReactionMenuHelper.startLoadingIfNeeded();
         }
-        // Clear any viewer-reaction tinting from a previous binding before setting new state.
-        reactions.setViewerReactedContents(java.util.Collections.emptySet());
-        // Show cached reactions immediately; fetch from API if not yet loaded
+        // Show reactions from the comment's own data, loaded with the timeline via GraphQL,
+        // instead of fetching them per row while scrolling (#162).
+        reactions.setViewerReactedContents(viewerReacted != null
+                ? viewerReacted : java.util.Collections.emptySet());
         reactions.setReactions(item.comment().reactions());
-        // Sync viewer state from cache immediately (no-op if cache has no entry for this item).
+        // A details-cache entry is newer (set after add/remove), so it overrides the loaded state.
         reactions.refreshViewerStateFromCache();
         if (item.comment().reactions() == null) {
+            // REST fallback for servers without GraphQL. Store the result on the comment it
+            // was requested for; only update this row if it still shows that comment.
+            final GitLabComment requested = item.comment();
             mCallback.loadReactionDetails(item, false)
                     .subscribe(details -> {
-                        if (!details.isEmpty()) {
-                            java.util.Map<String, Integer> counts = new java.util.HashMap<>();
-                            String ownLogin = com.gl4a.Gl4Application.get().getAuthLogin();
-                            java.util.Set<String> viewerReacted = new java.util.HashSet<>();
-                            for (com.gl4a.gitlab.model.GitLabReaction r : details) {
-                                counts.merge(r.name, 1, Integer::sum);
-                                if (com.gl4a.utils.ApiHelpers.loginEquals(r.user(), ownLogin)) {
-                                    viewerReacted.add(r.content());
-                                }
-                            }
-                            com.gl4a.gitlab.model.GitLabReactions agg =
-                                    com.gl4a.gitlab.model.GitLabReactions.builder()
-                                    .plusOne(counts.getOrDefault("thumbsup", 0))
-                                    .minusOne(counts.getOrDefault("thumbsdown", 0))
-                                    .laugh(counts.getOrDefault("laughing", 0))
-                                    .hooray(counts.getOrDefault("tada", 0))
-                                    .heart(counts.getOrDefault("heart", 0))
-                                    .confused(counts.getOrDefault("confused", 0))
-                                    .rocket(counts.getOrDefault("rocket", 0))
-                                    .eyes(counts.getOrDefault("eyes", 0))
-                                    .build();
-                            updateReactions(agg);
-                            reactions.setViewerReactedContents(viewerReacted);
+                        requested.withReactionDetails(details,
+                                Gl4Application.get().getAuthLogin());
+                        if (mBoundItem != item) {
+                            return;
                         }
+                        reactions.setViewerReactedContents(requested.viewerReactedContents());
+                        updateReactions(requested.reactions());
                     }, error -> { /* non-fatal */ });
         }
 

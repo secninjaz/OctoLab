@@ -150,6 +150,11 @@ public abstract class BaseActivity extends AppCompatActivity implements
     private RxLoader mRxLoader;
     private final CompositeDisposable mDisposeOnStop = new CompositeDisposable();
 
+    // Account that was active when this screen was created. Opening a link can switch the
+    // active account (see BrowseFilter); returning here switches back so this screen keeps
+    // loading with the account it belongs to.
+    private String mCreatedForLogin;
+
     private final Runnable mUpdateTaskDescriptionRunnable = () -> {
         String label = IntentUtils.isNewTaskIntent(getIntent()) ? getActionBarTitle() : null;
         setTaskDescription(new ActivityManager.TaskDescription(label, null,
@@ -158,6 +163,7 @@ public abstract class BaseActivity extends AppCompatActivity implements
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        mCreatedForLogin = Gl4Application.get().getAuthLogin();
         Bundle extras = getIntent().getExtras();
         if (extras != null) {
             onInitExtras(extras);
@@ -477,6 +483,16 @@ public abstract class BaseActivity extends AppCompatActivity implements
             lp.setScrollFlags(0);
         }
         view.setLayoutParams(lp);
+    }
+
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+        if (mCreatedForLogin != null
+                && !mCreatedForLogin.equals(Gl4Application.get().getAuthLogin())) {
+            // No-op if that account has since been removed.
+            Gl4Application.get().setActiveLogin(mCreatedForLogin);
+        }
     }
 
     @Override

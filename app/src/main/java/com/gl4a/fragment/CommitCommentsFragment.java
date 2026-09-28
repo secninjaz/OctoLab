@@ -245,6 +245,15 @@ public class CommitCommentsFragment extends ListDataBaseFragment<GitLabComment> 
                         }
                     }
                     return notes;
+                })
+                // Reactions for all notes come from one GraphQL query instead of per row,
+                // same as issue/MR comments (#162).
+                .flatMap(notes -> {
+                    java.util.List<Long> ids = new java.util.ArrayList<>();
+                    for (GitLabComment note : notes) ids.add(note.id());
+                    return com.gl4a.utils.NoteReactionsLoader.loadForNotes(ids)
+                            .map(reactions -> com.gl4a.utils.NoteReactionsLoader.apply(
+                                    notes, reactions));
                 });
     }
 

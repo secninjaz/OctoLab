@@ -277,6 +277,15 @@ public class ServiceFactory {
                 .create(serviceClass);
     }
 
+    /**
+     * Creates an uncached service against the instance's GraphQL endpoint, authenticated as the
+     * current account. Used only where the REST API has no equivalent (see GitLabGraphQLService).
+     */
+    public static <S> S getGraphQL(Class<S> serviceClass) {
+        return getForAccount(serviceClass, Gl4Application.get().getInstanceUrl() + "/api/",
+                Gl4Application.get().getAuthToken());
+    }
+
     public static void invalidateCache() { sCache.clear(); }
     public static OkHttpClient.Builder getHttpClientBuilder() { return sApiHttpClient.newBuilder(); }
     public static OkHttpClient getImageHttpClient() { return sImageHttpClient; }
@@ -293,12 +302,30 @@ public class ServiceFactory {
                 .addInterceptor(chain -> {
                     okhttp3.Request req = chain.request();
                     String host = req.url().host();
-                    String instanceHost = android.net.Uri.parse(
+                    String activeInstanceHost = android.net.Uri.parse(
                             Gl4Application.get().getInstanceUrl()).getHost();
-                    if (host != null && host.equals(instanceHost)) {
-                        String tok = Gl4Application.get().getAuthToken();
+                    String login;
+                    if (host != null && host.equals(activeInstanceHost)) {
+                        login = Gl4Application.get().getAuthLogin();
+                    } else if (host != null) {
+                        // Image requests aren't only for the active account — the drawer
+                        // shows avatars for every logged-in account, which may be on a
+                        // different instance than whichever one is currently active.
+                        java.util.List<String> matches =
+                                Gl4Application.get().getLoginsForInstanceHost(host);
+                        login = matches.isEmpty() ? null : matches.get(0);
+                    } else {
+                        login = null;
+                    }
+                    if (login != null) {
+                        String tok = Gl4Application.get().getTokenForLogin(login);
                         if (tok != null) {
-                            req = req.newBuilder().header("PRIVATE-TOKEN", tok).build();
+                            boolean oauth = Gl4Application.TOKEN_TYPE_OAUTH.equals(
+                                    Gl4Application.get().getTokenTypeForLogin(login));
+                            req = req.newBuilder()
+                                    .header(oauth ? "Authorization" : "PRIVATE-TOKEN",
+                                            oauth ? "Bearer " + tok : tok)
+                                    .build();
                         }
                     }
                     return chain.proceed(req);

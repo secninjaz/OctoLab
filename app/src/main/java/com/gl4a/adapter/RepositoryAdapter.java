@@ -100,13 +100,20 @@ public class RepositoryAdapter extends RootAdapter<GitLabProject, RepositoryAdap
         if ("internal".equals(repository.visibility)) {
             holder.tvPrivate.setVisibility(View.VISIBLE);
             holder.tvPrivate.setText(R.string.repo_type_internal);
+            // Same icons as GitLab: shield for internal, globe for public, lock for private.
+            holder.tvPrivate.setCompoundDrawablesWithIntrinsicBounds(
+                    R.drawable.internal_small, 0, 0, 0);
         } else if ("public".equals(repository.visibility)) {
             holder.tvPrivate.setVisibility(View.VISIBLE);
             holder.tvPrivate.setText(R.string.repo_type_public);
+            holder.tvPrivate.setCompoundDrawablesWithIntrinsicBounds(
+                    R.drawable.public_small, 0, 0, 0);
         } else {
-            // "private" or null — show Private label (existing behaviour)
+            // "private" or null — show Private label with its lock icon (existing behaviour)
             holder.tvPrivate.setVisibility(repository.isPrivate() ? View.VISIBLE : View.GONE);
             holder.tvPrivate.setText(R.string.repo_type_private);
+            holder.tvPrivate.setCompoundDrawablesWithIntrinsicBounds(
+                    R.drawable.private_small, 0, 0, 0);
         }
         holder.tvFork.setVisibility(repository.isFork() ? View.VISIBLE : View.GONE);
     }

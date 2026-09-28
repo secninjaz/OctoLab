@@ -50,6 +50,7 @@ public class Gl4Application extends Application implements
     private static final String KEY_INSTANCE_URL = "instance_url";
     private static final String KEY_PREFIX_INSTANCE_URL = "instance_url_";
     private static final String KEY_PREFIX_AVATAR_URL   = "avatar_url_";
+    private static final String KEY_PREFIX_NAME         = "name_";
 
     @Override
     public void onCreate() {
@@ -214,6 +215,7 @@ public class Gl4Application extends Application implements
                 .putLong(KEY_PREFIX_USER_ID + login, user.id())
                 .putString(KEY_PREFIX_INSTANCE_URL + login, currentUrl)
                 .putString(KEY_PREFIX_AVATAR_URL + login, user.avatarUrl())
+                .putString(KEY_PREFIX_NAME + login, user.name())
                 .apply();
         // Ensure notifications are enabled by default for every new login.
         // setDefaultValues() writes the XML default only if the key is absent.
@@ -349,6 +351,24 @@ public class Gl4Application extends Application implements
         return getPrefs().getString(KEY_PREFIX_AVATAR_URL + login, null);
     }
 
+    /**
+     * Returns every logged-in login whose own instance URL host matches {@code host}
+     * (case-insensitive) — used to route a tapped link to the right account regardless
+     * of which account is currently active, since a self-hosted URL only opens in-app
+     * when it matches the active account's instance (see LinkParser).
+     */
+    public java.util.List<String> getLoginsForInstanceHost(String host) {
+        java.util.List<String> matches = new java.util.ArrayList<>();
+        if (host == null) return matches;
+        for (String login : getAllLogins()) {
+            String loginHost = android.net.Uri.parse(getInstanceUrlForLogin(login)).getHost();
+            if (host.equalsIgnoreCase(loginHost)) {
+                matches.add(login);
+            }
+        }
+        return matches;
+    }
+
     public long getUserIdForLogin(String login) {
         if (login == null) return 0L;
         return getPrefs().getLong(KEY_PREFIX_USER_ID + login, 0L);
@@ -359,6 +379,20 @@ public class Gl4Application extends Application implements
         String existing = getPrefs().getString(KEY_PREFIX_AVATAR_URL + login, null);
         if (!url.equals(existing)) {
             getPrefs().edit().putString(KEY_PREFIX_AVATAR_URL + login, url).apply();
+        }
+    }
+
+    /** Display name (distinct from login/username) for an account, or null if never stored. */
+    public String getNameForLogin(String login) {
+        if (login == null) return null;
+        return getPrefs().getString(KEY_PREFIX_NAME + login, null);
+    }
+
+    public void updateStoredName(String login, String name) {
+        if (login == null || name == null) return;
+        String existing = getPrefs().getString(KEY_PREFIX_NAME + login, null);
+        if (!name.equals(existing)) {
+            getPrefs().edit().putString(KEY_PREFIX_NAME + login, name).apply();
         }
     }
 

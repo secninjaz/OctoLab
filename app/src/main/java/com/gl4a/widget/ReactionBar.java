@@ -475,6 +475,9 @@ public class ReactionBar extends HorizontalScrollView implements View.OnClickLis
 
     private static Single<List<GitLabReaction>> fetchReactions(Callback callback, Item item,
             ReactionDetailsCache cache) {
+        // Capture the key now: a recycled row's item may be bound to another comment by the
+        // time the request finishes, and keying by it then mixes up reactions (#162).
+        final Object key = item.getCacheKey();
         return callback.loadReactionDetails(item, false)
                 .compose(RxUtils::doInBackground)
                 .compose(RxUtils.sortList((lhs, rhs) -> {
@@ -486,12 +489,13 @@ public class ReactionBar extends HorizontalScrollView implements View.OnClickLis
                     }
                     return result;
                 }))
-                .doOnSuccess(reactions -> cache.putReactions(item, reactions));
+                .doOnSuccess(reactions -> cache.putReactions(key, item, reactions));
     }
 
     private static Single<Optional<GitLabReaction>> toggleReaction(String content, Long id,
             List<GitLabReaction> existingDetails, Callback callback, Item item,
             ReactionDetailsCache cache) {
+        final Object key = item.getCacheKey();
         final Single<Optional<GitLabReaction>> resultSingle;
 
         if (id == null) {
@@ -516,7 +520,7 @@ public class ReactionBar extends HorizontalScrollView implements View.OnClickLis
                             }
                         }
                     }
-                    cache.putReactions(item, existingDetails);
+                    cache.putReactions(key, item, existingDetails);
                 });
     }
 
@@ -669,9 +673,16 @@ public class ReactionBar extends HorizontalScrollView implements View.OnClickLis
         }
 
         public void putReactions(Item item, List<GitLabReaction> value) {
-            Object key = item.getCacheKey();
+            putReactions(item.getCacheKey(), item, value);
+        }
+
+        /**
+         * Stores reactions under {@code key}, the key {@code item} had when the request started.
+         * The listener is only notified while {@code item} still represents that key.
+         */
+        public void putReactions(Object key, Item item, List<GitLabReaction> value) {
             List<GitLabReaction> result = mMap.put(key, new ArrayList<>(value));
-            if (result != null && !mDestroyed) {
+            if (result != null && !mDestroyed && key.equals(item.getCacheKey())) {
                 mListener.onReactionsUpdated(item, buildReactions(value));
             }
         }

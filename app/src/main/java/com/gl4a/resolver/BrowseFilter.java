@@ -49,8 +49,54 @@ public class BrowseFilter extends AppCompatActivity {
         }
 
         // Translate gl4a:// URIs to https:// GitLab URLs for uniform parsing.
-        uri = normalizeUri(uri);
+        final Uri normalized = normalizeUri(uri);
 
+        // A link only routes in-app if its host matches the currently active account's
+        // instance (see LinkParser). Switch to a matching account first — automatically
+        // if only one is logged in for that host, or by asking if more than one is —
+        // so links for a non-active instance still open in-app instead of bouncing to
+        // the browser just because a different account happened to be active.
+        resolveAccountForHost(normalized.getHost(), () -> proceedWithUri(normalized));
+    }
+
+    private void resolveAccountForHost(String host, Runnable proceed) {
+        java.util.List<String> matches = Gl4Application.get().getLoginsForInstanceHost(host);
+
+        if (matches.isEmpty()) {
+            // No logged-in account for this host — LinkParser will fall back to the browser.
+            proceed.run();
+            return;
+        }
+
+        if (matches.size() == 1) {
+            String only = matches.get(0);
+            if (!only.equals(Gl4Application.get().getAuthLogin())) {
+                Gl4Application.get().setActiveLogin(only);
+            }
+            proceed.run();
+            return;
+        }
+
+        // Multiple accounts on this instance — always ask which one to use, even if
+        // one of them is already active, since the user may want a specific other one.
+        String[] logins = matches.toArray(new String[0]);
+        CharSequence[] labels = new CharSequence[logins.length];
+        for (int i = 0; i < logins.length; i++) {
+            String name = Gl4Application.get().getNameForLogin(logins[i]);
+            labels[i] = !com.gl4a.utils.StringUtils.isBlank(name)
+                    ? name + " (@" + logins[i] + ")" : "@" + logins[i];
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(R.string.choose_account_for_link)
+                .setItems(labels, (dialog, which) -> {
+                    Gl4Application.get().setActiveLogin(logins[which]);
+                    proceed.run();
+                })
+                .setOnCancelListener(dialog -> finish())
+                .show();
+    }
+
+    private void proceedWithUri(Uri uri) {
         int flags = getIntent().getFlags() & ~Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
         if ((flags & (Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NEW_DOCUMENT)) != 0) {
             flags |= Intent.FLAG_ACTIVITY_MULTIPLE_TASK;

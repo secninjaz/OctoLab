@@ -14,6 +14,7 @@ import com.gl4a.gitlab.service.GitLabIssueService;
 import com.gl4a.model.TimelineItem;
 import com.gl4a.utils.ApiHelpers;
 import com.gl4a.utils.IntentUtils;
+import com.gl4a.utils.NoteReactionsLoader;
 import com.gl4a.utils.RxUtils;
 
 import java.util.List;
@@ -72,12 +73,12 @@ public class IssueFragment extends IssueFragmentBase {
                             }
                             return retrofit2.Response.success(ApiHelpers.toPage(response));
                         }))
-                .map(comments -> {
-                    // Include system notes (mentions in commits, state changes, etc.)
-                    // so the issue timeline matches GitLab web. System notes render with
-                    // a distinct appearance via CommentViewHolder.isSystemNote().
-                    return comments;
-                })
+                // Include system notes (mentions in commits, state changes, etc.)
+                // so the issue timeline matches GitLab web. System notes render with
+                // a distinct appearance via CommentViewHolder.isSystemNote().
+                // Reactions for all notes come from one GraphQL query instead of per row (#162).
+                .zipWith(NoteReactionsLoader.load(false, mIssue.id(), bypassCache),
+                        NoteReactionsLoader::apply)
                 .compose(RxUtils.<GitLabComment, TimelineItem>mapList(
                         c -> new TimelineItem.TimelineComment(c)))
                 .subscribeOn(Schedulers.io());

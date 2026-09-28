@@ -16,6 +16,7 @@
     <string name="search">Search</string>
     <string name="search_code">Search code</string>
     <string name="logout">Logout</string>
+    <string name="choose_account_for_link">Multiple accounts on this instance — choose one to open this link with</string>
     <string name="login">Login</string>
     <string name="login_oauth">Login via OAuth (coming soon)</string>
     <string name="login_token">Login using access token</string>

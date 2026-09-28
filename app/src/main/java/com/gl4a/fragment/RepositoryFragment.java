@@ -263,12 +263,19 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         if ("internal".equals(mRepository.visibility)) {
             privateRow.setVisibility(View.VISIBLE);
             privateRow.setText(getString(R.string.repo_type_internal));
+            // Same icons as GitLab: shield for internal, globe for public, lock for private.
+            privateRow.setIcon(androidx.core.content.ContextCompat.getDrawable(
+                    getContext(), R.drawable.icon_internal));
         } else if ("public".equals(mRepository.visibility)) {
             privateRow.setVisibility(View.VISIBLE);
             privateRow.setText(getString(R.string.repo_type_public));
+            privateRow.setIcon(androidx.core.content.ContextCompat.getDrawable(
+                    getContext(), R.drawable.icon_public));
         } else {
             privateRow.setVisibility(mRepository.isPrivate() ? View.VISIBLE : View.GONE);
             privateRow.setText(getString(R.string.repo_type_private));
+            privateRow.setIcon(androidx.core.content.ContextCompat.getDrawable(
+                    getContext(), R.drawable.icon_private));
         }
 
         OverviewRow languageRow = mContentView.findViewById(R.id.language_row);

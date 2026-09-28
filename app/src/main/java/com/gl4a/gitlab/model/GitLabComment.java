@@ -77,6 +77,35 @@ public class GitLabComment implements Parcelable {
     private transient GitLabReactions mCachedReactions;
     public GitLabReactions reactions() { return mCachedReactions; }
     public GitLabComment withReactions(GitLabReactions r) { mCachedReactions = r; return this; }
+
+    // Emoji contents the signed-in user reacted with; null until reaction details are loaded
+    private transient java.util.Set<String> mViewerReactedContents;
+    public java.util.Set<String> viewerReactedContents() { return mViewerReactedContents; }
+
+    /** Stores reaction counts and the viewer's own reactions computed from award emoji details. */
+    public GitLabComment withReactionDetails(java.util.List<GitLabReaction> details,
+            String ownLogin) {
+        java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+        java.util.Set<String> viewerReacted = new java.util.HashSet<>();
+        for (GitLabReaction r : details) {
+            counts.merge(r.name, 1, Integer::sum);
+            if (com.gl4a.utils.ApiHelpers.loginEquals(r.user(), ownLogin)) {
+                viewerReacted.add(r.content());
+            }
+        }
+        mCachedReactions = GitLabReactions.builder()
+                .plusOne(counts.getOrDefault("thumbsup", 0))
+                .minusOne(counts.getOrDefault("thumbsdown", 0))
+                .laugh(counts.getOrDefault("laughing", 0))
+                .hooray(counts.getOrDefault("tada", 0))
+                .heart(counts.getOrDefault("heart", 0))
+                .confused(counts.getOrDefault("confused", 0))
+                .rocket(counts.getOrDefault("rocket", 0))
+                .eyes(counts.getOrDefault("eyes", 0))
+                .build();
+        mViewerReactedContents = viewerReacted;
+        return this;
+    }
     public String htmlUrl() { return ""; }
     public String pullRequestUrl() { return mrWebUrl; }
     public String commitId() { return ""; }

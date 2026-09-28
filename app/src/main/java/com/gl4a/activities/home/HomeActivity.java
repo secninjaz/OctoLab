@@ -96,6 +96,8 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
 
     private static final int OTHER_ACCOUNTS_GROUP_BASE_ID = 1000;
 
+    private final SparseArray<String> mOtherAccountLogins = new SparseArray<>();
+
     private static final SparseArray<String> START_PAGE_MAPPING = new SparseArray<>();
     static {
         START_PAGE_MAPPING.put(R.id.news_feed, "newsfeed");
@@ -320,7 +322,10 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
 
         int accountCount = Gl4Application.get().getAccounts().size();
         if (id >= OTHER_ACCOUNTS_GROUP_BASE_ID && id < OTHER_ACCOUNTS_GROUP_BASE_ID + accountCount) {
-            switchActiveUser(item.getTitle().toString());
+            String login = mOtherAccountLogins.get(id);
+            if (login != null) {
+                switchActiveUser(login);
+            }
             return true;
         }
 
@@ -571,6 +576,7 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
                 }
                 mLeftDrawerMenu.removeItem(item.getItemId());
             }
+            mOtherAccountLogins.clear();
 
             int id = OTHER_ACCOUNTS_GROUP_BASE_ID;
             LongSparseArray<String> accounts = Gl4Application.get().getAccounts();
@@ -580,7 +586,12 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
                     continue;
                 }
 
-                MenuItem item = mLeftDrawerMenu.add(R.id.other_accounts, id++, Menu.NONE, login);
+                String name = Gl4Application.get().getNameForLogin(login);
+                CharSequence label = !com.gl4a.utils.StringUtils.isBlank(name)
+                        ? name + " (@" + login + ")" : "@" + login;
+                MenuItem item = mLeftDrawerMenu.add(R.id.other_accounts, id, Menu.NONE, label);
+                mOtherAccountLogins.put(id, login);
+                id++;
                 AvatarHandler.assignAvatar(this, item, login, accounts.keyAt(i));
             }
         }

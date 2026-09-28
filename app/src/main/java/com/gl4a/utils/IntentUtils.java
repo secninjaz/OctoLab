@@ -17,7 +17,9 @@ import android.os.Parcelable;
 import android.widget.Toast;
 
 import com.gl4a.BaseActivity;
+import com.gl4a.Gl4Application;
 import com.gl4a.R;
+import com.gl4a.resolver.BrowseFilter;
 import com.gl4a.resolver.LinkParser;
 import com.gl4a.fragment.SettingsFragment;
 
@@ -79,6 +81,15 @@ public class IntentUtils {
             } catch (ActivityNotFoundException e) {
                 Toast.makeText(activity, R.string.link_not_openable, Toast.LENGTH_SHORT).show();
             }
+            return;
+        }
+
+        // LinkParser only routes in-app for the active account's instance. If the link is for
+        // another instance the user is logged in to, hand it to BrowseFilter, which switches to
+        // (or asks for) a matching account, same as for links opened from other apps.
+        List<String> hostLogins = Gl4Application.get().getLoginsForInstanceHost(uri.getHost());
+        if (!hostLogins.isEmpty() && !hostLogins.contains(Gl4Application.get().getAuthLogin())) {
+            activity.startActivity(BrowseFilter.makeRedirectionIntent(activity, uri, null));
             return;
         }
 

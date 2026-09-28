@@ -59,6 +59,15 @@ public class SecureTokenStore {
      */
     private void migrateLegacyFileIfNeeded(Context context, MasterKey masterKey) {
         if (masterKey == null || !mPrefs.getAll().isEmpty()) return;
+        // Check for legacy data with a plain (unencrypted) read first. Opening a file via
+        // EncryptedSharedPreferences.create() always generates and persists a Tink keyset
+        // as a side effect, even for a file name that doesn't otherwise exist — without this
+        // check, every fresh install (which never had a Gh4a-secure-pref file at all) would
+        // still end up with an empty one, plus a Keystore key it will never use.
+        if (context.getSharedPreferences(LEGACY_FILE_NAME, Context.MODE_PRIVATE)
+                .getAll().isEmpty()) {
+            return;
+        }
         try {
             SharedPreferences legacyPrefs = EncryptedSharedPreferences.create(
                     context,

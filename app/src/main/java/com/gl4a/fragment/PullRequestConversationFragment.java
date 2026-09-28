@@ -272,6 +272,9 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
                                     }
                                     return retrofit2.Response.success(ApiHelpers.toPage(response));
                                 }))
+                // Reactions for all notes come from one GraphQL query instead of per row (#162).
+                .zipWith(com.gl4a.utils.NoteReactionsLoader.load(true, mMergeRequest.id(), bypassCache),
+                        com.gl4a.utils.NoteReactionsLoader::apply)
                 .compose(com.gl4a.utils.RxUtils.<com.gl4a.gitlab.model.GitLabComment,
                         TimelineItem>mapList(
                         c -> new TimelineItem.TimelineComment(c)))

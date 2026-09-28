@@ -198,11 +198,14 @@ public class AvatarHandler {
             }
             return;
         }
-        // Persist the avatar URL so it is available when this account is shown as an
-        // inactive MenuItem in the drawer (which has no GitLabUser object available).
+        // Persist the avatar URL and display name so both are available when this account
+        // is shown as an inactive MenuItem in the drawer (which has no GitLabUser object).
         String avatarUrl = user.avatarUrl();
         if (user.login() != null && avatarUrl != null) {
             com.gl4a.Gl4Application.get().updateStoredAvatarUrl(user.login(), avatarUrl);
+        }
+        if (user.login() != null && user.name() != null) {
+            com.gl4a.Gl4Application.get().updateStoredName(user.login(), user.name());
         }
         // Pass email so we can fall back to Gravatar if the instance avatar fails.
         assignAvatarInternal(new ImageViewDelegate(view), user.login(), user.id(),
@@ -366,11 +369,21 @@ public class AvatarHandler {
         }
         return renderProjectPlaceholder(projectName, projectId, placeholderSizePx);
     }
+
     public static void assignAvatar(Context context, MenuItem item,
             String userName, long userId) {
         // Look up the stored avatar URL so inactive accounts can also do a network fetch
         // and benefit from the disk cache across sessions.
         String avatarUrl = com.gl4a.Gl4Application.get().getAvatarUrlForLogin(userName);
+        // A relative URL (common for self-hosted instances) must resolve against THIS
+        // account's own instance, not whichever instance happens to be globally active —
+        // the drawer can show accounts from a different instance than the active one.
+        // Resolving it here, before it reaches the shared fetch pipeline, means every
+        // other caller (project logos, comment authors, etc., which pass usernames that
+        // aren't necessarily one of the app's own logged-in accounts) is unaffected.
+        if (avatarUrl != null && avatarUrl.startsWith("/")) {
+            avatarUrl = com.gl4a.Gl4Application.get().getInstanceUrlForLogin(userName) + avatarUrl;
+        }
         assignAvatarInternal(new MenuItemDelegate(context, item), userName, userId, avatarUrl, null);
     }
 

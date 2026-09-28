@@ -15,9 +15,12 @@
  */
 package com.gl4a.adapter;
 import com.gl4a.gitlab.model.GitLabComment;
+import com.gl4a.gitlab.model.GitLabGraphQLAwardEmoji;
+import com.gl4a.gitlab.model.GitLabGraphQLError;
 import com.gl4a.gitlab.model.GitLabReaction;
 import com.gl4a.gitlab.model.GitLabReactions;
 import com.gl4a.gitlab.model.GitLabUser;
+import com.gl4a.gitlab.service.GitLabGraphQLService;
 
 import android.content.Context;
 import android.content.Intent;
@@ -44,9 +47,12 @@ import com.gl4a.utils.StringUtils;
 import com.gl4a.utils.UiUtils;
 import com.gl4a.widget.ReactionBar;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import io.reactivex.Single;
@@ -69,6 +75,9 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
     private final String mRepoName;
     private final ReactionBar.ReactionDetailsCache mReactionDetailsCache =
             new ReactionBar.ReactionDetailsCache(this);
+    // GitLab's awardEmojiRemove mutation needs the emoji name, not the award emoji's own id
+    // (which is all ReactionBar.Callback#deleteReaction gives us) — remember it here.
+    private final Map<Long, String> mAwardEmojiNames = new HashMap<>();
 
     private final ViewHolder.Callback mHolderCallback = new ViewHolder.Callback() {
         @Override
@@ -135,6 +144,7 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
         super.clear();
         mImageGetter.clearHtmlCache();
         mReactionDetailsCache.clear();
+        mAwardEmojiNames.clear();
     }
 
     @Override
@@ -194,8 +204,8 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
         // Commit comments cannot be edited (no note ID), so never show the edit timestamp.
         holder.tvEditTimestamp.setVisibility(View.GONE);
 
-        // Commit comments have no API id (id=0 for all). Use createdAt as a unique
-        // cache key so each comment gets its own ObjectInfo in HttpImageGetter.
+        // System notes have no note id in some responses; fall back to createdAt so each
+        // comment still gets its own ObjectInfo in HttpImageGetter.
         Object cacheKey = item.id() != 0 ? item.id()
                 : (item.createdAt() != null ? item.createdAt() : System.identityHashCode(item));
         mImageGetter.bindMarkdown(holder.tvDesc, item.body(), cacheKey);
@@ -204,25 +214,56 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
         holder.tvExtra.setText(login);
         holder.tvExtra.setTag(user);
 
-        // GitLab API has no award emoji endpoint for commit comments — hide reaction bar.
-        holder.reactions.setVisibility(View.GONE);
+        // Show reactions from the comment's own data, loaded with the comments via GraphQL,
+        // the same way as issue/MR comments (CommentViewHolder). Reaction details (needed
+        // to remove a reaction) are only fetched when the user opens the menu, unless the
+        // load could not provide reactions.
+        Set<String> viewerReacted = item.viewerReactedContents();
+        if (holder.mReactionMenuHelper != null && viewerReacted == null) {
+            holder.mReactionMenuHelper.startLoadingIfNeeded();
+        }
+        holder.reactions.setViewerReactedContents(viewerReacted != null
+                ? viewerReacted : java.util.Collections.emptySet());
+        holder.reactions.setReactions(item.reactions());
+        // A details-cache entry is newer (set after add/remove), so it overrides the loaded state.
+        holder.reactions.refreshViewerStateFromCache();
 
         String ourLogin = Gl4Application.get().getAuthLogin();
         MenuItem editMenuItem = holder.mPopupMenu.getMenu().findItem(R.id.edit);
         MenuItem deleteMenuItem = holder.mPopupMenu.getMenu().findItem(R.id.delete);
         MenuItem reactMenuItem = holder.mPopupMenu.getMenu().findItem(R.id.react);
 
-        // Commit comment API returns no note ID, so edit/delete/react are not supported.
+        // Edit/delete for commit comments is a separate, not-yet-implemented feature —
+        // leave those hidden. Reactions are supported via GraphQL, since GitLab's REST API
+        // has no award-emoji endpoint for commit comment notes (see the Callback methods below).
         editMenuItem.setVisible(false);
         deleteMenuItem.setVisible(false);
-        reactMenuItem.setVisible(false);
-        holder.ivMenu.setVisibility(View.GONE);
+        reactMenuItem.setVisible(true);
+        holder.ivMenu.setVisibility(View.VISIBLE);
     }
 
     @Override
     public Single<List<GitLabReaction>> loadReactionDetails(ReactionBar.Item item, boolean bypassCache) {
-        // TODO: GitLab reactions not yet implemented
-        return Single.just(new java.util.ArrayList<>());
+        long noteId = ((ViewHolder) item).mBoundItem.id();
+        Map<String, Object> body = new HashMap<>();
+        body.put("query", "query { note(id: \"" + noteGid(noteId) + "\") { awardEmoji { nodes { "
+                + "name user { id username name avatarUrl } } } } }");
+
+        return ServiceFactory.getGraphQL(GitLabGraphQLService.class).queryNoteAwardEmoji(body)
+                .map(ApiHelpers::throwOnFailure)
+                .map(response -> {
+                    throwOnGraphQLErrors(response.errors);
+                    List<GitLabGraphQLAwardEmoji> nodes = response.nodes();
+                    List<GitLabReaction> reactions = new ArrayList<>();
+                    if (nodes != null) {
+                        for (GitLabGraphQLAwardEmoji node : nodes) {
+                            GitLabReaction reaction = node.toGitLabReaction();
+                            mAwardEmojiNames.put(reaction.id(), reaction.name);
+                            reactions.add(reaction);
+                        }
+                    }
+                    return reactions;
+                });
     }
 
     @Override
@@ -232,14 +273,79 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
 
     @Override
     public Single<GitLabReaction> addReaction(ReactionBar.Item item, String content) {
-        // TODO: GitLab reactions not yet implemented
-        return Single.error(new UnsupportedOperationException("Reactions not yet implemented for GitLab"));
+        long noteId = ((ViewHolder) item).mBoundItem.id();
+        String emojiName = mapContentToEmojiName(content);
+        Map<String, Object> body = new HashMap<>();
+        body.put("query", "mutation { result: awardEmojiAdd(input: { awardableId: \""
+                + noteGid(noteId) + "\", name: \"" + emojiName + "\" }) { errors awardEmoji { "
+                + "name user { id username name avatarUrl } } } }");
+
+        return ServiceFactory.getGraphQL(GitLabGraphQLService.class).awardEmojiAdd(body)
+                .map(ApiHelpers::throwOnFailure)
+                .map(response -> {
+                    throwOnGraphQLErrors(response.errors);
+                    throwOnUserErrors(response.userErrors());
+                    GitLabGraphQLAwardEmoji awardEmoji = response.awardEmoji();
+                    if (awardEmoji == null) {
+                        throw new IllegalStateException("awardEmojiAdd returned no award emoji");
+                    }
+                    GitLabReaction reaction = awardEmoji.toGitLabReaction();
+                    mAwardEmojiNames.put(reaction.id(), reaction.name);
+                    return reaction;
+                });
     }
 
     @Override
     public Single<Boolean> deleteReaction(ReactionBar.Item item, long reactionId) {
-        // TODO: GitLab reactions not yet implemented
-        return Single.just(false);
+        long noteId = ((ViewHolder) item).mBoundItem.id();
+        String emojiName = mAwardEmojiNames.remove(reactionId);
+        if (emojiName == null) {
+            return Single.error(new IllegalStateException("Unknown reaction id " + reactionId));
+        }
+        Map<String, Object> body = new HashMap<>();
+        body.put("query", "mutation { result: awardEmojiRemove(input: { awardableId: \""
+                + noteGid(noteId) + "\", name: \"" + emojiName + "\" }) { errors } }");
+
+        return ServiceFactory.getGraphQL(GitLabGraphQLService.class).awardEmojiRemove(body)
+                .map(ApiHelpers::throwOnFailure)
+                .map(response -> {
+                    throwOnGraphQLErrors(response.errors);
+                    throwOnUserErrors(response.userErrors());
+                    return true;
+                });
+    }
+
+    private static String noteGid(long noteId) {
+        return "gid://gitlab/Note/" + noteId;
+    }
+
+    private static void throwOnGraphQLErrors(List<GitLabGraphQLError> errors) {
+        if (errors != null && !errors.isEmpty()) {
+            throw new RuntimeException(errors.get(0).message);
+        }
+    }
+
+    private static void throwOnUserErrors(List<String> errors) {
+        if (errors != null && !errors.isEmpty()) {
+            throw new RuntimeException(errors.get(0));
+        }
+    }
+
+    /** Mirrors IssueFragmentBase#mapContentToEmojiName — duplicated locally since this
+     * adapter doesn't share a base class with the issue/MR reaction implementations. */
+    private static String mapContentToEmojiName(String content) {
+        if (content == null) return "thumbsup";
+        switch (content) {
+            case "+1":      return "thumbsup";
+            case "-1":      return "thumbsdown";
+            case "laugh":   return "laughing";
+            case "hooray":  return "tada";
+            case "heart":   return "heart";
+            case "confused":return "confused";
+            case "rocket":  return "rocket";
+            case "eyes":    return "eyes";
+            default:        return content;
+        }
     }
 
     @Override
@@ -247,6 +353,7 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
         ViewHolder holder = (ViewHolder) item;
         holder.mBoundItem = holder.mBoundItem.withReactions(reactions);
         holder.reactions.setReactions(reactions);
+        holder.reactions.refreshViewerStateFromCache();
         if (holder.mReactionMenuHelper != null) {
             holder.mReactionMenuHelper.updateMenuItems();
         }
