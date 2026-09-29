@@ -10,6 +10,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - Comment threads on issues and MRs: replies are shown indented under the comment they belong to, and "Reply" on any comment of a thread posts into that thread (#123)
 - Login dialog links to the instance's personal access token page with the required `api` and `read_user` scopes pre-filled (#169)
+- Groups: a group screen with the group's projects, members and subgroups; group namespaces (owner taps, Back navigation, links, a user's groups) now open as groups instead of failing as users (#103, #111)
 - Reactions on commit comments (via GraphQL; GitLab's REST API has no award-emoji endpoint for commit notes), matching issue/MR comment behaviour (#159)
 - Internal and public repos show GitLab's own visibility icons (shield, globe) in the repo list and overview (#145)
 
