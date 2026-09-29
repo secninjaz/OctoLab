@@ -189,7 +189,8 @@ public class UserFragment extends LoadingFragmentBase implements
             // Fix: groups are not users; navigate to the group's repository list instead of
             // UserActivity (which would call /users?username=<path> and crash on a 0-result list).
             GitLabGroup group = (GitLabGroup) view.getTag();
-            intent = RepositoryListActivity.makeIntent(getActivity(), group.path, false);
+            intent = com.gl4a.activities.GroupActivity.makeIntent(getActivity(),
+                    group.fullPath != null ? group.fullPath : group.path);
         } else if (view.getTag() instanceof GitLabUser) {
             intent = UserActivity.makeIntent(getActivity(), (GitLabUser) view.getTag());
         }

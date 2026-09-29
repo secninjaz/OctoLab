@@ -697,4 +697,9 @@
     <string name="debug_clear_logs">Clear logs</string>
     <string name="debug_no_logs">No log entries — enable logging and reproduce the issue first</string>
     <string name="debug_logs_cleared">Logs cleared</string>
+    <!-- Groups (#103) -->
+    <string name="group">Group</string>
+    <string name="group_projects">Projects</string>
+    <string name="group_members">Members</string>
+    <string name="group_subgroups">Subgroups</string>
 </resources>

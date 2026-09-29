@@ -35,7 +35,8 @@ public class OrganizationMemberListFragment extends PagedDataBaseFragment<GitLab
         String organization = getArguments().getString("org");
         final GitLabGroupService service =
                 ServiceFactory.get(GitLabGroupService.class, bypassCache);
-        return service.getMembersByPath(organization, page, 25)
+        // Encoded: nested group paths contain "/" (#103).
+        return service.getMembersByPath(android.net.Uri.encode(organization), page, 25)
                 .map(response -> {
                     if (!response.isSuccessful() || response.body() == null) {
                         return Response.<GitLabPage<GitLabUser>>error(

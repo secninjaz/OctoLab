@@ -48,6 +48,22 @@ public interface GitLabGroupService {
             @Query("per_page") int perPage
     );
 
+    /** Projects of a group given by its URL-encoded full path (#103). */
+    @GET("groups/{id}/projects?order_by=last_activity_at")
+    Single<Response<List<GitLabProject>>> getProjectsByPath(
+            @Path(value = "id", encoded = true) String groupPath,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
+    /** Direct subgroups of a group given by its URL-encoded full path (#103). */
+    @GET("groups/{id}/subgroups")
+    Single<Response<List<GitLabGroup>>> getSubgroupsByPath(
+            @Path(value = "id", encoded = true) String groupPath,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
     @GET("groups/{id}/projects")
     Single<Response<List<GitLabProject>>> getProjects(
             @Path("id") long groupId,

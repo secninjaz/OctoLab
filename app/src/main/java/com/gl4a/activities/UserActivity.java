@@ -177,6 +177,26 @@ public class UserActivity extends BaseFragmentPagerActivity {
         return super.onOptionsItemSelected(item);
     }
 
+    /**
+     * Namespaces are opened here from many places (owner taps, Back from a project, links)
+     * without knowing whether they are a user or a group. If no user has this name, open the
+     * group with that path instead (#103, #111); fail as before if there is none.
+     */
+    private io.reactivex.Single<GitLabUser> openAsGroupOrFail() {
+        return ServiceFactory.get(com.gl4a.gitlab.service.GitLabGroupService.class, false)
+                .getGroupByPath(android.net.Uri.encode(mUserLogin))
+                .map(ApiHelpers::throwOnFailure)
+                .observeOn(io.reactivex.android.schedulers.AndroidSchedulers.mainThread())
+                .flatMap(group -> {
+                    startActivity(GroupActivity.makeIntent(this,
+                            group.fullPath != null ? group.fullPath : mUserLogin));
+                    finish();
+                    return io.reactivex.Single.<GitLabUser>never();
+                })
+                .onErrorResumeNext(err -> io.reactivex.Single.error(
+                        new RuntimeException("User not found: " + mUserLogin)));
+    }
+
     private void loadUser(boolean force) {
         GitLabUserService service = ServiceFactory.get(GitLabUserService.class, force);
         io.reactivex.Single<GitLabUser> userSingle;
@@ -200,8 +220,7 @@ public class UserActivity extends BaseFragmentPagerActivity {
                     .map(ApiHelpers::throwOnFailure)
                     .flatMap(users -> {
                         if (users.isEmpty()) {
-                            return io.reactivex.Single.error(
-                                    new RuntimeException("User not found: " + mUserLogin));
+                            return openAsGroupOrFail();
                         }
                         return service.getUser(users.get(0).id)
                                 .map(ApiHelpers::throwOnFailure);

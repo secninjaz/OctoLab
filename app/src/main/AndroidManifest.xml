@@ -124,6 +124,7 @@
         <activity android:name=".activities.IssueMilestoneEditActivity" android:exported="false" />
         <activity android:name=".activities.IssueMilestoneListActivity" android:exported="false" />
         <activity android:name=".activities.OrganizationMemberListActivity" android:exported="false" />
+        <activity android:name=".activities.GroupActivity" android:exported="false" />
         <activity android:name=".activities.PullRequestActivity" android:exported="false" />
         <activity android:name=".activities.PullRequestDiffViewerActivity"
             android:exported="false"

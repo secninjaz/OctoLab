@@ -117,6 +117,10 @@ public class RepositoryListFragment extends PagedDataBaseFragment<GitLabProject>
                 // Your Projects — all projects the user is a member of
                 raw = service.listProjects(true, page, 25, sortOrder, sortDir, null, false);
             }
+        } else if (mIsOrg) {
+            // Group namespace: /users/:group/projects has nothing for a group (#103).
+            raw = ServiceFactory.get(com.gl4a.gitlab.service.GitLabGroupService.class, bypassCache)
+                    .getProjectsByPath(android.net.Uri.encode(mLogin), page, 25);
         } else {
             raw = service.getUserProjects(mLogin, page, 25);
         }

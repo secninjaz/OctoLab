@@ -169,18 +169,20 @@ public class LinkParser {
     @Nullable
     private static ParseResult parseGroupLink(FragmentActivity activity, Uri uri,
             List<String> parts) {
-        // /groups/{groupPath} or /groups/{groupPath}/-/members
-        String groupPath = parts.size() >= 2 ? parts.get(1) : null;
-        if (groupPath == null) return null;
-
+        // /groups/{groupPath} or /groups/{groupPath}/-/members; the path may be nested
+        // (/groups/parent/child), up to the "-" separator (#103).
         int dashIndex = parts.indexOf("-");
+        int pathEnd = dashIndex >= 0 ? dashIndex : parts.size();
+        if (pathEnd < 2) return null;
+        String groupPath = TextUtils.join("/", parts.subList(1, pathEnd));
+
         if (dashIndex >= 2 && parts.size() > dashIndex + 1) {
             String action = parts.get(dashIndex + 1);
             if ("members".equals(action)) {
                 return new ParseResult(OrganizationMemberListActivity.makeIntent(activity, groupPath));
             }
         }
-        return new ParseResult(UserActivity.makeIntent(activity, groupPath));
+        return new ParseResult(com.gl4a.activities.GroupActivity.makeIntent(activity, groupPath));
     }
 
     private static ParseResult parseUserLink(FragmentActivity activity, @NonNull Uri uri,
