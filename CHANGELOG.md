@@ -12,6 +12,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Login dialog links to the instance's personal access token page with the required `api` and `read_user` scopes pre-filled (#169)
 - Groups: a group screen with the group's projects, members and subgroups; group namespaces (owner taps, Back navigation, links, a user's groups) now open as groups instead of failing as users (#103, #111)
 - Group tree like GitLab web on the group screen and a new Groups drawer entry: expandable subgroups and projects with GitLab's icons, visibility, your role (including inherited), and the group's projects at any depth; Up from a subgroup goes to its parent group (#172)
+- Groups can be sorted by name (default) or last activity, and the choice is remembered (#175)
 - Reactions on commit comments (via GraphQL; GitLab's REST API has no award-emoji endpoint for commit notes), matching issue/MR comment behaviour (#159)
 - Internal and public repos show GitLab's own visibility icons (shield, globe) in the repo list and overview (#145)
 
@@ -29,6 +30,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - System notes (e.g. "added N commits") showed raw HTML and markdown; they are now rendered like on GitLab web, with lists, links and linked commit SHAs (#165)
 - Notifications failed to load, in the app and in the background, whenever a to-do pointed at a commit (e.g. a mention in a commit comment); commit to-dos now load and open the commit (#166)
 - Hooray reactions were posted but never shown in the app; they now show, with GitLab's 🎉 party-popper icon instead of a cake (#167)
+- System notification icons used the namespace's initial instead of the project's, unlike To-dos; all project logos now come from one shared helper, and user profiles show group logos (#176)
 - Token login accepted any text and failed silently; tokens are now format-checked, a failed login explains why (rejected, missing scopes, unreachable instance) and keeps the dialog open, and the instance URL is restored (#168)
 
 ## [1.3.6] - 2026-09-21
