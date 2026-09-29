@@ -22,9 +22,15 @@
     <string name="login_token">Login using access token</string>
     <string name="login_summary_oauth">Opens your GitLab instance in the browser to authorize OctoLab via OAuth.</string>
     <string name="login_summary_token">Enter a Personal Access Token with api + read_user scopes.</string>
+    <string name="login_create_token">Create a token on %1$s</string>
     <string name="instance_url_hint">Instance URL (default: https://gitlab.com)</string>
     <string name="credentials_error_empty">This field must not be empty.</string>
     <string name="credentials_error_invalid_token">The entered text does not look like a valid access token.</string>
+    <string name="login_error_token_rejected">%1$s rejected this token. Check that it is copied correctly and is not expired or revoked.</string>
+    <string name="login_error_token_scope">This token is missing the required scopes. Create one with the api and read_user scopes.</string>
+    <string name="login_error_http">Login failed: %1$s returned HTTP %2$d.</string>
+    <string name="login_error_unreachable">Could not reach %1$s. Check the instance URL and your connection.</string>
+    <string name="login_error_generic">Login failed: %1$s</string>
     <string name="credentials_token">Access token</string>
     <string name="try_again">Try again</string>
     <string name="report_issue">Report issue</string>
@@ -55,6 +61,8 @@
     <string name="delete">Delete</string>
     <string name="reply">Reply</string>
     <string name="reply_selected">Reply (Selected)</string>
+    <string name="replying_to_thread_by">Replying to thread by %1$s</string>
+    <string name="reply_to_thread_hint">Reply to thread</string>
     <string name="add_comment">Add comment</string>
     <string name="add_reaction">Add reaction</string>
     <string name="remove_reaction">Remove reaction</string>

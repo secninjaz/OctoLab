@@ -140,6 +140,50 @@ public class ServiceFactory {
                         writer.endArray();
                     }
                 })
+            // A to-do's target is an issue/MR, except for commit to-dos (mentions in commit
+            // comments), where it is a commit whose id is the SHA string. Parsing that as
+            // GitLabIssue failed the whole to-do list (#166), so split commit targets out.
+            .add(new com.squareup.moshi.JsonAdapter.Factory() {
+              @Override
+              public com.squareup.moshi.JsonAdapter<?> create(java.lang.reflect.Type type,
+                      java.util.Set<? extends java.lang.annotation.Annotation> annotations,
+                      Moshi moshi) {
+                if (type != com.gl4a.gitlab.model.GitLabTodo.class) return null;
+                final com.squareup.moshi.JsonAdapter<com.gl4a.gitlab.model.GitLabTodo> delegate =
+                        moshi.nextAdapter(this, type, annotations);
+                return new com.squareup.moshi.JsonAdapter<com.gl4a.gitlab.model.GitLabTodo>() {
+                    @Override
+                    public com.gl4a.gitlab.model.GitLabTodo fromJson(
+                            @androidx.annotation.NonNull com.squareup.moshi.JsonReader reader)
+                            throws java.io.IOException {
+                        Object value = reader.readJsonValue();
+                        if (!(value instanceof java.util.Map)) return delegate.fromJsonValue(value);
+                        @SuppressWarnings("unchecked")
+                        java.util.Map<String, Object> json = (java.util.Map<String, Object>) value;
+                        Object commit = null;
+                        if (com.gl4a.gitlab.model.GitLabTodo.TYPE_COMMIT.equals(
+                                json.get("target_type"))) {
+                            commit = json.remove("target");
+                        }
+                        com.gl4a.gitlab.model.GitLabTodo todo = delegate.fromJsonValue(json);
+                        if (todo != null && commit instanceof java.util.Map) {
+                            java.util.Map<?, ?> c = (java.util.Map<?, ?>) commit;
+                            todo.commitSha = c.get("id") instanceof String
+                                    ? (String) c.get("id") : null;
+                            todo.commitTitle = c.get("title") instanceof String
+                                    ? (String) c.get("title") : null;
+                        }
+                        return todo;
+                    }
+                    @Override
+                    public void toJson(
+                            @androidx.annotation.NonNull com.squareup.moshi.JsonWriter writer,
+                            com.gl4a.gitlab.model.GitLabTodo value) throws java.io.IOException {
+                        delegate.toJson(writer, value);
+                    }
+                };
+              }
+            })
             .build();
 
     private static final HttpLoggingInterceptor LOGGING_INTERCEPTOR =

@@ -64,15 +64,18 @@ public class IssueFragment extends IssueFragmentBase {
         final long projectId = mIssue.projectId;
         final GitLabIssueService service = ServiceFactory.get(GitLabIssueService.class, bypassCache);
 
+        // Discussions rather than flat notes, so replies can be shown under their thread (#123).
         return ApiHelpers.PageIterator
-                .<GitLabComment>toSingle(page -> service.getComments(projectId, issueIid, "asc", (int) page, 100)
+                .<com.gl4a.gitlab.model.GitLabDiscussion>toSingle(page -> service.getDiscussions(projectId, issueIid, (int) page, 100)
                         .map(response -> {
                             if (!response.isSuccessful() || response.body() == null) {
-                                return retrofit2.Response.<com.gl4a.gitlab.model.GitLabPage<GitLabComment>>error(
+                                return retrofit2.Response.<com.gl4a.gitlab.model.GitLabPage<
+                                        com.gl4a.gitlab.model.GitLabDiscussion>>error(
                                         response.errorBody(), response.raw());
                             }
                             return retrofit2.Response.success(ApiHelpers.toPage(response));
                         }))
+                .map(com.gl4a.gitlab.model.GitLabDiscussion::flatten)
                 // Include system notes (mentions in commits, state changes, etc.)
                 // so the issue timeline matches GitLab web. System notes render with
                 // a distinct appearance via CommentViewHolder.isSystemNote().
@@ -102,6 +105,6 @@ public class IssueFragment extends IssueFragmentBase {
 
     @Override
     public int getCommentEditorHintResId() {
-        return R.string.issue_comment_hint;
+        return getCommentHint(R.string.issue_comment_hint);
     }
 }

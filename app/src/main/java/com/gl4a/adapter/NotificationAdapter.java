@@ -195,6 +195,9 @@ public class NotificationAdapter extends
 
         String iidPart = (todo.target != null && todo.target.iid > 0)
                 ? " #" + todo.target.iid : "";
+        if (todo.isCommit() && todo.commitSha != null) {
+            iidPart = " " + todo.commitSha.substring(0, Math.min(8, todo.commitSha.length()));
+        }
 
         String action = todo.actionName != null ? todo.actionName : "";
         String verb;

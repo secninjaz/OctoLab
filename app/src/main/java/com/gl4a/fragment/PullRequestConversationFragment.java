@@ -261,17 +261,19 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
 
         // Load ALL MR notes across pages so the scroll-to-comment works regardless
         // of how far into the conversation the target note is.
+        // Discussions rather than flat notes, so replies can be shown under their thread (#123).
         return ApiHelpers.PageIterator
-                .<com.gl4a.gitlab.model.GitLabComment>toSingle(
-                        page -> mrService.getComments(projectId, mrIid, "asc", (int) page, 100)
+                .<com.gl4a.gitlab.model.GitLabDiscussion>toSingle(
+                        page -> mrService.getDiscussions(projectId, mrIid, (int) page, 100)
                                 .map(response -> {
                                     if (!response.isSuccessful() || response.body() == null) {
                                         return retrofit2.Response.<com.gl4a.gitlab.model.GitLabPage<
-                                                com.gl4a.gitlab.model.GitLabComment>>error(
+                                                com.gl4a.gitlab.model.GitLabDiscussion>>error(
                                                 response.errorBody(), response.raw());
                                     }
                                     return retrofit2.Response.success(ApiHelpers.toPage(response));
                                 }))
+                .map(com.gl4a.gitlab.model.GitLabDiscussion::flatten)
                 // Reactions for all notes come from one GraphQL query instead of per row (#162).
                 .zipWith(com.gl4a.utils.NoteReactionsLoader.load(true, mMergeRequest.id(), bypassCache),
                         com.gl4a.utils.NoteReactionsLoader::apply)
@@ -289,6 +291,12 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
                 com.gl4a.ServiceFactory.get(com.gl4a.gitlab.service.GitLabMergeRequestService.class, false);
         java.util.Map<String, Object> req = new java.util.HashMap<>();
         req.put("body", comment);
+        if (mReplyToThread != null) {
+            return service.addDiscussionNote(mMergeRequest.projectId, mMergeRequest.iid,
+                    mReplyToThread.discussionId(), req)
+                    .map(com.gl4a.utils.ApiHelpers::throwOnFailure)
+                    .compose(com.gl4a.utils.RxUtils::doInBackground);
+        }
         return service.createComment(mMergeRequest.projectId, mMergeRequest.iid, req)
                 .map(com.gl4a.utils.ApiHelpers::throwOnFailure)
                 .compose(com.gl4a.utils.RxUtils::doInBackground);
@@ -422,7 +430,7 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
 
     @Override
     public int getCommentEditorHintResId() {
-        return R.string.pull_request_comment_hint;
+        return getCommentHint(R.string.pull_request_comment_hint);
     }
 
     @Override

@@ -107,6 +107,9 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
     private final ReactionBar.ReactionDetailsCache mReactionDetailsCache =
             new ReactionBar.ReactionDetailsCache(this);
     private TimelineItemAdapter mAdapter;
+    // Thread being replied to via the comment menu's "Reply", or null (#123).
+    protected GitLabComment mReplyToThread;
+    private View mReplyBar;
     private HttpImageGetter mImageGetter;
     private EditorBottomSheet mBottomSheet;
 
@@ -203,11 +206,19 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         }
 
         getBaseActivity().removeAppBarOffsetListener(mBottomSheet);
+        // The reply bar belonged to this view's editor; a new view starts without a reply.
+        mReplyBar = null;
+        mReplyToThread = null;
     }
 
     @Override
     protected void onRecyclerViewInflated(RecyclerView view, LayoutInflater inflater) {
         super.onRecyclerViewInflated(view, inflater);
+        // Own divider (see hasDividers()): none between replies of a thread, so a thread
+        // reads as one block (#123).
+        view.addItemDecoration(new com.gl4a.widget.DividerItemDecoration(view.getContext(),
+                (parent, child) -> !TimelineItemAdapter.isThreadReplyRow(
+                        parent.getChildViewHolder(child))));
 
         mListHeaderView = inflater.inflate(R.layout.issue_comment_list_header, view, false);
         mAdapter.setHeaderView(mListHeaderView);
@@ -689,12 +700,20 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         GitLabIssueService service = ServiceFactory.get(GitLabIssueService.class, false);
         java.util.Map<String, Object> request = new java.util.HashMap<>();
         request.put("body", comment);
+        if (mReplyToThread != null) {
+            return service.addDiscussionNote(mIssue.projectId, mIssue.number(),
+                    mReplyToThread.discussionId(), request)
+                    .map(ApiHelpers::throwOnFailure);
+        }
         return service.createComment(mIssue.projectId, mIssue.number(), request)
                 .map(ApiHelpers::throwOnFailure);
     }
 
     @Override
     public void onEditorTextSent() {
+        if (mReplyToThread != null) {
+            setReplyToThread(null);
+        }
         // reload comments
         if (isAdded()) {
             reloadEvents(false);
@@ -738,14 +757,66 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
     }
 
     @Override
+    protected boolean hasDividers() {
+        // Added in onRecyclerViewInflated() with a thread-aware filter instead (#123).
+        return false;
+    }
+
+    @Override
     public void onReplyCommentSelected(long replyToId) {
-        // Not used in this screen
+        // Not used in this screen; thread replies go through replyToThread() (#123)
     }
 
     @Override
     public long getSelectedReplyCommentId() {
-        // Not used in this screen
-        return 0;
+        return mReplyToThread != null ? mReplyToThread.id() : 0;
+    }
+
+    @Override
+    public String getSelectedReplyDiscussionId() {
+        return mReplyToThread != null ? mReplyToThread.discussionId() : null;
+    }
+
+    @Override
+    public void replyToThread(GitLabComment comment) {
+        boolean cancel = mReplyToThread != null && comment.discussionId() != null
+                && comment.discussionId().equals(mReplyToThread.discussionId());
+        setReplyToThread(cancel ? null : comment);
+    }
+
+    /**
+     * Sets the thread the editor posts into; other threads are dimmed and a bar with a cancel
+     * button stays above the editor while one is set.
+     */
+    protected void setReplyToThread(@androidx.annotation.Nullable GitLabComment comment) {
+        mReplyToThread = comment;
+        if (mReplyBar == null && comment != null) {
+            mReplyBar = LayoutInflater.from(getContext())
+                    .inflate(R.layout.editor_reply_bar, mBottomSheet, false);
+            mReplyBar.findViewById(R.id.btn_cancel_reply).setOnClickListener(
+                    v -> setReplyToThread(null));
+            mBottomSheet.addHeaderView(mReplyBar);
+        } else if (mReplyBar != null && comment == null) {
+            mBottomSheet.removeHeaderView(mReplyBar);
+            mReplyBar = null;
+        }
+        if (mReplyBar != null) {
+            GitLabUser author = comment.user();
+            String name = author != null && author.name() != null ? author.name()
+                    : author != null ? author.login() : "";
+            ((TextView) mReplyBar.findViewById(R.id.tv_reply_to))
+                    .setText(getString(R.string.replying_to_thread_by, name));
+        }
+        mBottomSheet.updateHint();
+        if (mAdapter != null) {
+            mAdapter.notifyDataSetChanged();
+        }
+    }
+
+    /** Editor hint: the screen's usual hint, or a reply hint while replying to a thread. */
+    @androidx.annotation.StringRes
+    protected int getCommentHint(@androidx.annotation.StringRes int defaultHintResId) {
+        return mReplyToThread != null ? R.string.reply_to_thread_hint : defaultHintResId;
     }
 
     /** Override in subclass to reload the parent issue/PR object. */

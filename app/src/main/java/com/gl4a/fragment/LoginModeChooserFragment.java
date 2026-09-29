@@ -57,8 +57,11 @@ public class LoginModeChooserFragment extends DialogFragment implements
     private View mProgressContainer;
     private WrappedEditor mToken;
     private WrappedEditor mInstanceUrl;
+    private android.widget.TextView mCreateTokenLink;
     private Button mOkButton;
     private ParentCallback mCallback;
+    // Instance URL before this dialog changed it, restored if the login fails (#168).
+    private String mPreviousInstanceUrl;
 
     @Override
     public void onAttach(Context context) {
@@ -84,8 +87,9 @@ public class LoginModeChooserFragment extends DialogFragment implements
 
         mToken = new WrappedEditor(view, R.id.token, R.id.token_wrapper) {
             // GitLab tokens: glpat-XXXX (PAT), glgat-XXXX (group), gldt-XXXX (deploy),
-            // glsoat-XXXX (service account), or legacy alphanumeric. Require ≥8 non-whitespace chars.
-            private final Pattern TOKEN_PATTERN = Pattern.compile("\\S{8,}");
+            // glsoat-XXXX (service account), or legacy 20-char alphanumeric. All use only
+            // letters, digits, '_', '-' and '.', and are at least 20 characters (#168).
+            private final Pattern TOKEN_PATTERN = Pattern.compile("[A-Za-z0-9_.\\-]{20,}");
             @Override
             protected int getTextErrorResId(Editable s) {
                 int resId = super.getTextErrorResId(s);
@@ -103,10 +107,25 @@ public class LoginModeChooserFragment extends DialogFragment implements
                 // Empty is OK — defaults to gitlab.com
                 return 0;
             }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                super.afterTextChanged(s);
+                updateCreateTokenLink();
+            }
         };
+        mCreateTokenLink = view.findViewById(R.id.create_token_link);
+        mCreateTokenLink.setOnClickListener(v -> IntentUtils.openInCustomTabOrBrowser(
+                requireActivity(), Uri.parse(enteredInstanceUrl()
+                        + "/-/user_settings/personal_access_tokens")
+                        .buildUpon()
+                        .appendQueryParameter("name", "OctoLab")
+                        .appendQueryParameter("scopes", "api,read_user")
+                        .build()));
         // Pre-fill with current instance URL
         android.widget.EditText urlEdit = view.findViewById(R.id.instance_url);
         if (urlEdit != null) urlEdit.setText(Gl4Application.get().getInstanceUrl());
+        updateCreateTokenLink();
 
         mModeGroup.check(R.id.token_button);
 
@@ -136,12 +155,18 @@ public class LoginModeChooserFragment extends DialogFragment implements
     @Override
     public void onCancel(@NonNull DialogInterface dialog) {
         super.onCancel(dialog);
+        restoreInstanceUrl();
         mCallback.onLoginCanceled();
     }
 
     @Override
     public void onClick(View v) {
         // Save instance URL — if the field is cleared, reset to the default (gitlab.com).
+        // Remember the current one: the global instance URL is also what the active account's
+        // requests use, so it must go back if this login fails (#168).
+        if (mPreviousInstanceUrl == null) {
+            mPreviousInstanceUrl = Gl4Application.get().getInstanceUrl();
+        }
         if (mInstanceUrl != null) {
             String url = mInstanceUrl.getText();
             if (!TextUtils.isEmpty(url)) {
@@ -158,18 +183,65 @@ public class LoginModeChooserFragment extends DialogFragment implements
             mCallback.onLoginStartOauth();
             dismissAllowingStateLoss();
         } else {
-            handleTokenCheck(makeTokenCheckSingle(mToken.getText()));
+            // Deferred so a malformed instance URL (Retrofit rejects the base URL) is reported
+            // like any other login error instead of crashing (#168).
+            handleTokenCheck(Single.defer(() -> makeTokenCheckSingle(mToken.getText())));
         }
     }
 
     private void handleTokenCheck(Single<Pair<String, GitLabUser>> checkSingle) {
         checkSingle.subscribe(pair -> {
+            mPreviousInstanceUrl = null;
             mCallback.onLoginFinished(pair.first, pair.second);
             dismissAllowingStateLoss();
         }, error -> {
-            mCallback.onLoginFailed(error);
-            dismissAllowingStateLoss();
+            // Keep the dialog open and say what went wrong, instead of closing it silently.
+            String instance = Gl4Application.get().getInstanceUrl();
+            restoreInstanceUrl();
+            updateContainerVisibility(false);
+            mToken.showError(describeLoginError(error, instance));
         });
+    }
+
+    /** Instance URL as currently typed (gitlab.com if empty), without trailing slashes. */
+    private String enteredInstanceUrl() {
+        String url = mInstanceUrl != null ? mInstanceUrl.getText() : null;
+        if (TextUtils.isEmpty(url)) url = Gl4Application.DEFAULT_INSTANCE;
+        if (!url.contains("://")) url = "https://" + url;
+        while (url.endsWith("/")) url = url.substring(0, url.length() - 1);
+        return url;
+    }
+
+    /** Keeps the "Create a token on <host>" link in step with the instance URL field (#169). */
+    private void updateCreateTokenLink() {
+        if (mCreateTokenLink == null) return;
+        String host = Uri.parse(enteredInstanceUrl()).getHost();
+        mCreateTokenLink.setText(getString(R.string.login_create_token,
+                host != null ? host : enteredInstanceUrl()));
+    }
+
+    private void restoreInstanceUrl() {
+        if (mPreviousInstanceUrl != null) {
+            Gl4Application.get().setInstanceUrl(mPreviousInstanceUrl);
+            mPreviousInstanceUrl = null;
+        }
+    }
+
+    private String describeLoginError(Throwable error, String instance) {
+        String host = Uri.parse(instance).getHost();
+        if (host == null) host = instance;
+        if (error instanceof com.gl4a.ApiRequestException) {
+            int status = ((com.gl4a.ApiRequestException) error).getStatus();
+            if (status == 401) return getString(R.string.login_error_token_rejected, host);
+            if (status == 403) return getString(R.string.login_error_token_scope);
+            return getString(R.string.login_error_http, host, status);
+        }
+        if (error instanceof java.io.IOException) {
+            return getString(R.string.login_error_unreachable, host);
+        }
+        String message = error.getMessage();
+        return getString(R.string.login_error_generic,
+                message != null ? message : error.getClass().getSimpleName());
     }
 
     private void updateContainerVisibility(boolean busy) {
@@ -224,6 +296,14 @@ public class LoginModeChooserFragment extends DialogFragment implements
 
         public boolean hasError() {
             return mWrapper != null && mWrapper.isErrorEnabled();
+        }
+
+        /** Shows an error that clears once the text is edited. */
+        public void showError(CharSequence error) {
+            if (mWrapper != null) {
+                mWrapper.setError(error);
+            }
+            updateOkButtonState();
         }
 
         @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}

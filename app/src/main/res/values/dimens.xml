@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <dimen name="content_padding">16dp</dimen>
+    <!-- Comment thread replies (#123): thread line under the first avatar's centre (27-29dp),
+         replies start ~13dp to its right -->
+    <dimen name="thread_reply_indent">26dp</dimen>
+    <dimen name="thread_line_left">27dp</dimen>
     <dimen name="overview_item_spacing">12dp</dimen>
     <dimen name="overview_header_spacing">4dp</dimen>
     <dimen name="default_label_badge_size">6dp</dimen>

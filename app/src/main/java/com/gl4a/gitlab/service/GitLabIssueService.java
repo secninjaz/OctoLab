@@ -1,6 +1,7 @@
 package com.gl4a.gitlab.service;
 
 import com.gl4a.gitlab.model.GitLabComment;
+import com.gl4a.gitlab.model.GitLabDiscussion;
 import com.gl4a.gitlab.model.GitLabIssue;
 import com.gl4a.gitlab.model.GitLabLabel;
 import com.gl4a.gitlab.model.GitLabMilestone;
@@ -87,6 +88,23 @@ public interface GitLabIssueService {
     Single<Response<GitLabIssue>> editIssue(
             @Path("id") long projectId,
             @Path("iid") int iid,
+            @Body Map<String, Object> body
+    );
+
+    // Issue discussions: notes grouped into threads (#123)
+    @GET("projects/{id}/issues/{iid}/discussions")
+    Single<Response<List<GitLabDiscussion>>> getDiscussions(
+            @Path("id") long projectId,
+            @Path("iid") int iid,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
+    @POST("projects/{id}/issues/{iid}/discussions/{discussionId}/notes")
+    Single<Response<GitLabComment>> addDiscussionNote(
+            @Path("id") long projectId,
+            @Path("iid") int iid,
+            @Path("discussionId") String discussionId,
             @Body Map<String, Object> body
     );
 

@@ -149,6 +149,16 @@ public class ReviewFragment extends ListDataBaseFragment<TimelineItem> implement
     }
 
     @Override
+    public void replyToThread(GitLabComment comment) {
+        // Thread replies are only offered for issue/MR discussions (#123)
+    }
+
+    @Override
+    public String getSelectedReplyDiscussionId() {
+        return null;
+    }
+
+    @Override
     public String getShareSubject(GitLabComment comment) {
         return null;
     }

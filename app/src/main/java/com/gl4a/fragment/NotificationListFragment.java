@@ -149,6 +149,15 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
         // item.notification is a GitLabTodo
         GitLabTodo todo = item.notification;
 
+        if (todo.isCommit() && todo.targetUrl != null) {
+            // Commit to-dos have no issue/MR target; the commit URL (with #note_N) routes
+            // in-app through LinkParser (#166).
+            markTodoAsDone(todo);
+            com.gl4a.utils.IntentUtils.openLinkInternallyOrExternally(
+                    getActivity(), android.net.Uri.parse(todo.targetUrl));
+            return;
+        }
+
         if (todo.project != null && todo.project.id > 0 && todo.target != null) {
             long projectId = todo.project.id;
             String pns = todo.project.pathWithNamespace != null ? todo.project.pathWithNamespace : "";

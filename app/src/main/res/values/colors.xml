@@ -105,4 +105,6 @@
     <color name="octodroid">#FC6D26</color>
     <color name="launcher_bg">#FC6D26</color>
     <color name="launcher_background">#1E1E2E</color>
+    <!-- Comment thread line (#123); translucent grey, readable on light and dark -->
+    <color name="thread_line">#66888888</color>
 </resources>

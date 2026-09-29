@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Background for replies in a comment thread (#123): the normal ripple plus a vertical
+     thread line centred under the thread's first avatar, like GitLab web. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="?attr/selectableItemBackground" />
+    <item
+        android:width="2dp"
+        android:gravity="left|fill_vertical"
+        android:left="@dimen/thread_line_left">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/thread_line" />
+        </shape>
+    </item>
+</layer-list>

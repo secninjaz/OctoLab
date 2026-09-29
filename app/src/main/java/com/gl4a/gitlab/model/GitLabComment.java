@@ -74,6 +74,18 @@ public class GitLabComment implements Parcelable {
     public void setMrWebUrl(String url) { this.mrWebUrl = url != null ? url : ""; }
 
     // Transient reaction cache — populated asynchronously from the award emoji API
+    // Thread info from the discussions API (#123). A reply is any note after the first in a
+    // non-individual discussion; GitLab threads are one level deep.
+    private transient String mDiscussionId;
+    private transient boolean mThreadReply;
+    public String discussionId() { return mDiscussionId; }
+    public boolean isThreadReply() { return mThreadReply; }
+    public GitLabComment withThread(String discussionId, boolean reply) {
+        mDiscussionId = discussionId;
+        mThreadReply = reply;
+        return this;
+    }
+
     private transient GitLabReactions mCachedReactions;
     public GitLabReactions reactions() { return mCachedReactions; }
     public GitLabComment withReactions(GitLabReactions r) { mCachedReactions = r; return this; }

@@ -58,6 +58,10 @@ public class TimelineItemAdapter
         void addText(CharSequence text);
         void onReplyCommentSelected(long replyToId);
         long getSelectedReplyCommentId();
+        /** Starts (or, if already selected, cancels) a reply to the comment's thread (#123). */
+        void replyToThread(GitLabComment comment);
+        /** Discussion id of the thread being replied to, or null. */
+        String getSelectedReplyDiscussionId();
         String getShareSubject(GitLabComment comment);
         Single<List<GitLabReaction>> loadReactionDetails(GitLabComment comment, boolean bypassCache);
         Single<GitLabReaction> addReaction(GitLabComment comment, String content);
@@ -98,8 +102,26 @@ public class TimelineItemAdapter
         }
 
         @Override
+        public boolean canReplyToThread(TimelineItem.TimelineComment comment) {
+            // Offered on every comment of a thread, replies included (each posts into the
+            // same thread), and on standalone comments, which start a thread.
+            return !mLocked && comment.comment().discussionId() != null
+                    && !comment.comment().isSystemNote();
+        }
+
+        @Override
+        public boolean isReplyThreadSelected(TimelineItem.TimelineComment comment) {
+            String selected = mActionCallback.getSelectedReplyDiscussionId();
+            return selected != null && selected.equals(comment.comment().discussionId());
+        }
+
+        @Override
         public boolean onMenItemClick(TimelineItem.TimelineComment comment, MenuItem menuItem) {
             switch (menuItem.getItemId()) {
+                case R.id.reply:
+                    mActionCallback.replyToThread(comment.comment());
+                    return true;
+
                 case R.id.edit:
                     mActionCallback.editComment(comment.comment());
                     return true;
@@ -243,7 +265,7 @@ public class TimelineItemAdapter
                 break;
             case VIEW_TYPE_SYSTEM_NOTE:
                 view = inflater.inflate(R.layout.row_system_note, parent, false);
-                holder = new SystemNoteViewHolder(view);
+                holder = new SystemNoteViewHolder(view, mImageGetter);
                 break;
             default:
                 throw new IllegalArgumentException("viewType: Unknown timeline item type.");
@@ -300,6 +322,11 @@ public class TimelineItemAdapter
         holder.updateReactions(reactions);
     }
 
+    /** Whether a timeline row is a reply inside a comment thread (#123). */
+    public static boolean isThreadReplyRow(RecyclerView.ViewHolder holder) {
+        return holder instanceof CommentViewHolder && ((CommentViewHolder) holder).isThreadReply();
+    }
+
     private boolean shouldFadeReplyGroup(TimelineItem item) {
         long replyCommentId = mActionCallback.getSelectedReplyCommentId();
         if (replyCommentId == 0) {
@@ -310,6 +337,11 @@ public class TimelineItemAdapter
         }
         if (item instanceof TimelineItem.TimelineComment) {
             TimelineItem.TimelineComment tc = (TimelineItem.TimelineComment) item;
+            String replyDiscussionId = mActionCallback.getSelectedReplyDiscussionId();
+            if (replyDiscussionId != null) {
+                // Replying to a thread: keep that whole thread fully visible (#123).
+                return !replyDiscussionId.equals(tc.comment().discussionId());
+            }
             if (tc.getParentDiff() != null) {
                 return tc.getParentDiff().getInitialComment().id() != replyCommentId;
             }
@@ -332,29 +364,44 @@ public class TimelineItemAdapter
         public abstract void bind(TItem item);
     }
 
+    /**
+     * Markdown for a system note, prefixed with the author's name ("Ashish Gola assigned to
+     * @tabish.khan") like GitLab web. Root-relative link targets such as "Compare with previous
+     * version" are made absolute first: GitLab's markdown API resolves them against the
+     * repository (/-/blob/main/...) rather than the instance (#165).
+     */
+    public static String systemNoteMarkdown(com.gl4a.gitlab.model.GitLabUser author,
+            String body) {
+        String markdown = body != null ? body : "";
+        markdown = markdown.replace("](/",
+                "](" + com.gl4a.Gl4Application.get().getInstanceUrl() + "/");
+        if (author != null && author.name() != null && !author.name().isEmpty()) {
+            markdown = author.name() + " " + markdown;
+        }
+        return markdown;
+    }
+
     /** Minimal view holder for GitLab system notes — no avatar, menu, or reactions. */
     static class SystemNoteViewHolder
             extends TimelineItemViewHolder<TimelineItem.TimelineComment> {
         private final android.widget.TextView tvNote;
         private final android.widget.TextView tvTimestamp;
+        private final HttpImageGetter mImageGetter;
 
-        SystemNoteViewHolder(android.view.View itemView) {
+        SystemNoteViewHolder(android.view.View itemView, HttpImageGetter imageGetter) {
             super(itemView);
             tvNote = itemView.findViewById(R.id.tv_system_note);
             tvTimestamp = itemView.findViewById(R.id.tv_timestamp);
+            mImageGetter = imageGetter;
         }
 
         @Override
         public void bind(TimelineItem.TimelineComment item) {
-            // Prepend author name so it reads "Ashish Gola assigned to @tabish.khan"
-            // matching GitLab web's system note format.
-            com.gl4a.gitlab.model.GitLabUser author = item.getUser();
-            String body = item.comment().body() != null ? item.comment().body() : "";
-            if (author != null && author.name() != null && !author.name().isEmpty()) {
-                tvNote.setText(author.name() + " " + body);
-            } else {
-                tvNote.setText(body);
-            }
+            // The body is markdown/HTML (lists, links, commit SHAs, references), so render
+            // it like a comment (#165).
+            mImageGetter.bindMarkdown(tvNote,
+                    systemNoteMarkdown(item.getUser(), item.comment().body()),
+                    item.comment().id());
             java.util.Date createdAt = item.getCreatedAt();
             tvTimestamp.setText(com.gl4a.utils.StringUtils.formatRelativeTime(
                     itemView.getContext(), createdAt, true));

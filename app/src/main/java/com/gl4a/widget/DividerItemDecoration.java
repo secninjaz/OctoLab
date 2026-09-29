@@ -9,7 +9,13 @@ import androidx.recyclerview.widget.RecyclerView;
 import android.view.View;
 
 public class DividerItemDecoration extends RecyclerView.ItemDecoration {
+    /** Decides per item whether a divider is drawn above it. */
+    public interface Filter {
+        boolean hasDividerAbove(RecyclerView parent, View child);
+    }
+
     private final Drawable mDivider;
+    private Filter mFilter;
 
     public DividerItemDecoration(Context context) {
         final TypedArray a = context.obtainStyledAttributes(null, new int[] {
@@ -19,11 +25,17 @@ public class DividerItemDecoration extends RecyclerView.ItemDecoration {
 		a.recycle();
     }
 
+    public DividerItemDecoration(Context context, Filter filter) {
+        this(context);
+        mFilter = filter;
+    }
+
     @Override
     public void getItemOffsets (Rect outRect, View view, RecyclerView parent, RecyclerView.State state) {
         super.getItemOffsets(outRect, view, parent, state);
         if (mDivider == null) return;
         if (parent.getChildAdapterPosition(view) < 1) return;
+        if (mFilter != null && !mFilter.hasDividerAbove(parent, view)) return;
 
         outRect.top = mDivider.getIntrinsicHeight();
     }
@@ -40,6 +52,9 @@ public class DividerItemDecoration extends RecyclerView.ItemDecoration {
         int childCount = parent.getChildCount();
         for (int i = 0; i < childCount - 1; i++) {
             View child = parent.getChildAt(i);
+            if (mFilter != null && !mFilter.hasDividerAbove(parent, parent.getChildAt(i + 1))) {
+                continue;
+            }
 
             RecyclerView.LayoutParams params = (RecyclerView.LayoutParams) child.getLayoutParams();
 

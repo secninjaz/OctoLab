@@ -1,6 +1,7 @@
 package com.gl4a.gitlab.service;
 
 import com.gl4a.gitlab.model.GitLabComment;
+import com.gl4a.gitlab.model.GitLabDiscussion;
 import com.gl4a.gitlab.model.GitLabCommit;
 import com.gl4a.gitlab.model.GitLabDiff;
 import com.gl4a.gitlab.model.GitLabMergeRequest;
@@ -132,11 +133,20 @@ public interface GitLabMergeRequestService {
             @Path("noteId") long noteId
     );
 
+    // MR discussions: notes grouped into threads (#123)
     @GET("projects/{id}/merge_requests/{iid}/discussions")
-    Single<Response<List<Map<String, Object>>>> getDiscussions(
+    Single<Response<List<GitLabDiscussion>>> getDiscussions(
             @Path("id") long projectId,
             @Path("iid") int iid,
             @Query("page") int page,
             @Query("per_page") int perPage
+    );
+
+    @POST("projects/{id}/merge_requests/{iid}/discussions/{discussionId}/notes")
+    Single<Response<GitLabComment>> addDiscussionNote(
+            @Path("id") long projectId,
+            @Path("iid") int iid,
+            @Path("discussionId") String discussionId,
+            @Body Map<String, Object> body
     );
 }

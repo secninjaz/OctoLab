@@ -172,7 +172,7 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
     public RecyclerView.ViewHolder onCreateViewHolder(LayoutInflater inflater, ViewGroup parent, int viewType) {
         if (viewType == VIEW_TYPE_SYSTEM_NOTE) {
             View v = inflater.inflate(R.layout.row_system_note, parent, false);
-            return new SystemNoteViewHolder(v);
+            return new SystemNoteViewHolder(v, mImageGetter);
         }
         View v = inflater.inflate(R.layout.row_timeline_comment, parent, false);
         ViewHolder holder = new ViewHolder(v, mHolderCallback, this, mReactionDetailsCache);
@@ -363,20 +363,19 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
         private final android.widget.TextView tvNote;
         private final android.widget.TextView tvTimestamp;
 
-        SystemNoteViewHolder(View itemView) {
+        private final HttpImageGetter mImageGetter;
+
+        SystemNoteViewHolder(View itemView, HttpImageGetter imageGetter) {
             super(itemView);
             tvNote = itemView.findViewById(R.id.tv_system_note);
             tvTimestamp = itemView.findViewById(R.id.tv_timestamp);
+            mImageGetter = imageGetter;
         }
 
         void bind(GitLabComment item) {
-            GitLabUser author = item.user();
-            String body = item.body() != null ? item.body() : "";
-            if (author != null && author.name() != null && !author.name().isEmpty()) {
-                tvNote.setText(author.name() + " " + body);
-            } else {
-                tvNote.setText(body);
-            }
+            // System note bodies are markdown/HTML; render them like comments (#165).
+            mImageGetter.bindMarkdown(tvNote, com.gl4a.adapter.timeline.TimelineItemAdapter
+                    .systemNoteMarkdown(item.user(), item.body()), item.id());
             tvTimestamp.setText(StringUtils.formatRelativeTime(
                     itemView.getContext(), item.createdAtDate(), true));
         }

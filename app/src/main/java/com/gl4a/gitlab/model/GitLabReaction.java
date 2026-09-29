@@ -15,7 +15,9 @@ public class GitLabReaction {
     public static final String CONTENT_PLUS_ONE = "+1";
     public static final String CONTENT_MINUS_ONE = "-1";
     public static final String CONTENT_LAUGH = "laugh";
-    public static final String CONTENT_HOORAY = "tada";
+    // Contents are the app-side names; mapEmojiNameToContent() maps GitLab's "tada" to this.
+    // It was "tada" itself, so loaded hooray reactions never matched and never showed (#167).
+    public static final String CONTENT_HOORAY = "hooray";
     public static final String CONTENT_HEART = "heart";
     public static final String CONTENT_CONFUSED = "confused";
     public static final String CONTENT_ROCKET = "rocket";

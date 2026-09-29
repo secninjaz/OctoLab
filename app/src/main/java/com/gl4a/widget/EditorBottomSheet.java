@@ -177,6 +177,13 @@ public class EditorBottomSheet extends FrameLayout implements View.OnClickListen
         mContainer.setVisibility(View.VISIBLE);
     }
 
+    public void removeHeaderView(View view) {
+        mContainer.removeView(view);
+        if (mContainer.getChildCount() == 0) {
+            mContainer.setVisibility(View.GONE);
+        }
+    }
+
     public void setListener(Listener listener) {
         mListener = listener;
     }

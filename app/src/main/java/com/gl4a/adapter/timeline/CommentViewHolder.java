@@ -53,6 +53,7 @@ class CommentViewHolder
     private final ReactionBar.AddReactionMenuHelper mReactionMenuHelper;
 
     private TimelineItem.TimelineComment mBoundItem;
+    private final android.graphics.drawable.Drawable mDefaultBackground;
 
     private final UiUtils.QuoteActionModeCallback mQuoteActionModeCallback;
 
@@ -62,6 +63,9 @@ class CommentViewHolder
         void quoteText(CharSequence text);
         void addText(CharSequence text);
         boolean onMenItemClick(TimelineItem.TimelineComment comment, MenuItem menuItem);
+        /** Whether "Reply" (add a note to this comment's thread) is offered (#123). */
+        boolean canReplyToThread(TimelineItem.TimelineComment comment);
+        boolean isReplyThreadSelected(TimelineItem.TimelineComment comment);
         Single<List<GitLabReaction>> loadReactionDetails(TimelineItem.TimelineComment item, boolean bypassCache);
         Single<GitLabReaction> addReaction(TimelineItem.TimelineComment item, String content);
         Single<Boolean> deleteReaction(TimelineItem.TimelineComment item, long reactionId);
@@ -72,6 +76,7 @@ class CommentViewHolder
         super(view);
 
         mContext = view.getContext();
+        mDefaultBackground = view.getBackground();
         mImageGetter = imageGetter;
         mCallback = callback;
         mRepoOwner = repoOwner;
@@ -119,6 +124,7 @@ class CommentViewHolder
         boolean sameItem = mBoundItem != null
                 && mBoundItem.comment().id() == item.comment().id();
         mBoundItem = item;
+        bindThreadIndent(item.comment().isThreadReply());
         if (!sameItem) {
             // Different comment: hide WebView but do NOT load about:blank — that triggers
             // an extra layout pass. The WebView keeps its previous content invisibly.
@@ -210,6 +216,29 @@ class CommentViewHolder
         menu.findItem(R.id.edit).setVisible(canEdit);
         menu.findItem(R.id.delete).setVisible(canEdit);
         menu.findItem(R.id.view_in_file).setVisible(item.hasFilePatch() && position != -1);
+        MenuItem replyItem = menu.findItem(R.id.reply);
+        replyItem.setVisible(mCallback.canReplyToThread(item));
+        replyItem.setTitle(mCallback.isReplyThreadSelected(item)
+                ? R.string.reply_selected : R.string.reply);
+    }
+
+    /** Whether this row is a reply inside a thread (drawn without a divider above, #123). */
+    public boolean isThreadReply() {
+        return mBoundItem != null && mBoundItem.comment().isThreadReply();
+    }
+
+    /** Indents replies under their thread's first comment, with a thread line (#123). */
+    private void bindThreadIndent(boolean reply) {
+        int padding = mContext.getResources().getDimensionPixelSize(R.dimen.content_padding);
+        int indent = reply
+                ? mContext.getResources().getDimensionPixelSize(R.dimen.thread_reply_indent) : 0;
+        itemView.setPaddingRelative(padding + indent, itemView.getPaddingTop(),
+                itemView.getPaddingEnd(), itemView.getPaddingBottom());
+        if (reply) {
+            itemView.setBackgroundResource(R.drawable.timeline_thread_reply_background);
+        } else {
+            itemView.setBackground(mDefaultBackground);
+        }
     }
 
     @Nullable

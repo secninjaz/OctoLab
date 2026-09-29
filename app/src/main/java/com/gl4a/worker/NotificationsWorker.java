@@ -501,7 +501,12 @@ public class NotificationsWorker extends Worker {
                 ? todo.author.name() : "Someone";
         String verb = formatActionVerb(todo.actionName);
         String ref = "";
-        if (todo.target != null) {
+        if (todo.isCommit() && todo.commitSha != null) {
+            ref = " in commit " + todo.commitSha.substring(0, Math.min(8, todo.commitSha.length()));
+            if (todo.commitTitle != null && !todo.commitTitle.isEmpty()) {
+                ref += " " + todo.commitTitle;
+            }
+        } else if (todo.target != null) {
             String prefix = "MergeRequest".equals(todo.targetType) ? "!" : "#";
             ref = " in " + prefix + todo.target.iid;
             if (todo.target.title != null && !todo.target.title.isEmpty()) {
