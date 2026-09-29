@@ -20,6 +20,13 @@ public interface GitLabGroupService {
             @Query("per_page") int perPage
     );
 
+    /** Top-level groups the current user is a member of, like "Your groups" (#172). */
+    @GET("groups?min_access_level=10&top_level_only=true&order_by=name&sort=asc")
+    Single<Response<List<GitLabGroup>>> listMemberGroups(
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
     /** GET /users/:id/groups — groups the specified user belongs to. */
     @GET("users/{id}/groups")
     Single<Response<List<GitLabGroup>>> getUserGroups(
@@ -51,6 +58,14 @@ public interface GitLabGroupService {
     /** Projects of a group given by its URL-encoded full path (#103). */
     @GET("groups/{id}/projects?order_by=last_activity_at")
     Single<Response<List<GitLabProject>>> getProjectsByPath(
+            @Path(value = "id", encoded = true) String groupPath,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
+    /** Projects of a group and all its subgroups, for the group screen's Projects row (#172). */
+    @GET("groups/{id}/projects?include_subgroups=true&order_by=last_activity_at")
+    Single<Response<List<GitLabProject>>> getAllProjectsByPath(
             @Path(value = "id", encoded = true) String groupPath,
             @Query("page") int page,
             @Query("per_page") int perPage

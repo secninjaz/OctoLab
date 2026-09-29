@@ -19,14 +19,20 @@ import com.gl4a.BaseActivity;
 import com.gl4a.R;
 import com.gl4a.ServiceFactory;
 import com.gl4a.gitlab.model.GitLabGroup;
+import com.gl4a.gitlab.model.GitLabProject;
 import com.gl4a.gitlab.service.GitLabGroupService;
 import com.gl4a.utils.ApiHelpers;
 import com.gl4a.utils.AvatarHandler;
 import com.gl4a.utils.IntentUtils;
+import com.gl4a.utils.MembershipRoles;
 import com.gl4a.utils.UiUtils;
+import com.gl4a.widget.GroupTree;
 import com.gl4a.widget.SwipeRefreshLayout;
 
+import java.util.ArrayList;
 import java.util.List;
+
+import io.reactivex.Single;
 
 /**
  * Group overview (#103): name, path, description, links to the group's projects and members,
@@ -42,16 +48,22 @@ public class GroupActivity extends BaseActivity implements
 
     private static final int ID_LOADER_GROUP = 0;
     private static final int ID_LOADER_SUBGROUPS = 1;
+    private static final int TREE_PAGE_SIZE = 100;
 
     private String mGroupPath;
     private GitLabGroup mGroup;
     private View mRootView;
+    private GroupTree.State mTreeState;
+    private GroupTree mTree;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.group);
         mRootView = findViewById(R.id.root);
+        // Survives rotation, so the tree keeps its rows, expanded groups and scroll (#172).
+        mTreeState = new androidx.lifecycle.ViewModelProvider(this).get(GroupTree.State.class);
+        mTree = new GroupTree(this, findViewById(R.id.ll_subgroups), mTreeState);
         findViewById(R.id.tv_projects).setOnClickListener(this);
         findViewById(R.id.tv_members).setOnClickListener(this);
         setChildScrollDelegate(this);
@@ -95,6 +107,16 @@ public class GroupActivity extends BaseActivity implements
     }
 
     @Override
+    protected Intent navigateUp() {
+        String path = groupPath();
+        int lastSlash = path != null ? path.lastIndexOf('/') : -1;
+        // A subgroup's parent is always a group, never a user namespace.
+        return lastSlash > 0
+                ? makeIntent(this, path.substring(0, lastSlash))
+                : getToplevelActivityIntent();
+    }
+
+    @Override
     public boolean canChildScrollUp() {
         return UiUtils.canViewScrollUp(mRootView);
     }
@@ -102,6 +124,7 @@ public class GroupActivity extends BaseActivity implements
     @Override
     public void onRefresh() {
         mGroup = null;
+        mTreeState.clear();
         setContentShown(false);
         loadGroup(true);
         super.onRefresh();
@@ -114,8 +137,6 @@ public class GroupActivity extends BaseActivity implements
             startActivity(RepositoryListActivity.makeIntent(this, groupPath(), true));
         } else if (id == R.id.tv_members) {
             startActivity(OrganizationMemberListActivity.makeIntent(this, groupPath()));
-        } else if (v.getTag() instanceof GitLabGroup) {
-            startActivity(makeIntent(this, ((GitLabGroup) v.getTag()).fullPath));
         }
     }
 
@@ -138,7 +159,7 @@ public class GroupActivity extends BaseActivity implements
 
     private void bindGroup() {
         ImageView avatar = findViewById(R.id.iv_avatar);
-        AvatarHandler.assignAvatarLogo(avatar, mGroup.name, mGroup.id, mGroup.avatarUrl);
+        AvatarHandler.assignGroupLogo(avatar, mGroup);
         ((TextView) findViewById(R.id.tv_name)).setText(mGroup.name);
         ((TextView) findViewById(R.id.tv_path)).setText(mGroup.fullPath);
         TextView description = findViewById(R.id.tv_description);
@@ -149,30 +170,42 @@ public class GroupActivity extends BaseActivity implements
         }
     }
 
-    private void loadSubgroups(boolean force) {
-        GitLabGroupService service = ServiceFactory.get(GitLabGroupService.class, force);
-        service.getSubgroupsByPath(Uri.encode(groupPath()), 1, 100)
-                .map(ApiHelpers::throwOnFailure)
-                .compose(makeLoaderSingle(ID_LOADER_SUBGROUPS, force))
-                // Non-fatal: the overview is still useful without the subgroup list.
-                .subscribe(this::fillSubgroups, error -> fillSubgroups(null));
+    /** Tree data and the viewer's roles, cached together so badges survive rotation (#172). */
+    private static class TreeData {
+        final List<Object> children;
+        final MembershipRoles roles;
+
+        TreeData(List<Object> children, MembershipRoles roles) {
+            this.children = children;
+            this.roles = roles;
+        }
     }
 
-    private void fillSubgroups(@Nullable List<GitLabGroup> subgroups) {
-        ViewGroup container = findViewById(R.id.ll_subgroups);
-        container.removeAllViews();
-        int count = subgroups != null ? subgroups.size() : 0;
-        findViewById(R.id.tv_subgroups_header).setVisibility(count > 0 ? View.VISIBLE : View.GONE);
-        LayoutInflater inflater = getLayoutInflater();
-        for (int i = 0; i < count; i++) {
-            GitLabGroup subgroup = subgroups.get(i);
-            View row = inflater.inflate(R.layout.selectable_label_with_avatar, container, false);
-            row.setTag(subgroup);
-            row.setOnClickListener(this);
-            AvatarHandler.assignAvatarLogo(row.findViewById(R.id.iv_gravatar),
-                    subgroup.name, subgroup.id, subgroup.avatarUrl);
-            ((TextView) row.findViewById(R.id.tv_title)).setText(subgroup.name);
-            container.addView(row);
+    @Override
+    protected void onPause() {
+        super.onPause();
+        mTreeState.scrollY = mRootView.getScrollY();
+    }
+
+    private void loadSubgroups(boolean force) {
+        if (!force && mTreeState.hasContent()) {
+            // Rebuilt after rotation: same rows and expanded groups, no reload.
+            findViewById(R.id.tv_subgroups_header).setVisibility(View.VISIBLE);
+            mTree.restore();
+            final int scrollY = mTreeState.scrollY;
+            mRootView.post(() -> mRootView.scrollTo(0, scrollY));
+            return;
         }
+        GroupTree.loadChildren(groupPath(), force)
+                .zipWith(MembershipRoles.load(), TreeData::new)
+                .compose(makeLoaderSingle(ID_LOADER_SUBGROUPS, force))
+                .subscribe(data -> {
+                    findViewById(R.id.tv_subgroups_header)
+                            .setVisibility(data.children.isEmpty() ? View.GONE : View.VISIBLE);
+                    mTree.setRoots(data.children, data.roles);
+                }, error -> {
+                    // Non-fatal: the overview is still useful without the tree.
+                    findViewById(R.id.tv_subgroups_header).setVisibility(View.GONE);
+                });
     }
 }

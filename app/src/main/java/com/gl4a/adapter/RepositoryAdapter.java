@@ -49,35 +49,8 @@ public class RepositoryAdapter extends RootAdapter<GitLabProject, RepositoryAdap
 
     @Override
     public void onBindViewHolder(ViewHolder holder, GitLabProject repository) {
-        // Use avatars already embedded in the project response (no extra API calls):
-        // project's own avatar → immediate parent namespace avatar → full hierarchy walk.
-        if (repository.avatarUrl != null && !repository.avatarUrl.isEmpty()) {
-            AvatarHandler.assignAvatarLogo(holder.ivAvatar, repository.name(),
-                    repository.id(), repository.avatarUrl);
-        } else if (repository.namespace != null
-                && repository.namespace.avatarUrl != null
-                && !repository.namespace.avatarUrl.isEmpty()
-                && "group".equals(repository.namespace.kind)) {
-            // Group /uploads/ avatars return 401 without session cookie.
-            // Use the API avatar endpoint which accepts PRIVATE-TOKEN.
-            String groupAvatarUrl = com.gl4a.Gl4Application.get().getApiBaseUrl()
-                    + "groups/" + repository.namespace.id + "/avatar";
-            AvatarHandler.assignAvatarLogo(holder.ivAvatar,
-                    repository.namespace.name != null ? repository.namespace.name : repository.name(),
-                    repository.namespace.id, groupAvatarUrl);
-        } else {
-            // No avatar at project or immediate parent level — show project initials.
-            // Intentionally capped at 2 levels (project → parent group); deeper ancestor
-            // walk was deliberately omitted to keep the repo list fast and predictable.
-            // If a future requirement needs grandparent-and-above fallback, re-enable:
-            //   AvatarHandler.assignAvatarForProject(holder.ivAvatar,
-            //           repository.name(), repository.id());
-            // Note: group /uploads/ avatar URLs return 401 without session cookie.
-            // The API avatar endpoint (api/v4/groups/:id/avatar) must be used instead —
-            // see the fetchProjectAvatarUrl path in AvatarHandler for context.
-            holder.ivAvatar.setImageDrawable(
-                    new AvatarHandler.DefaultAvatarDrawable(repository.name(), null, true));
-        }
+        // Shared with every other project logo in the app — see AvatarHandler.assignProjectLogo.
+        AvatarHandler.assignProjectLogo(holder.ivAvatar, repository);
         holder.tvTitle.setText(ApiHelpers.formatRepoName(mContext, repository));
 
         if (!StringUtils.isBlank(repository.description())) {

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Group overview (#103): header, description, projects/members rows, subgroups. -->
+<!-- Group overview (#103): header, description, projects/members rows, and a tree of
+     subgroups and projects that expands in place (#172). -->
 <androidx.core.widget.NestedScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -25,6 +26,7 @@
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:layout_marginRight="16dp"
+                android:background="@drawable/avatar_frame"
                 tools:src="@drawable/default_avatar" />
 
             <LinearLayout

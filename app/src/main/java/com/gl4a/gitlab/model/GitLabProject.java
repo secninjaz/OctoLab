@@ -77,11 +77,23 @@ public class GitLabProject implements Parcelable {
         @Json(name = "name") public String name;
         @Json(name = "path") public String path;
         @Json(name = "kind") public String kind;
+        @Json(name = "full_path") public String fullPath;
         @Json(name = "avatar_url") public String avatarUrl;
         @Json(name = "web_url") public String webUrl;
 
         public GitLabUser toUser() {
             GitLabUser u = new GitLabUser();
+            if ("group".equals(kind)) {
+                // A group namespace's id is a group id, not a user id: passing it on made
+                // UserActivity load /users/<group id> (404, or an unrelated user with the same
+                // id). Use the full path instead, which UserActivity resolves to the group
+                // screen (#172).
+                u.username = fullPath != null ? fullPath : path;
+                u.name = name;
+                u.avatarUrl = avatarUrl;
+                u.webUrl = webUrl;
+                return u;
+            }
             u.id = id;
             u.username = path;
             u.name = name;

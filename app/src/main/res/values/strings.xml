@@ -141,10 +141,10 @@
     <string name="mentioned">Mentioned</string>
     <string name="participating">Participating</string>
     <string name="reviews">Reviews</string>
-    <string name="my_repositories">My repositories</string>
-    <string name="my_issues">My issues</string>
-    <string name="my_pull_requests">My merge requests</string>
-    <string name="my_gists">My snippets</string>
+    <string name="my_repositories">Projects</string>
+    <string name="my_issues">Work items</string>
+    <string name="my_pull_requests">Merge requests</string>
+    <string name="my_gists">Snippets</string>
     <string name="start_page">Start page</string>
     <string name="start_page_last_selected">Last selected</string>
     <string name="comment_editor_locked_hint">Comments are only available to collaborators</string>
@@ -701,5 +701,16 @@
     <string name="group">Group</string>
     <string name="group_projects">Projects</string>
     <string name="group_members">Members</string>
-    <string name="group_subgroups">Subgroups</string>
+    <string name="group_subgroups">Subgroups and projects</string>
+    <string name="group_expand">Expand or collapse</string>
+    <string name="groups">Groups</string>
+    <string name="no_groups_found">You are not a member of any group.</string>
+    <string name="role_owner">Owner</string>
+    <string name="role_maintainer">Maintainer</string>
+    <string name="role_developer">Developer</string>
+    <string name="role_reporter">Reporter</string>
+    <string name="role_guest">Guest</string>
+    <string name="role_planner">Planner</string>
+    <string name="role_minimal_access">Minimal access</string>
+    <string name="group_tree_loading_failed">Could not load subgroups and projects</string>
 </resources>

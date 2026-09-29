@@ -357,6 +357,8 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
                 return new NotificationListFactory(this);
             case R.id.my_repos:
                 return new RepositoryFactory(this, mUserLogin, getPrefs());
+            case R.id.my_groups:
+                return new GroupListFactory(this);
             case R.id.my_issues:
                 return new IssueListFactory(this, mUserLogin, false, getPrefs());
             case R.id.my_prs:

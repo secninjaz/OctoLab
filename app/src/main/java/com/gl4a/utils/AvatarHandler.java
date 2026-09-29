@@ -277,6 +277,59 @@ public class AvatarHandler {
     }
 
     /**
+     * The single project logo derivation for every project row and header in the app (#172):
+     * the project's own avatar, then its parent group's avatar via the API avatar endpoint,
+     * then the initials tile. Use together with {@code @drawable/avatar_frame} as the view
+     * background. Extend this rather than deriving project logos locally.
+     */
+    public static void assignProjectLogo(ImageView view, com.gl4a.gitlab.model.GitLabProject project) {
+        // Use avatars already embedded in the project response (no extra API calls):
+        // project's own avatar → immediate parent namespace avatar → full hierarchy walk.
+        if (project.avatarUrl != null && !project.avatarUrl.isEmpty()) {
+            AvatarHandler.assignAvatarLogo(view, project.name(),
+                    project.id(), project.avatarUrl);
+        } else if (project.namespace != null
+                && project.namespace.avatarUrl != null
+                && !project.namespace.avatarUrl.isEmpty()
+                && "group".equals(project.namespace.kind)) {
+            // Group /uploads/ avatars return 401 without session cookie.
+            // Use the API avatar endpoint which accepts PRIVATE-TOKEN.
+            String groupAvatarUrl = com.gl4a.Gl4Application.get().getApiBaseUrl()
+                    + "groups/" + project.namespace.id + "/avatar";
+            AvatarHandler.assignAvatarLogo(view,
+                    project.namespace.name != null ? project.namespace.name : project.name(),
+                    project.namespace.id, groupAvatarUrl);
+        } else {
+            // No avatar at project or immediate parent level — show project initials.
+            // Intentionally capped at 2 levels (project → parent group); deeper ancestor
+            // walk was deliberately omitted to keep the repo list fast and predictable.
+            // If a future requirement needs grandparent-and-above fallback, re-enable:
+            //   AvatarHandler.assignAvatarForProject(view,
+            //           project.name(), project.id());
+            // Note: group /uploads/ avatar URLs return 401 without session cookie.
+            // The API avatar endpoint (api/v4/groups/:id/avatar) must be used instead —
+            // see the fetchProjectAvatarUrl path in AvatarHandler for context.
+            view.setImageDrawable(
+                    new AvatarHandler.DefaultAvatarDrawable(project.name(), null, true));
+        }
+    }
+
+    /**
+     * The single group logo derivation (#172): the group's avatar via the API avatar endpoint
+     * (group /uploads/ URLs return 401 without a session cookie), else the initials tile.
+     * Use together with {@code @drawable/avatar_frame} as the view background.
+     */
+    public static void assignGroupLogo(ImageView view, com.gl4a.gitlab.model.GitLabGroup group) {
+        if (group.avatarUrl != null && !group.avatarUrl.isEmpty() && group.id > 0) {
+            String groupAvatarUrl = com.gl4a.Gl4Application.get().getApiBaseUrl()
+                    + "groups/" + group.id + "/avatar";
+            assignAvatarLogo(view, group.name, group.id, groupAvatarUrl);
+        } else {
+            view.setImageDrawable(new DefaultAvatarDrawable(group.name, null, true));
+        }
+    }
+
+    /**
      * Loads the project avatar for the To-do list header row.
      * Fetches avatar_url via GET /projects/{id} (Todos API omits it) and caches by project ID.
      */

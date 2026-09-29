@@ -211,7 +211,7 @@ public class UserActivity extends BaseFragmentPagerActivity {
                         return service.searchUsers(mUserLogin, 1, 1)
                                 .map(ApiHelpers::throwOnFailure)
                                 .flatMap(users -> users.isEmpty()
-                                        ? io.reactivex.Single.error(err)
+                                        ? openAsGroupOrFail()
                                         : service.getUser(users.get(0).id)
                                                 .map(ApiHelpers::throwOnFailure));
                     });
