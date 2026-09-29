@@ -8,6 +8,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [1.3.7] - 2026-09-28
 
 ### Added
+- Comment threads on issues and MRs: replies are shown indented under the comment they belong to, and "Reply" on any comment of a thread posts into that thread (#123)
+- Login dialog links to the instance's personal access token page with the required `api` and `read_user` scopes pre-filled (#169)
 - Reactions on commit comments (via GraphQL; GitLab's REST API has no award-emoji endpoint for commit notes), matching issue/MR comment behaviour (#159)
 - Internal and public repos show GitLab's own visibility icons (shield, globe) in the repo list and overview (#145)
 
@@ -19,6 +21,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fast scrolling on issues/MRs showed reactions from other comments; reactions now load with the timeline in one GraphQL query instead of per row (#162)
 - Internal and public repos no longer show the private-repo lock icon (#145)
 - Fresh installs no longer create an empty legacy keystore file
+- System notes (e.g. "added N commits") showed raw HTML and markdown; they are now rendered like on GitLab web, with lists, links and linked commit SHAs (#165)
+- Notifications failed to load, in the app and in the background, whenever a to-do pointed at a commit (e.g. a mention in a commit comment); commit to-dos now load and open the commit (#166)
+- Hooray reactions were posted but never shown in the app; they now show, with GitLab's 🎉 party-popper icon instead of a cake (#167)
+- Token login accepted any text and failed silently; tokens are now format-checked, a failed login explains why (rejected, missing scopes, unreachable instance) and keeps the dialog open, and the instance URL is restored (#168)
 
 ## [1.3.6] - 2026-09-21
 
