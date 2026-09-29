@@ -704,6 +704,9 @@
     <string name="group_subgroups">Subgroups and projects</string>
     <string name="group_expand">Expand or collapse</string>
     <string name="groups">Groups</string>
+    <string name="group_sort">Sort</string>
+    <string name="group_sort_name">Name</string>
+    <string name="group_sort_activity">Last activity</string>
     <string name="no_groups_found">You are not a member of any group.</string>
     <string name="role_owner">Owner</string>
     <string name="role_maintainer">Maintainer</string>

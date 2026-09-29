@@ -398,8 +398,8 @@ public class NotificationsWorker extends Worker {
         // group, else the colored initials tile), not a separate reimplementation.
         int iconSizePx = context.getResources()
                 .getDimensionPixelSize(android.R.dimen.notification_large_icon_width);
-        builder.setLargeIcon(
-                AvatarHandler.loadProjectAvatarSynchronously(projectName, projectId, iconSizePx));
+        // The one shared project logo, so it matches the app exactly (#176).
+        builder.setLargeIcon(AvatarHandler.loadProjectLogoSynchronously(first.project, iconSizePx));
 
         boolean hasNewTodo = false;
         NotificationCompat.InboxStyle inbox = new NotificationCompat.InboxStyle()

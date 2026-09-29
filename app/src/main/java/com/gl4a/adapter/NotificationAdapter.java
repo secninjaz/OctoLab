@@ -140,12 +140,10 @@ public class NotificationAdapter extends
             holder.ivAction.setVisibility(item.isRead() ? View.GONE : View.VISIBLE);
             holder.tvTitle.setText(ApiHelpers.formatRepoName(mContext, item.repository));
 
-            // Use assignAvatarForProject so the project's own uploaded avatar is shown.
-            // The Todos API omits avatar_url from the project sub-object; the method
-            // fetches it asynchronously via GET /projects/{id}.
+            // The one shared project logo (#176); it fetches the avatar itself when the Todos
+            // API's slim project data doesn't include it.
             if (item.repository != null) {
-                String projectName = item.repository.name != null ? item.repository.name : "";
-                AvatarHandler.assignAvatarForProject(holder.ivAvatar, projectName, item.repository.id);
+                AvatarHandler.assignProjectLogo(holder.ivAvatar, item.repository);
                 // Tag with the project so the click handler opens RepositoryActivity,
                 // not UserActivity (which would search for a user named after the project).
                 holder.ivAvatar.setTag(item.repository);

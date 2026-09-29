@@ -112,7 +112,8 @@ public class GroupListFragment extends Fragment implements BaseActivity.Refresha
         view.findViewById(R.id.progress).setVisibility(View.VISIBLE);
         view.findViewById(R.id.tv_empty).setVisibility(View.GONE);
         if (mLoad != null) mLoad.dispose();
-        mLoad = Single.fromCallable(() -> loadAllGroups(force))
+        final boolean byActivity = GroupTree.isSortByActivity(requireContext());
+        mLoad = Single.fromCallable(() -> loadAllGroups(force, byActivity))
                 .zipWith(MembershipRoles.load(), Data::new)
                 .compose(RxUtils::doInBackground)
                 .subscribe(this::show, error -> {
@@ -125,7 +126,13 @@ public class GroupListFragment extends Fragment implements BaseActivity.Refresha
                 });
     }
 
-    private static List<GitLabGroup> loadAllGroups(boolean force) {
+    /** Reloads after the sort was changed from the menu (#175). */
+    public void onSortChanged() {
+        if (mState != null) mState.clear();
+        load(false);
+    }
+
+    private static List<GitLabGroup> loadAllGroups(boolean force, boolean byActivity) {
         GitLabGroupService service = ServiceFactory.get(GitLabGroupService.class, force);
         List<GitLabGroup> groups = new ArrayList<>();
         for (int page = 1; page <= MAX_PAGES; page++) {
@@ -135,7 +142,8 @@ public class GroupListFragment extends Fragment implements BaseActivity.Refresha
             groups.addAll(batch);
             if (batch.size() < PAGE_SIZE) break;
         }
-        return groups;
+        // Name order comes from the API; latest activity first on request (#175).
+        return byActivity ? GroupTree.sortByActivity(groups, force).blockingGet() : groups;
     }
 
     private void show(Data data) {

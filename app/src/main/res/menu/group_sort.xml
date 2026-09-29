@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sort for group trees and the Groups list (#175); the choice is remembered. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+      xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/group_sort"
+        android:title="@string/group_sort"
+        app:showAsAction="never">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item
+                    android:id="@+id/group_sort_name"
+                    android:title="@string/group_sort_name" />
+                <item
+                    android:id="@+id/group_sort_activity"
+                    android:title="@string/group_sort_activity" />
+            </group>
+        </menu>
+    </item>
+</menu>

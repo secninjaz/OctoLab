@@ -98,13 +98,134 @@ public class GroupTree implements View.OnClickListener {
         }
     }
 
-    /** A group's direct subgroups, then its direct projects, like GitLab web. */
-    public static Single<List<Object>> loadChildren(String groupPath, boolean force) {
+    private static final String PREF_SORT_BY_ACTIVITY = "group_tree_sort_by_activity";
+    private static final int ACTIVITY_BATCH = 50;
+
+    /** Remembered sort for group trees and the Groups list: name (default) or activity (#175). */
+    public static boolean isSortByActivity(android.content.Context context) {
+        return context.getSharedPreferences(com.gl4a.fragment.SettingsFragment.PREF_NAME,
+                android.content.Context.MODE_PRIVATE).getBoolean(PREF_SORT_BY_ACTIVITY, false);
+    }
+
+    /** Checks the current sort in a menu inflated from R.menu.group_sort. */
+    public static void prepareSortMenu(android.view.Menu menu, android.content.Context context) {
+        android.view.MenuItem item = menu.findItem(isSortByActivity(context)
+                ? R.id.group_sort_activity : R.id.group_sort_name);
+        if (item != null) item.setChecked(true);
+    }
+
+    /** Handles a sort menu item; returns true if the sort changed and the tree must reload. */
+    public static boolean onSortItemSelected(android.view.MenuItem item,
+            android.content.Context context) {
+        int id = item.getItemId();
+        if (id != R.id.group_sort_name && id != R.id.group_sort_activity) return false;
+        boolean byActivity = id == R.id.group_sort_activity;
+        item.setChecked(true);
+        if (byActivity == isSortByActivity(context)) return false;
+        context.getSharedPreferences(com.gl4a.fragment.SettingsFragment.PREF_NAME,
+                android.content.Context.MODE_PRIVATE).edit()
+                .putBoolean(PREF_SORT_BY_ACTIVITY, byActivity).apply();
+        return true;
+    }
+
+    /**
+     * Sorts groups by latest activity, newest first, like projects (#175). GitLab can't order
+     * groups by activity, so a group's activity is its most recently active project at any
+     * depth, fetched for up to 50 groups per GraphQL request (aliased group(fullPath:) fields);
+     * falls back to one REST request per group. Groups without projects go last.
+     */
+    public static Single<List<GitLabGroup>> sortByActivity(List<GitLabGroup> groups,
+            boolean force) {
+        if (groups == null || groups.isEmpty()) {
+            return Single.just(groups != null ? groups : new ArrayList<>());
+        }
+        return Single.fromCallable(() -> {
+                    fillActivityViaGraphQL(groups);
+                    return sortedByActivity(groups);
+                })
+                .onErrorResumeNext(error -> sortByActivityRest(groups, force));
+    }
+
+    private static void fillActivityViaGraphQL(List<GitLabGroup> groups) {
+        com.gl4a.gitlab.service.GitLabGraphQLService service =
+                ServiceFactory.getGraphQL(com.gl4a.gitlab.service.GitLabGraphQLService.class);
+        for (int start = 0; start < groups.size(); start += ACTIVITY_BATCH) {
+            List<GitLabGroup> batch = groups.subList(start,
+                    Math.min(start + ACTIVITY_BATCH, groups.size()));
+            StringBuilder query = new StringBuilder("query {");
+            for (int i = 0; i < batch.size(); i++) {
+                String path = pathOf(batch.get(i)).replace("\\", "").replace("\"", "");
+                query.append(" g").append(i).append(": group(fullPath: \"").append(path)
+                        .append("\") { projects(includeSubgroups: true, sort: ACTIVITY_DESC,"
+                                + " first: 1) { nodes { lastActivityAt } } }");
+            }
+            query.append(" }");
+            java.util.Map<String, Object> body = new HashMap<>();
+            body.put("query", query.toString());
+            retrofit2.Response<com.gl4a.gitlab.model.GitLabGroupActivityResponse> response =
+                    service.getGroupActivity(body).blockingGet();
+            com.gl4a.gitlab.model.GitLabGroupActivityResponse payload = response.body();
+            if (!response.isSuccessful() || payload == null || payload.data == null
+                    || (payload.errors != null && !payload.errors.isEmpty())) {
+                throw new IllegalStateException("GraphQL group activity failed: HTTP "
+                        + response.code());
+            }
+            for (int i = 0; i < batch.size(); i++) {
+                com.gl4a.gitlab.model.GitLabGroupActivityResponse.Group g = payload.data.get("g" + i);
+                batch.get(i).latestActivityAt = g != null && g.projects != null
+                        && g.projects.nodes != null && !g.projects.nodes.isEmpty()
+                        ? g.projects.nodes.get(0).lastActivityAt : null;
+            }
+        }
+    }
+
+    private static List<GitLabGroup> sortedByActivity(List<GitLabGroup> groups) {
+        List<GitLabGroup> sorted = new ArrayList<>(groups);
+        // ISO-8601 UTC timestamps sort correctly as strings.
+        java.util.Collections.sort(sorted, (a, b) -> {
+            if (a.latestActivityAt == null) return b.latestActivityAt == null ? 0 : 1;
+            if (b.latestActivityAt == null) return -1;
+            return b.latestActivityAt.compareTo(a.latestActivityAt);
+        });
+        return sorted;
+    }
+
+    /** Fallback when GraphQL is unavailable: one small REST request per group. */
+    private static Single<List<GitLabGroup>> sortByActivityRest(List<GitLabGroup> groups,
+            boolean force) {
+        GitLabGroupService service = ServiceFactory.get(GitLabGroupService.class, force);
+        return io.reactivex.Observable.fromIterable(groups)
+                .flatMap(group -> service.getLatestProject(group.id)
+                        .map(response -> {
+                            List<GitLabProject> latest = response.body();
+                            group.latestActivityAt = response.isSuccessful() && latest != null
+                                    && !latest.isEmpty() ? latest.get(0).lastActivityAt() : null;
+                            return group;
+                        })
+                        .onErrorReturnItem(group)
+                        .toObservable(), 8)
+                .toList()
+                .map(GroupTree::sortedByActivity);
+    }
+
+    /**
+     * A group's direct subgroups, then its direct projects, like GitLab web; each part by name
+     * (default) or by latest activity (#175).
+     */
+    public static Single<List<Object>> loadChildren(String groupPath, boolean force,
+            boolean byActivity) {
         GitLabGroupService service = ServiceFactory.get(GitLabGroupService.class, force);
         String encoded = Uri.encode(groupPath);
+        Single<List<GitLabGroup>> subgroups = service.getSubgroupsByPath(encoded, 1, PAGE_SIZE)
+                .map(ApiHelpers::throwOnFailure);
+        if (byActivity) {
+            subgroups = subgroups.flatMap(groups -> sortByActivity(groups, force));
+        }
         return Single.zip(
-                service.getSubgroupsByPath(encoded, 1, PAGE_SIZE).map(ApiHelpers::throwOnFailure),
-                service.getProjectsByPath(encoded, 1, PAGE_SIZE).map(ApiHelpers::throwOnFailure),
+                subgroups,
+                service.getProjectsByPath(encoded, byActivity ? "last_activity_at" : "name",
+                        byActivity ? "desc" : "asc", 1, PAGE_SIZE)
+                        .map(ApiHelpers::throwOnFailure),
                 (groups, projects) -> {
                     List<Object> result = new ArrayList<>();
                     if (groups != null) result.addAll(groups);
@@ -187,7 +308,7 @@ public class GroupTree implements View.OnClickListener {
             return;
         }
         node.loading = true;
-        loadChildren(path, false)
+        loadChildren(path, false, isSortByActivity(mActivity))
                 .compose(RxUtils::doInBackground)
                 .subscribe(children -> {
                     node.loading = false;

@@ -56,9 +56,11 @@ public interface GitLabGroupService {
     );
 
     /** Projects of a group given by its URL-encoded full path (#103). */
-    @GET("groups/{id}/projects?order_by=last_activity_at")
+    @GET("groups/{id}/projects")
     Single<Response<List<GitLabProject>>> getProjectsByPath(
             @Path(value = "id", encoded = true) String groupPath,
+            @Query("order_by") String orderBy,
+            @Query("sort") String sort,
             @Query("page") int page,
             @Query("per_page") int perPage
     );
@@ -70,6 +72,13 @@ public interface GitLabGroupService {
             @Query("page") int page,
             @Query("per_page") int perPage
     );
+
+    /**
+     * The group's most recently active project at any depth; its last_activity_at is used as
+     * the group's activity, which GitLab doesn't expose for groups (#175).
+     */
+    @GET("groups/{id}/projects?include_subgroups=true&order_by=last_activity_at&sort=desc&per_page=1&simple=true")
+    Single<Response<List<GitLabProject>>> getLatestProject(@Path("id") long groupId);
 
     /** Direct subgroups of a group given by its URL-encoded full path (#103). */
     @GET("groups/{id}/subgroups")

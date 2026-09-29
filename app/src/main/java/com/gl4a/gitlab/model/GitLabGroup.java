@@ -15,6 +15,8 @@ public class GitLabGroup {
     @Json(name = "parent_id") public Long parentId;
     @Json(name = "members_count") public int membersCount;
     @Json(name = "projects_count") public int projectsCount;
+    // Latest activity of any project in the group, for sorting (#175); null if none/unknown.
+    public transient String latestActivityAt;
 
     // GitHub Organization compat
     public long id() { return id; }

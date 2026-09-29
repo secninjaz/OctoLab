@@ -78,6 +78,7 @@ public class GitLabProject implements Parcelable {
         @Json(name = "path") public String path;
         @Json(name = "kind") public String kind;
         @Json(name = "full_path") public String fullPath;
+        @Json(name = "parent_id") public Long parentId;
         @Json(name = "avatar_url") public String avatarUrl;
         @Json(name = "web_url") public String webUrl;
 

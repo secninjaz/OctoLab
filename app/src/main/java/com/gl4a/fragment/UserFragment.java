@@ -286,7 +286,9 @@ public class UserFragment extends LoadingFragmentBase implements
             groupUser.avatarUrl = group.avatarUrl;
 
             ImageView avatar = rowView.findViewById(R.id.iv_gravatar);
-            AvatarHandler.assignAvatar(avatar, groupUser);
+            // The one shared group logo, not a user avatar (#176).
+            AvatarHandler.assignGroupLogo(avatar, group);
+            avatar.setBackgroundResource(R.drawable.avatar_frame);
 
             TextView nameView = rowView.findViewById(R.id.tv_title);
             nameView.setText(group.name);

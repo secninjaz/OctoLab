@@ -220,7 +220,7 @@ public class AvatarHandler {
      * Like {@link #assignAvatar} but uses a rounded-rectangle clip (20% corner radius) instead
      * of a full circle. Use for project/group logos whose content extends to the image corners.
      */
-    public static void assignAvatarLogo(ImageView view, String name, long id, String url) {
+    private static void assignAvatarLogo(ImageView view, String name, long id, String url) {
         assignAvatarInternal(new ImageViewDelegate(view), name, id, url, null, true);
     }
 
@@ -277,41 +277,83 @@ public class AvatarHandler {
     }
 
     /**
-     * The single project logo derivation for every project row and header in the app (#172):
-     * the project's own avatar, then its parent group's avatar via the API avatar endpoint,
-     * then the initials tile. Use together with {@code @drawable/avatar_frame} as the view
-     * background. Extend this rather than deriving project logos locally.
+     * THE project logo for every screen and notification (#172, #176). Do not derive project
+     * logos anywhere else. Order: the project's own avatar; its parent group's avatar (via the
+     * API avatar endpoint, as group /uploads/ URLs 401 without a session cookie); if the
+     * project data is slim (e.g. from the Todos API) or the project sits in a nested group,
+     * GET /projects/:id and walk up the ancestor groups (cached per project); else the
+     * initials tile of the project's own name. Use with {@code @drawable/avatar_frame}.
      */
     public static void assignProjectLogo(ImageView view, com.gl4a.gitlab.model.GitLabProject project) {
-        // Use avatars already embedded in the project response (no extra API calls):
-        // project's own avatar → immediate parent namespace avatar → full hierarchy walk.
-        if (project.avatarUrl != null && !project.avatarUrl.isEmpty()) {
-            AvatarHandler.assignAvatarLogo(view, project.name(),
-                    project.id(), project.avatarUrl);
-        } else if (project.namespace != null
-                && project.namespace.avatarUrl != null
-                && !project.namespace.avatarUrl.isEmpty()
-                && "group".equals(project.namespace.kind)) {
-            // Group /uploads/ avatars return 401 without session cookie.
-            // Use the API avatar endpoint which accepts PRIVATE-TOKEN.
-            String groupAvatarUrl = com.gl4a.Gl4Application.get().getApiBaseUrl()
-                    + "groups/" + project.namespace.id + "/avatar";
-            AvatarHandler.assignAvatarLogo(view,
-                    project.namespace.name != null ? project.namespace.name : project.name(),
-                    project.namespace.id, groupAvatarUrl);
+        String name = projectLogoName(project);
+        String inlineUrl = inlineProjectLogoUrl(project);
+        if (inlineUrl != null) {
+            assignAvatarLogo(view, name, inlineLogoId(project), inlineUrl);
+        } else if (needsProjectLogoLookup(project)) {
+            assignProjectLogoByLookup(view, name, project.id);
         } else {
-            // No avatar at project or immediate parent level — show project initials.
-            // Intentionally capped at 2 levels (project → parent group); deeper ancestor
-            // walk was deliberately omitted to keep the repo list fast and predictable.
-            // If a future requirement needs grandparent-and-above fallback, re-enable:
-            //   AvatarHandler.assignAvatarForProject(view,
-            //           project.name(), project.id());
-            // Note: group /uploads/ avatar URLs return 401 without session cookie.
-            // The API avatar endpoint (api/v4/groups/:id/avatar) must be used instead —
-            // see the fetchProjectAvatarUrl path in AvatarHandler for context.
-            view.setImageDrawable(
-                    new AvatarHandler.DefaultAvatarDrawable(project.name(), null, true));
+            view.setImageDrawable(new DefaultAvatarDrawable(name, null, true));
         }
+    }
+
+    /**
+     * {@link #assignProjectLogo} as a Bitmap, for notifications. Same decision, same result.
+     * Performs blocking network I/O — call from a background thread only.
+     */
+    public static Bitmap loadProjectLogoSynchronously(
+            @Nullable com.gl4a.gitlab.model.GitLabProject project, int placeholderSizePx) {
+        String name = project != null ? projectLogoName(project) : "GitLab";
+        long id = project != null ? project.id : 0;
+        if (project != null) {
+            try {
+                String url = inlineProjectLogoUrl(project);
+                if (url == null && needsProjectLogoLookup(project)) {
+                    url = fetchProjectAvatarUrl(project.id);
+                }
+                if (url != null) {
+                    Bitmap bitmap = fetchBitmap(url);
+                    if (bitmap != null) return fitLogoToSquare(bitmap);
+                }
+            } catch (IOException e) {
+                Log.d(TAG, "loadProjectLogoSynchronously failed for id=" + id, e);
+            }
+        }
+        return renderProjectPlaceholder(name, id, placeholderSizePx);
+    }
+
+    /** The name the initials tile uses: always the project's own name (#176). */
+    private static String projectLogoName(com.gl4a.gitlab.model.GitLabProject project) {
+        if (project.name != null && !project.name.isEmpty()) return project.name;
+        return project.path != null ? project.path : "";
+    }
+
+    /** A logo URL available in the project data itself, or null. */
+    @Nullable
+    private static String inlineProjectLogoUrl(com.gl4a.gitlab.model.GitLabProject project) {
+        if (project.avatarUrl != null && !project.avatarUrl.isEmpty()) return project.avatarUrl;
+        if (project.namespace != null && "group".equals(project.namespace.kind)
+                && project.namespace.avatarUrl != null && !project.namespace.avatarUrl.isEmpty()
+                && project.namespace.id > 0) {
+            return com.gl4a.Gl4Application.get().getApiBaseUrl()
+                    + "groups/" + project.namespace.id + "/avatar";
+        }
+        return null;
+    }
+
+    private static long inlineLogoId(com.gl4a.gitlab.model.GitLabProject project) {
+        return project.avatarUrl != null && !project.avatarUrl.isEmpty()
+                ? project.id : project.namespace.id;
+    }
+
+    /**
+     * Whether the logo may be further up than the project data shows: slim data without a
+     * namespace (Todos API), or a namespace that is itself a subgroup.
+     */
+    private static boolean needsProjectLogoLookup(com.gl4a.gitlab.model.GitLabProject project) {
+        if (project.id <= 0) return false;
+        if (project.namespace == null) return true;
+        return "group".equals(project.namespace.kind)
+                && project.namespace.parentId != null && project.namespace.parentId > 0;
     }
 
     /**
@@ -329,11 +371,8 @@ public class AvatarHandler {
         }
     }
 
-    /**
-     * Loads the project avatar for the To-do list header row.
-     * Fetches avatar_url via GET /projects/{id} (Todos API omits it) and caches by project ID.
-     */
-    public static void assignAvatarForProject(ImageView view, String projectName, long projectId) {
+    /** Async GET /projects/:id + ancestor walk for {@link #assignProjectLogo}; cached per project. */
+    private static void assignProjectLogoByLookup(ImageView view, String projectName, long projectId) {
         if (projectId <= 0) {
             view.setImageDrawable(new DefaultAvatarDrawable(projectName, null, true));
             return;
@@ -387,40 +426,13 @@ public class AvatarHandler {
      * a Drawable to. Most projects have no uploaded avatar, so this is the common case,
      * not just a network-failure fallback.
      */
-    public static Bitmap renderProjectPlaceholder(String projectName, long projectId, int sizePx) {
+    private static Bitmap renderProjectPlaceholder(String projectName, long projectId, int sizePx) {
         DefaultAvatarDrawable drawable = new DefaultAvatarDrawable(projectName,
                 projectId > 0 ? projectId : null, true);
         Bitmap bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
         drawable.setBounds(0, 0, sizePx, sizePx);
         drawable.draw(new Canvas(bitmap));
         return bitmap;
-    }
-
-    /**
-     * Synchronously resolves a project's avatar for contexts outside the async View-based
-     * pipeline (e.g. notifications) — reuses the exact same URL resolution (including the
-     * parent-namespace fallback walk) and fetch logic as the in-app path
-     * (assignAvatarForProject), so a project showing a real logo or an inherited group logo
-     * in-app shows the same thing in a notification, not just its own possibly-unset avatar.
-     * Falls back to the same colored initials-tile placeholder when nothing is set anywhere
-     * in the hierarchy. Performs blocking network I/O — call from a background thread only.
-     */
-    public static Bitmap loadProjectAvatarSynchronously(String projectName, long projectId,
-            int placeholderSizePx) {
-        if (projectId > 0) {
-            try {
-                String url = fetchProjectAvatarUrl(projectId);
-                if (url != null) {
-                    Bitmap bitmap = fetchBitmap(url);
-                    if (bitmap != null) {
-                        return fitLogoToSquare(bitmap);
-                    }
-                }
-            } catch (IOException e) {
-                Log.d(TAG, "loadProjectAvatarSynchronously failed for id=" + projectId, e);
-            }
-        }
-        return renderProjectPlaceholder(projectName, projectId, placeholderSizePx);
     }
 
     public static void assignAvatar(Context context, MenuItem item,

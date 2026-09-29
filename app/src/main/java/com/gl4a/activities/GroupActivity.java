@@ -92,11 +92,22 @@ public class GroupActivity extends BaseActivity implements
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.group, menu);
+        getMenuInflater().inflate(R.menu.group_sort, menu);
+        GroupTree.prepareSortMenu(menu, this);
         return super.onCreateOptionsMenu(menu);
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        if (GroupTree.onSortItemSelected(item, this)) {
+            mTreeState.clear();
+            loadSubgroups(true);
+            return true;
+        }
+        if (item.getItemId() == R.id.group_sort_name
+                || item.getItemId() == R.id.group_sort_activity) {
+            return true;
+        }
         if (item.getItemId() == R.id.browser) {
             String url = mGroup != null && mGroup.webUrl != null ? mGroup.webUrl
                     : com.gl4a.Gl4Application.get().getInstanceUrl() + "/" + mGroupPath;
@@ -196,7 +207,7 @@ public class GroupActivity extends BaseActivity implements
             mRootView.post(() -> mRootView.scrollTo(0, scrollY));
             return;
         }
-        GroupTree.loadChildren(groupPath(), force)
+        GroupTree.loadChildren(groupPath(), force, GroupTree.isSortByActivity(this))
                 .zipWith(MembershipRoles.load(), TreeData::new)
                 .compose(makeLoaderSingle(ID_LOADER_SUBGROUPS, force))
                 .subscribe(data -> {
