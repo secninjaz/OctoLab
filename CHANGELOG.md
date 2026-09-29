@@ -11,8 +11,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Comment threads on issues and MRs: replies are shown indented under the comment they belong to, and "Reply" on any comment of a thread posts into that thread (#123)
 - Login dialog links to the instance's personal access token page with the required `api` and `read_user` scopes pre-filled (#169)
 - Groups: a group screen with the group's projects, members and subgroups; group namespaces (owner taps, Back navigation, links, a user's groups) now open as groups instead of failing as users (#103, #111)
+- Group tree like GitLab web on the group screen and a new Groups drawer entry: expandable subgroups and projects with GitLab's icons, visibility, your role (including inherited), and the group's projects at any depth; Up from a subgroup goes to its parent group (#172)
 - Reactions on commit comments (via GraphQL; GitLab's REST API has no award-emoji endpoint for commit notes), matching issue/MR comment behaviour (#159)
 - Internal and public repos show GitLab's own visibility icons (shield, globe) in the repo list and overview (#145)
+
+### Changed
+- GitLab's own icons for projects, work items, snippets and to-dos across the app; drawer labels now read Projects, Groups, Work items, Merge requests and Snippets (#172)
 
 ### Fixed
 - Links for another instance you are logged in to now open in-app with the matching account — switching automatically for one match, or asking when several match — both from other apps and when tapped inside the app, instead of opening in the browser (#163)
