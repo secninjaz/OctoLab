@@ -84,15 +84,21 @@ public class HtmlUtils {
         builder.append(".css' rel='stylesheet' type='text/css'/>");
     }
 
-    private static class ReplySpan implements LeadingMarginSpan {
+    /**
+     * Blockquote: a bar plus a light tint, distinct from the timeline's thread and system-note
+     * styling (#179).
+     */
+    private static class ReplySpan implements LeadingMarginSpan, LineBackgroundSpan {
         private final int mColor;
         private final int mMargin;
         private final int mSize;
+        private final int mBackground;
 
-        public ReplySpan(int margin, int size, int color) {
+        public ReplySpan(int margin, int size, int color, int background) {
             mColor = color;
             mMargin = margin;
             mSize = size;
+            mBackground = background;
         }
 
         @Override
@@ -112,6 +118,15 @@ public class HtmlUtils {
             c.drawRect(x, top, x + dir * mSize, bottom, p);
 
             p.setStyle(style);
+            p.setColor(color);
+        }
+
+        @Override
+        public void drawBackground(Canvas c, Paint p, int left, int right, int top,
+                int baseline, int bottom, CharSequence text, int start, int end, int lineNumber) {
+            final int color = p.getColor();
+            p.setColor(mBackground);
+            c.drawRect(left, top, right, bottom, p);
             p.setColor(color);
         }
     }
@@ -382,13 +397,14 @@ public class HtmlUtils {
         };
         private static final float SMALL_TEXT_SIZE = 0.8f;
 
-        private static final int REPLY_MARKER_COLOR = 0xffdddddd;
 
         private final float mDividerHeight;
         private final float mDisplayTextScaling;
         private final int mBulletMargin;
         private final int mReplyMargin;
         private final int mReplyMarkerSize;
+        private final int mReplyMarkerColor;
+        private final int mReplyBackground;
         private final int mCodeBlockBackgroundColor;
 
         private final Context mContext;
@@ -441,6 +457,8 @@ public class HtmlUtils {
             mBulletMargin = res.getDimensionPixelSize(R.dimen.bullet_span_margin);
             mReplyMargin = res.getDimensionPixelSize(R.dimen.reply_span_margin);
             mReplyMarkerSize = res.getDimensionPixelSize(R.dimen.reply_span_size);
+            mReplyMarkerColor = res.getColor(R.color.quote_bar);
+            mReplyBackground = res.getColor(R.color.quote_bg);
             mCodeBlockBackgroundColor = UiUtils.resolveColor(context, R.attr.colorCodeBackground);
 
             mContext = context;
@@ -608,7 +626,7 @@ public class HtmlUtils {
             } else if (tag.equalsIgnoreCase("img")) {
                 startImg(attributes, mImageGetter);
             } else if (tag.equalsIgnoreCase("video")) {
-                appendVideoLink(attributes.getValue("src"));
+                appendVideoLink(attributes.getValue("src"), attributes.getValue("data-title"));
             } else if (tag.equalsIgnoreCase("table")) {
                 appendNewlines(2);
                 start(new Table());
@@ -735,9 +753,31 @@ public class HtmlUtils {
             }
         }
 
-        private void appendVideoLink(String videoUrl) {
+        private void appendVideoLink(String videoUrl, String title) {
+            if (videoUrl == null || videoUrl.startsWith("data:")) return;
+            String source = HttpImageGetter.VIDEO_THUMBNAIL_PREFIX + videoUrl;
+            Drawable thumbnail = mImageGetter != null && videoUrl.startsWith("http")
+                    ? mImageGetter.getDrawable(source) : null;
+            if (thumbnail != null) {
+                // A thumbnail of the first frame above the name; both open the video in-app
+                int start = mSpannableStringBuilder.length();
+                mSpannableStringBuilder.append("\uFFFC");
+                mSpannableStringBuilder.setSpan(new ImageSpan(thumbnail, source),
+                        start, start + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                mSpannableStringBuilder.setSpan(new LinkSpan(videoUrl),
+                        start, start + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                mSpannableStringBuilder.append("\n");
+            }
             mSpannableStringBuilder.append("\uD83C\uDFA5 "); // movie camera emoji
-            String videoLinkText = mContext.getString(R.string.view_video);
+            // The file's name, like GitLab's player title, instead of a generic label (#187)
+            String name = title;
+            if (android.text.TextUtils.isEmpty(name)) {
+                String path = android.net.Uri.parse(videoUrl).getLastPathSegment();
+                name = path != null ? path : null;
+            }
+            String videoLinkText = !android.text.TextUtils.isEmpty(name)
+                    ? mContext.getString(R.string.view_video_named, name)
+                    : mContext.getString(R.string.view_video);
             mSpannableStringBuilder.append(videoLinkText);
             mSpannableStringBuilder.setSpan(new LinkSpan(videoUrl),
                     mSpannableStringBuilder.length() - videoLinkText.length(),
@@ -805,7 +845,7 @@ public class HtmlUtils {
 
         private Object[] getSpansForBlockElementType(@NonNull BlockElement.Type type) {
             return switch (type) {
-                case Alert -> new Object[] { new ReplySpan(mReplyMargin, mReplyMarkerSize, REPLY_MARKER_COLOR) };
+                case Alert -> new Object[] { new ReplySpan(mReplyMargin, mReplyMarkerSize, mReplyMarkerColor, mReplyBackground) };
                 case AlertTitle -> new Object[] { new StyleSpan(Typeface.BOLD_ITALIC) };
                 case Generic -> new Object[0];
             };
@@ -842,7 +882,8 @@ public class HtmlUtils {
 
         private void endBlockquote() {
             endBlockElement();
-            end(Blockquote.class, new ReplySpan(mReplyMargin, mReplyMarkerSize, REPLY_MARKER_COLOR));
+            end(Blockquote.class, new ReplySpan(mReplyMargin, mReplyMarkerSize, mReplyMarkerColor,
+                    mReplyBackground));
         }
 
         private void startHeading(Attributes attributes, int level) {

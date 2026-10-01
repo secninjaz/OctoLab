@@ -140,8 +140,9 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         mRepoName = args.getString("repo");
         mIssue = args.getParcelable("issue");
         mIsCollaborator = args.getBoolean("collaborator");
-        if (!android.text.TextUtils.isEmpty(mRepoOwner) && !android.text.TextUtils.isEmpty(mRepoName)) {
-            Gl4Application.get().setCurrentProjectPath(mRepoOwner + "/" + mRepoName);
+        String projectPath = getProjectPath();
+        if (projectPath != null) {
+            Gl4Application.get().setCurrentProjectPath(projectPath);
         }
         mInitialComment = args.getParcelable("initial_comment");
         args.remove("initial_comment");
@@ -164,6 +165,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         mBottomSheet.setListener(this);
 
         mImageGetter = new HttpImageGetter(inflater.getContext());
+        mImageGetter.setProjectPath(getProjectPath());
         updateCommentSectionVisibility(v);
         updateCommentLockState();
 
@@ -214,11 +216,8 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
     @Override
     protected void onRecyclerViewInflated(RecyclerView view, LayoutInflater inflater) {
         super.onRecyclerViewInflated(view, inflater);
-        // Own divider (see hasDividers()): none between replies of a thread, so a thread
-        // reads as one block (#123).
-        view.addItemDecoration(new com.gl4a.widget.DividerItemDecoration(view.getContext(),
-                (parent, child) -> !TimelineItemAdapter.isThreadReplyRow(
-                        parent.getChildViewHolder(child))));
+        // GitLab web's timeline line instead of row dividers (#179).
+        view.addItemDecoration(new com.gl4a.widget.TimelineLineDecoration(view.getContext(), true));
 
         mListHeaderView = inflater.inflate(R.layout.issue_comment_list_header, view, false);
         mAdapter.setHeaderView(mListHeaderView);
@@ -317,12 +316,29 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         mAdapter = new TimelineItemAdapter(getActivity(), mRepoOwner, mRepoName, mIssue.number(),
                 mIssue.pullRequest() != null, true, this);
         mAdapter.setLocked(isLocked());
+        mAdapter.setProjectPath(getProjectPath());
         return mAdapter;
+    }
+
+    @Override
+    protected androidx.recyclerview.widget.LinearLayoutManager createLayoutManager(
+            android.content.Context context) {
+        // Keeps the scrollbar's size steady while scrolling a timeline of very different
+        // row heights (#152)
+        com.gl4a.widget.StableScrollbarLayoutManager layoutManager =
+                new com.gl4a.widget.StableScrollbarLayoutManager(context);
+        layoutManager.setCollapsedRows(
+                position -> mAdapter != null && mAdapter.isRowCollapsed(position));
+        return layoutManager;
     }
 
     @Override
     protected void onAddData(RootAdapter<TimelineItem, ?> adapter, List<TimelineItem> data) {
         super.onAddData(adapter, data);
+        // Render all notes now rather than as each scrolls in, so rows keep their height (#152)
+        if (mAdapter != null) {
+            mAdapter.prerenderMarkdown(data);
+        }
         if (mInitialComment != null) {
             for (int i = 0; i < data.size(); i++) {
                 TimelineItem item = data.get(i);
@@ -333,6 +349,11 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
                     itemId = ((TimelineItem.TimelineReview) item).review().id();
                 }
                 if (mInitialComment.matches(itemId, item.getCreatedAt())) {
+                    // A reply in a collapsed thread has no height; open its thread first (#179).
+                    if (item instanceof TimelineItem.TimelineComment && mAdapter != null) {
+                        mAdapter.expandThread(
+                                ((TimelineItem.TimelineComment) item).comment().discussionId());
+                    }
                     final int scrollPos = i + 1; /* adjust for header view */
                     mPendingScrollPosition = scrollPos;
                     // Also post directly so the scroll fires after setContentShown(true)
@@ -411,13 +432,15 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         ivGravatar.setOnClickListener(this);
 
         TextView tvExtra = mListHeaderView.findViewById(R.id.tv_extra);
-        tvExtra.setText(ApiHelpers.getUserLoginWithType(getActivity(), mIssue.user()));
+        tvExtra.setText(ApiHelpers.getUserNameWithLogin(getActivity(), mIssue.user()));
         tvExtra.setOnClickListener(this);
         tvExtra.setTag(mIssue.user());
 
         TextView tvTimestamp = mListHeaderView.findViewById(R.id.tv_timestamp);
         tvTimestamp.setText(StringUtils.formatRelativeTime(getActivity(),
                 mIssue.createdAt(), true));
+
+        loadDescriptionEdited(mListHeaderView.findViewById(R.id.tv_edited));
 
         String body = mIssue.body();
         TextView descriptionView = mListHeaderView.findViewById(R.id.tv_desc);
@@ -459,7 +482,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
             for (GitLabUser assignee : assignees) {
                 View row = inflater.inflate(R.layout.row_assignee, assigneeContainer, false);
                 TextView tvAssignee = row.findViewById(R.id.tv_assignee);
-                tvAssignee.setText(ApiHelpers.getUserLogin(getActivity(), assignee));
+                tvAssignee.setText(ApiHelpers.getUserDisplayName(getActivity(), assignee));
 
                 ImageView ivAssignee = row.findViewById(R.id.iv_assignee);
                 AvatarHandler.assignAvatar(ivAssignee, assignee);
@@ -481,6 +504,84 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
 
         assignHighlightColor();
         bindSpecialViews(mListHeaderView);
+    }
+
+    private static final String DESCRIPTION_EDIT_QUERY =
+            "query($path: ID!, $iid: String!) { project(fullPath: $path) {"
+            + " workItems(iid: $iid) { nodes { widgets {"
+            + " ... on WorkItemWidgetDescription { lastEditedAt lastEditedBy { username name } }"
+            + " } } } } }";
+
+    /**
+     * Shows who last edited the issue description and when, like GitLab web (#151). REST has
+     * no such field (an issue's updated_at changes with every comment), so it comes from the
+     * work item's description widget over GraphQL; hidden if that's unavailable. GitLab
+     * doesn't expose this for merge request descriptions.
+     */
+    private void loadDescriptionEdited(TextView view) {
+        view.setVisibility(View.GONE);
+        if (isMergeRequestView() || mRepoOwner == null || mRepoName == null) {
+            return;
+        }
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("path", mRepoOwner + "/" + mRepoName);
+        variables.put("iid", String.valueOf(mIssue.number()));
+        Map<String, Object> body = new HashMap<>();
+        body.put("query", DESCRIPTION_EDIT_QUERY);
+        body.put("variables", variables);
+        ServiceFactory.getGraphQL(com.gl4a.gitlab.service.GitLabGraphQLService.class)
+                .getDescriptionEdit(body)
+                .map(response -> {
+                    com.gl4a.gitlab.model.GitLabDescriptionEditResponse payload = response.body();
+                    if (payload == null || payload.data == null || payload.data.project == null
+                            || payload.data.project.workItems == null
+                            || payload.data.project.workItems.nodes == null) {
+                        return new GitLabComment();
+                    }
+                    // Reuse the comment's edit details so the line reads the same as on notes
+                    GitLabComment edit = new GitLabComment();
+                    for (com.gl4a.gitlab.model.GitLabDescriptionEditResponse.WorkItem item
+                            : payload.data.project.workItems.nodes) {
+                        if (item == null || item.widgets == null) continue;
+                        for (com.gl4a.gitlab.model.GitLabDescriptionEditResponse.Widget widget
+                                : item.widgets) {
+                            if (widget != null && widget.lastEditedBy != null) {
+                                GitLabUser editor = GitLabUser.create(
+                                        widget.lastEditedBy.username, 0);
+                                editor.name = widget.lastEditedBy.name;
+                                edit.withEditInfo(widget.lastEditedAt, editor);
+                            }
+                        }
+                    }
+                    return edit;
+                })
+                .compose(RxUtils::doInBackground)
+                .subscribe(edit -> {
+                    if (isAdded()) {
+                        com.gl4a.adapter.timeline.CommentViewHolder.bindEdited(view, edit);
+                    }
+                }, error -> android.util.Log.d(Gl4Application.LOG_TAG,
+                        "Description edit details unavailable", error));
+    }
+
+    /**
+     * The issue's or MR's project path: from owner/repo, or, when opened from a cross-project
+     * list with only a project ID, from its web URL (namespace/repo before "/-/"). Notes are
+     * rendered against it so their references link to the right project (#197).
+     */
+    @androidx.annotation.Nullable
+    private String getProjectPath() {
+        if (!android.text.TextUtils.isEmpty(mRepoOwner)
+                && !android.text.TextUtils.isEmpty(mRepoName)) {
+            return mRepoOwner + "/" + mRepoName;
+        }
+        String webUrl = mIssue != null ? mIssue.webUrl : null;
+        if (webUrl == null) {
+            return null;
+        }
+        List<String> segments = android.net.Uri.parse(webUrl).getPathSegments();
+        int dash = segments.indexOf("-");
+        return dash >= 2 ? android.text.TextUtils.join("/", segments.subList(0, dash)) : null;
     }
 
     /** Subclasses override to true when displaying a merge request rather than an issue. */
@@ -758,7 +859,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
 
     @Override
     protected boolean hasDividers() {
-        // Added in onRecyclerViewInflated() with a thread-aware filter instead (#123).
+        // Cards and the timeline line separate rows instead (#179).
         return false;
     }
 
@@ -802,8 +903,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         }
         if (mReplyBar != null) {
             GitLabUser author = comment.user();
-            String name = author != null && author.name() != null ? author.name()
-                    : author != null ? author.login() : "";
+            String name = author != null ? ApiHelpers.getUserDisplayName(getActivity(), author) : "";
             ((TextView) mReplyBar.findViewById(R.id.tv_reply_to))
                     .setText(getString(R.string.replying_to_thread_by, name));
         }

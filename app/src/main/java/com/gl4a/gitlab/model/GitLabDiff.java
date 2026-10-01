@@ -27,7 +27,26 @@ public class GitLabDiff {
         if (renamedFile) return "renamed";
         return "modified";
     }
-    public int additions() { return 0; }
-    public int deletions() { return 0; }
-    public int changes() { return 0; }
+    // GitLab's diff APIs don't return line counts, so count them from the unified diff;
+    // these were hard-coded to 0, so every summary read "0 additions and 0 deletions" (#184).
+    private transient int mAdditions = -1;
+    private transient int mDeletions = -1;
+
+    public int additions() { countLines(); return mAdditions; }
+    public int deletions() { countLines(); return mDeletions; }
+    public int changes() { return additions() + deletions(); }
+
+    private void countLines() {
+        if (mAdditions >= 0) return;
+        int added = 0, removed = 0;
+        if (diff != null) {
+            for (String line : diff.split("\n", -1)) {
+                if (line.startsWith("+++") || line.startsWith("---")) continue;
+                if (line.startsWith("+")) added++;
+                else if (line.startsWith("-")) removed++;
+            }
+        }
+        mAdditions = added;
+        mDeletions = removed;
+    }
 }

@@ -229,6 +229,19 @@ public class CommitCommentsFragment extends ListDataBaseFragment<GitLabComment> 
     }
 
     @Override
+    protected void onRecyclerViewInflated(androidx.recyclerview.widget.RecyclerView view,
+            android.view.LayoutInflater inflater) {
+        super.onRecyclerViewInflated(view, inflater);
+        // Same GitLab-style timeline as issues/MRs: cards on a timeline line, no dividers (#179).
+        view.addItemDecoration(new com.gl4a.widget.TimelineLineDecoration(view.getContext(), false));
+    }
+
+    @Override
+    protected boolean hasDividers() {
+        return false;
+    }
+
+    @Override
     protected Single<List<GitLabComment>> onCreateDataSingle(boolean bypassCache) {
         GitLabCommitService service = ServiceFactory.get(GitLabCommitService.class, bypassCache);
         return com.gl4a.utils.SingleFactory.getProjectId(mRepoOwner, mRepoName)

@@ -1,98 +1,225 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Timeline comment like GitLab web (#179): avatar in the timeline column, the comment in a
+     card beside it. Thread replies continue in the same card (top/middle/bottom card segments,
+     set in CommentViewHolder) with a small avatar in the header instead of the column one. -->
 <RelativeLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="?attr/selectableItemBackground"
     android:clipToPadding="false"
-    android:minHeight="?attr/listPreferredItemHeight"
-    android:padding="@dimen/content_padding">
+    android:paddingLeft="@dimen/timeline_side_padding"
+    android:paddingRight="@dimen/timeline_side_padding"
+    android:paddingTop="@dimen/timeline_row_gap"
+    android:paddingBottom="@dimen/timeline_row_gap">
 
     <com.gl4a.widget.FixedSizeImageView
         android:id="@+id/iv_gravatar"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:layout_marginRight="16dp"
+        android:layout_width="@dimen/timeline_avatar_size"
+        android:layout_height="@dimen/timeline_avatar_size"
+        android:layout_marginTop="10dp"
         android:background="?attr/selectableItemBackgroundBorderless"
         tools:src="@drawable/default_avatar" />
 
-    <ImageView
-        android:id="@+id/iv_menu"
-        style="@style/SelectableBorderlessItem"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:layout_alignParentRight="true"
-        android:layout_marginRight="-8dp"
-        android:scaleType="center"
-        android:src="@drawable/overflow" />
-
-    <com.gl4a.widget.LinkHandlingTextView
-        android:id="@+id/tv_extra"
-        android:layout_width="wrap_content"
+    <RelativeLayout
+        android:id="@+id/card"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
+        android:layout_marginLeft="@dimen/timeline_content_gap"
         android:layout_toRightOf="@id/iv_gravatar"
-        android:background="?selectableItemBackground"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="?android:attr/textColorPrimary"
-        tools:text="username" />
+        android:background="@drawable/timeline_card"
+        android:padding="12dp">
 
-    <com.gl4a.widget.LinkHandlingTextView
-        android:id="@+id/tv_timestamp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignBaseline="@id/tv_extra"
-        android:layout_alignWithParentIfMissing="true"
-        android:layout_marginLeft="16dp"
-        android:layout_toLeftOf="@id/iv_menu"
-        android:layout_toRightOf="@id/tv_extra"
-        android:textAppearance="@style/TextAppearance.VerySmall"
-        tools:text="5 days ago" />
+        <com.gl4a.widget.FixedSizeImageView
+            android:id="@+id/iv_reply_avatar"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginRight="8dp"
+            android:visibility="gone"
+            tools:src="@drawable/default_avatar" />
 
-    <com.gl4a.widget.LinkHandlingTextView
-        android:id="@+id/tv_edit_timestamp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/tv_timestamp"
-        android:layout_marginLeft="16dp"
-        android:layout_toLeftOf="@id/iv_menu"
-        android:layout_toRightOf="@id/tv_extra"
-        android:drawableLeft="@drawable/comment_edit"
-        android:drawablePadding="2dp"
-        android:textAppearance="@style/TextAppearance.VerySmall"
-        tools:text="5 days ago" />
+        <ImageView
+            android:id="@+id/iv_menu"
+            style="@style/SelectableBorderlessItem"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_alignParentRight="true"
+            android:layout_marginRight="-6dp"
+            android:scaleType="center"
+            android:src="@drawable/overflow" />
 
-    <com.gl4a.widget.LinkHandlingTextView
-        android:id="@+id/tv_desc"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/tv_edit_timestamp"
-        android:layout_marginTop="8dp"
-        android:layout_toLeftOf="@id/iv_menu"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="?android:attr/textColorPrimary"
-        android:textIsSelectable="true"
-        app:needsLinkHandling="true"
-        tools:text="Comment text" />
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_extra"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentTop="true"
+            android:layout_toRightOf="@id/iv_reply_avatar"
+            android:background="?selectableItemBackground"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="?android:attr/textColorPrimary"
+            tools:text="Display Name @username" />
 
-    <!-- Used instead of tv_desc when content contains a table -->
-    <WebView
-        android:id="@+id/wv_table"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/tv_edit_timestamp"
-        android:layout_marginTop="8dp"
-        android:layout_toLeftOf="@id/iv_menu"
-        android:visibility="gone" />
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_timestamp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignBaseline="@id/tv_extra"
+            android:layout_alignWithParentIfMissing="true"
+            android:layout_marginLeft="8dp"
+            android:layout_toLeftOf="@id/iv_menu"
+            android:layout_toRightOf="@id/tv_extra"
+            android:textAppearance="@style/TextAppearance.VerySmall"
+            tools:text="5 days ago" />
 
-    <com.gl4a.widget.ReactionBar
-        android:id="@+id/reactions"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/tv_desc"
-        android:layout_marginTop="2dp"
-        android:layout_toLeftOf="@id/iv_menu" />
+        <!-- "Resolved 1 day ago by linsui" on a resolved thread's first note (#179) -->
+        <TextView
+            android:id="@+id/tv_resolved"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/tv_thread_context"
+            android:layout_marginTop="2dp"
+            android:textAppearance="@style/TextAppearance.VerySmall"
+            android:visibility="gone"
+            tools:text="Resolved 1 day ago by linsui" />
+
+        <!-- Diff threads, like GitLab web (#179): "started a thread on (an old version of) the
+             diff", the file, and the code lines the thread is about -->
+        <TextView
+            android:id="@+id/tv_thread_context"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_timestamp"
+            android:layout_marginTop="2dp"
+            android:textAppearance="@style/TextAppearance.VerySmall"
+            android:visibility="gone"
+            tools:text="started a thread on an old version of the diff" />
+
+        <TextView
+            android:id="@+id/tv_diff_file"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_resolved"
+            android:layout_marginTop="8dp"
+            android:ellipsize="middle"
+            android:singleLine="true"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:text="metadata/com.secninjaz.octolab.yml" />
+
+        <HorizontalScrollView
+            android:id="@+id/sv_diff_snippet"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_diff_file"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/timeline_card"
+            android:fillViewport="true"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <!-- Fills the card's width so diff line colours reach the edge; still scrolls
+                 sideways for longer lines -->
+            <TextView
+                android:id="@+id/tv_diff_snippet"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:padding="6dp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="12sp"
+                tools:text="   5 +   - NonFreeNet" />
+
+        </HorizontalScrollView>
+
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_desc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/sv_diff_snippet"
+            android:layout_marginTop="6dp"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textIsSelectable="true"
+            app:needsLinkHandling="true"
+            tools:text="Comment text" />
+
+        <!-- Used instead of tv_desc when content contains a table -->
+        <WebView
+            android:id="@+id/wv_table"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/sv_diff_snippet"
+            android:layout_marginTop="6dp"
+            android:visibility="gone" />
+
+        <!-- "Edited 2 days ago by Jay B" under the text, like GitLab web (#151) -->
+        <TextView
+            android:id="@+id/tv_edited"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_desc"
+            android:layout_marginTop="4dp"
+            android:textAppearance="@style/TextAppearance.VerySmall"
+            android:visibility="gone"
+            tools:text="Edited 2 days ago by Jay B" />
+
+        <com.gl4a.widget.ReactionBar
+            android:id="@+id/reactions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_edited"
+            android:layout_marginTop="2dp" />
+
+        <!-- On a thread's first note: "▸ 7 replies · Last reply by Jay B · 3 weeks ago" with
+             reply authors' avatars; toggles the replies (#179) -->
+        <LinearLayout
+            android:id="@+id/ll_thread_toggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/reactions"
+            android:layout_marginLeft="-12dp"
+            android:layout_marginRight="-12dp"
+            android:layout_marginTop="8dp"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="8dp"
+            android:paddingRight="12dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="0dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/iv_thread_chevron"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/chevron_down" />
+
+            <LinearLayout
+                android:id="@+id/ll_thread_avatars"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="4dp"
+                android:orientation="horizontal" />
+
+            <TextView
+                android:id="@+id/tv_thread_toggle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="6dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:textAppearance="?android:attr/textAppearanceSmall"
+                android:textColor="?android:attr/textColorSecondary"
+                tools:text="7 replies · Last reply by Jay B · 3 weeks ago" />
+
+        </LinearLayout>
+
+    </RelativeLayout>
 
 </RelativeLayout>

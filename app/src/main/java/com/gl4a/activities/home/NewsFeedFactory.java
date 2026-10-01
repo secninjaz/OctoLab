@@ -205,7 +205,7 @@ public class NewsFeedFactory extends FragmentFactory implements Spinner.OnItemSe
             AvatarHandler.assignAvatar(avatar, user);
 
             TextView nameView = convertView.findViewById(R.id.tv_title);
-            nameView.setText(user.login());
+            nameView.setText(com.gl4a.utils.ApiHelpers.getUserDisplayName(convertView.getContext(), user));
 
             return convertView;
         }

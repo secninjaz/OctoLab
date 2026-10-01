@@ -158,7 +158,7 @@ public class IssueLabelAdapter extends
         if (colorString != null && !colorString.startsWith("#")) {
             colorString = "#" + colorString;
         }
-        int color = Color.parseColor(colorString != null ? colorString : "#eeeeee");
+        int color = com.gl4a.utils.ApiHelpers.parseGitLabColor(colorString);
         int textColor = UiUtils.textColorForBackground(mContext, color);
 
         holder.color.setBackgroundColor(color);

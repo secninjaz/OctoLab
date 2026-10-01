@@ -209,7 +209,7 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
                         inflater.inflate(R.layout.row_assignee, reviewerList, false);
                 android.widget.TextView tvReviewer = row.findViewById(R.id.tv_assignee);
                 tvReviewer.setText(
-                        com.gl4a.utils.ApiHelpers.getUserLogin(getActivity(), reviewer));
+                        com.gl4a.utils.ApiHelpers.getUserDisplayName(getActivity(), reviewer));
                 android.widget.ImageView ivReviewer = row.findViewById(R.id.iv_assignee);
                 com.gl4a.utils.AvatarHandler.assignAvatar(ivReviewer, reviewer);
                 ivReviewer.setTag(reviewer);
@@ -273,14 +273,23 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
                                     }
                                     return retrofit2.Response.success(ApiHelpers.toPage(response));
                                 }))
-                .map(com.gl4a.gitlab.model.GitLabDiscussion::flatten)
+                // Label/milestone/state changes live in resource events, not notes (#180).
+                .zipWith(com.gl4a.utils.TimelineEvents.load(projectId, true, mrIid, bypassCache),
+                        com.gl4a.gitlab.model.GitLabDiscussion::flattenWithEvents)
                 // Reactions for all notes come from one GraphQL query instead of per row (#162).
                 .zipWith(com.gl4a.utils.NoteReactionsLoader.load(true, mMergeRequest.id(), bypassCache),
                         com.gl4a.utils.NoteReactionsLoader::apply)
+                // Some users (e.g. token bots) come back named "****" (#193)
+                .map(com.gl4a.utils.MaskedNames::unmask)
                 .compose(com.gl4a.utils.RxUtils.<com.gl4a.gitlab.model.GitLabComment,
                         TimelineItem>mapList(
                         c -> new TimelineItem.TimelineComment(c)))
                 .subscribeOn(Schedulers.io());
+    }
+
+    @Override
+    public String getMergeRequestHeadSha() {
+        return mMergeRequest != null ? mMergeRequest.sha : null;
     }
 
     // ---- Override IssueFragmentBase API calls to use MR endpoints instead of Issue endpoints ----

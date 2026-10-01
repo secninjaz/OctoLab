@@ -399,7 +399,8 @@ public class NotificationsWorker extends Worker {
         int iconSizePx = context.getResources()
                 .getDimensionPixelSize(android.R.dimen.notification_large_icon_width);
         // The one shared project logo, so it matches the app exactly (#176).
-        builder.setLargeIcon(AvatarHandler.loadProjectLogoSynchronously(first.project, iconSizePx));
+        builder.setLargeIcon(AvatarHandler.loadProjectLogoSynchronously(first.project, iconSizePx,
+                apiBaseForLogin(accountLogin)));
 
         boolean hasNewTodo = false;
         NotificationCompat.InboxStyle inbox = new NotificationCompat.InboxStyle()
@@ -514,6 +515,13 @@ public class NotificationsWorker extends Worker {
             }
         }
         return authorName + " " + verb + ref;
+    }
+
+    /** API base of the account a notification belongs to, e.g. "https://host/api/v4/". */
+    private static String apiBaseForLogin(String login) {
+        String instanceUrl = com.gl4a.Gl4Application.get().getInstanceUrlForLogin(login);
+        if (instanceUrl == null) return null;
+        return instanceUrl.endsWith("/") ? instanceUrl + "api/v4/" : instanceUrl + "/api/v4/";
     }
 
     private static SharedPreferences getPrefs(Context context) {

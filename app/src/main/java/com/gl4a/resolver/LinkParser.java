@@ -8,6 +8,7 @@ import androidx.fragment.app.FragmentActivity;
 import android.text.TextUtils;
 
 import com.gl4a.R;
+import com.gl4a.activities.AttachmentViewerActivity;
 import com.gl4a.activities.CommitActivity;
 import com.gl4a.activities.CompareActivity;
 import com.gl4a.activities.IssueActivity;
@@ -81,7 +82,18 @@ public class LinkParser {
             return null;
         }
 
+        // Attachments (/-/project/{id}/uploads/{secret}/{file}, or the older
+        // /{namespace}/{repo}/uploads/{secret}/{file}) aren't project pages: open them
+        // in-app, where the account token is sent, so no browser login is needed.
+        if (isUploadLink(parts)) {
+            return new ParseResult(AttachmentViewerActivity.makeIntent(activity, uri));
+        }
+
         String first = parts.get(0);
+        // Other instance-wide /-/ routes (/-/user_settings, /-/snippets/...) have no in-app screen
+        if ("-".equals(first)) {
+            return null;
+        }
         if (RESERVED_NAMES.contains(first)) {
             // Handle a few top-level paths
             switch (first) {
@@ -156,6 +168,8 @@ public class LinkParser {
                     return parseCompareLink(activity, user, repo, id);
                 case "wiki":
                     return new ParseResult(WikiListActivity.makeIntent(activity, user, repo, null));
+                case "wikis":
+                    return parseWikiLink(activity, parts, user, repo, dashIndex);
                 case "members":
                     return new ParseResult(OrganizationMemberListActivity.makeIntent(activity, user));
             }
@@ -164,6 +178,27 @@ public class LinkParser {
 
         // No "/-/" separator — plain namespace/repo URL at any depth
         return new ParseResult(RepositoryActivity.makeIntent(activity, user, repo));
+    }
+
+    @NonNull
+    private static ParseResult parseWikiLink(FragmentActivity activity, List<String> parts,
+            String user, String repo, int dashIndex) {
+        // parts: [..., "-", "wikis", ...slug segments...] — slugs can be nested ("a/b").
+        int slugStart = dashIndex + 2;
+        String slug = parts.size() > slugStart
+                ? TextUtils.join("/", parts.subList(slugStart, parts.size()))
+                : null;
+        if ("pages".equals(slug)) {
+            slug = null;
+        }
+        return new ParseResult(WikiListActivity.makeIntent(activity, user, repo, slug));
+    }
+
+    private static boolean isUploadLink(List<String> parts) {
+        // [..., "uploads", secret, file]; the secret is a 32-character hex string
+        int n = parts.size();
+        return n >= 4 && "uploads".equals(parts.get(n - 3))
+                && parts.get(n - 2).matches("[0-9a-f]{32}");
     }
 
     @Nullable
@@ -245,6 +280,18 @@ public class LinkParser {
         int subPageIndex = dashIndex + 3;
         String subPage = parts.size() > subPageIndex ? parts.get(subPageIndex) : null;
         int page = parseMergeRequestPage(subPage);
+
+        // "Compare with previous version": diffs of one MR version against the previous (#184).
+        String versionParam = uri.getQueryParameter("diff_id");
+        if ("diffs".equals(subPage) && versionParam != null) {
+            try {
+                return new ParseResult(new MergeRequestVersionCompareLoadTask(activity, uri,
+                        user, repo, mrNumber, Long.parseLong(versionParam),
+                        uri.getQueryParameter("start_sha")));
+            } catch (NumberFormatException e) {
+                // fall through to the MR's Files tab
+            }
+        }
 
         DiffHighlightId diffId = extractDiffId(uri.getFragment(), "diff-");
         if (diffId != null) {

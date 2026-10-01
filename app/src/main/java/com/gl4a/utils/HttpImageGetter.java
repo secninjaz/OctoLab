@@ -21,9 +21,13 @@ import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Point;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.media.MediaMetadataRetriever;
 import android.os.AsyncTask;
 import android.os.Handler;
 import android.text.Html.ImageGetter;
@@ -32,6 +36,7 @@ import android.text.TextUtils;
 import android.text.style.ImageSpan;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.util.LruCache;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView;
@@ -70,6 +75,20 @@ import okhttp3.Response;
 import pl.droidsonroids.gif.GifDrawable;
 
 public class HttpImageGetter {
+    /** Above this, Phase 1's local preview is skipped for plain text (#186). */
+    private static final int LARGE_NOTE_CHARS = 20000;
+    /** Larger images aren't inlined as data URIs, they load from their URL (#187). */
+    private static final int MAX_EMBEDDED_IMAGE_BYTES = 2 * 1024 * 1024;
+    /** Image source for a video's thumbnail: this prefix, then the video's URL. */
+    public static final String VIDEO_THUMBNAIL_PREFIX = "octolab-video-thumbnail:";
+    /** First frames by video URL, so rebinding a comment doesn't fetch them again. */
+    private static final LruCache<String, Bitmap> sVideoFrames = new LruCache<String, Bitmap>(
+            8 * 1024 * 1024) {
+        @Override
+        protected int sizeOf(String key, Bitmap value) {
+            return value.getByteCount();
+        }
+    };
     private static class GifCallback implements Drawable.Callback {
         private final List<WeakReference<TextView>> mViewRefs;
         private final Handler mHandler = new Handler();
@@ -170,6 +189,8 @@ public class HttpImageGetter {
         // Raw server HTML from Phase 2 — cached so table WebView can be re-populated
         // when a recycled ViewHolder is re-bound to the same content.
         String mServerHtml;
+        // Phase 2 (server) rendering has been applied, so it isn't requested again (#152)
+        boolean mServerRendered;
         private ImageGetterAsyncTask mTask;
         private boolean mHasStartedImageLoad;
         private boolean mResumed = true;
@@ -201,12 +222,20 @@ public class HttpImageGetter {
             }
         }
         void encodeAndLoadImages(Context context, String html) {
+            applyEncodedAndLoadImages(HtmlUtils.encode(context, html, this));
+        }
+
+        /** Like {@link #encodeAndLoadImages}, for text already converted off the main thread. */
+        void applyEncodedAndLoadImages(CharSequence encoded) {
+            if (encoded == null) return;
             if (mTask != null) {
                 mTask.cancel(true);
                 mTask = null;
             }
             mHasStartedImageLoad = false;
-            encode(context, html);
+            synchronized (this) {
+                mHtml = encoded;
+            }
             apply(mHtml);
             ImageSpan[] spans = getImageSpans();
             if (spans.length > 0) {
@@ -311,6 +340,7 @@ public class HttpImageGetter {
                 mTask = null;
             }
             mHtml = null;
+            mServerRendered = false;
             mHasStartedImageLoad = false;
         }
 
@@ -323,6 +353,16 @@ public class HttpImageGetter {
                     view.setVisibility(visibility);
                 }
             }
+        }
+
+        /** The views currently showing this note. */
+        List<TextView> views() {
+            List<TextView> views = new ArrayList<>();
+            for (WeakReference<TextView> ref : mViewRefs) {
+                TextView view = ref.get();
+                if (view != null) views.add(view);
+            }
+            return views;
         }
 
         private void addView(TextView view) {
@@ -390,6 +430,11 @@ public class HttpImageGetter {
     private final Handler mHandler = new Handler();
     private final Map<Object, ObjectInfo> mObjectInfos = new HashMap<>();
     private final Set<Object> mMarkdownApiInProgress = new HashSet<>();
+    /** Notes rendered on the server at once while pre-rendering a timeline (#152). */
+    private static final int PRERENDER_CONCURRENCY = 3;
+    private io.reactivex.disposables.Disposable mPrerender;
+    // The project GitLab resolves #N, !N and commit references against (#197)
+    private String mProjectPath;
     private final Drawable mGifPlaceholderDrawable;
     private final Drawable mLoadingDrawable;
     private final Drawable mErrorDrawable;
@@ -425,6 +470,15 @@ public class HttpImageGetter {
                 mErrorDrawable.getIntrinsicWidth(), mErrorDrawable.getIntrinsicHeight());
     }
 
+    /**
+     * Sets the project whose notes this renders, so GitLab links #N, !N and commit references
+     * against it (#197). Without it the app-wide current project is used, which is unset, or
+     * another project's, when an issue was opened from a cross-project list.
+     */
+    public void setProjectPath(String projectPath) {
+        mProjectPath = projectPath;
+    }
+
     public void pause() {
         for (ObjectInfo info : mObjectInfos.values()) {
             info.setResumed(false);
@@ -445,6 +499,9 @@ public class HttpImageGetter {
     }
 
     public void destroy() {
+        if (mPrerender != null) {
+            mPrerender.dispose();
+        }
         for (ObjectInfo info : mObjectInfos.values()) {
             info.discardLoadedImages();
         }
@@ -497,108 +554,173 @@ public class HttpImageGetter {
         // encode() + apply() only — do NOT start ImageGetterAsyncTask here.
         // Images stay as loading placeholders until Phase 2 provides correct API URLs.
         // This avoids showing error drawables for relative/broken image URLs in Phase 1.
-        info.encode(view.getContext(), HtmlUtils.markdownToHtml(markdown));
-        info.apply(info.mHtml);
-
-        // Phase 2: server-side GFM rendering with images embedded as data URIs.
-        // Images are fetched on the IO thread and embedded before the HTML is shown,
-        // eliminating all async image loading and auth complexity.
-        if (!mMarkdownApiInProgress.contains(id)) {
-            mMarkdownApiInProgress.add(id);
-            final String instanceUrl = com.gl4a.Gl4Application.get().getInstanceUrl();
-            final String tok = com.gl4a.Gl4Application.get().getAuthToken();
-            final Map<String, Object> reqBody = new java.util.HashMap<>();
-            reqBody.put("text", markdown);
-            reqBody.put("gfm", true);
-            final String projectPath = com.gl4a.Gl4Application.get().getCurrentProjectPath();
-            if (projectPath != null) reqBody.put("project", projectPath);
-
-            ServiceFactory.get(GitLabMarkdownService.class, false)
-                    .render(reqBody)
-                    .map(response -> {
-                        // Runs on IO thread — safe to do blocking image fetches here.
-                        if (!response.isSuccessful() || response.body() == null
-                                || android.text.TextUtils.isEmpty(response.body().html)) {
-                            return "";
-                        }
-                        String rawHtml = response.body().html;
-                        // Fix lazy-loading: swap data-src → src, make relative absolute.
-                        String html = rawHtml
-                                .replaceAll("src=\"data:[^\"]*\"([^>]*?)data-src=\"([^\"]+)\"",
-                                        "src=\"$2\"$1")
-                                .replaceAll("data-src=\"([^\"]+)\"([^>]*?)src=\"data:[^\"]*\"",
-                                        "src=\"$1\"$2")
-                                .replaceAll("\\s*data-src=\"[^\"]*\"", "")
-                                .replaceAll("\\s*data-canonical-src=\"[^\"]*\"", "")
-                                .replaceAll("\\s*data-sourcepos=\"[^\"]*\"", "")
-                                .replaceAll("\\s*class=\"[^\"]*\"", "")
-                                .replaceAll("\\s*dir=\"[^\"]*\"", "")
-                                .replaceAll("\\s*decoding=\"[^\"]*\"", "");
-                        // Make relative src absolute.
-                        html = html.replaceAll("src=\"(/[^\"]+)\"",
-                                "src=\"" + instanceUrl + "$1\"");
-
-                        // Embed all instance images as data URIs so they display immediately
-                        // without any further async loading or auth complexity.
-                        java.util.regex.Matcher imgM = java.util.regex.Pattern
-                                .compile("src=\"(" + java.util.regex.Pattern.quote(instanceUrl)
-                                        + "[^\"]+)\"")
-                                .matcher(html);
-                        java.lang.StringBuffer imgSb = new java.lang.StringBuffer();
-                        while (imgM.find()) {
-                            String imgUrl = imgM.group(1);
-                            // Rewrite /uploads/ and /-/raw/ to API endpoints first.
-                            imgUrl = imgUrl.replaceAll(
-                                    "/-/project/(\\d+)/uploads/",
-                                    "/api/v4/projects/$1/uploads/");
-                            imgUrl = rewriteRawUrl(imgUrl, instanceUrl);
-                            // Fetch and embed.
-                            String dataUri = fetchAsDataUri(imgUrl, tok);
-                            if (dataUri != null) {
-                                imgM.appendReplacement(imgSb,
-                                        java.util.regex.Matcher.quoteReplacement(
-                                                "src=\"" + dataUri + "\""));
-                            } else {
-                                imgM.appendReplacement(imgSb,
-                                        java.util.regex.Matcher.quoteReplacement(
-                                                "src=\"" + imgUrl + "\""));
-                            }
-                        }
-                        imgM.appendTail(imgSb);
-                        return imgSb.toString();
-                    })
-                    .subscribeOn(Schedulers.io())
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe(
-                        html -> {
-                            mMarkdownApiInProgress.remove(id);
-                            if (!mDestroyed && !html.isEmpty()) {
-                                // If HTML contains a table, render in a companion WebView
-                                // (wv_table) for proper grid display. Otherwise use
-                                // Html.fromHtml() via the existing encode/apply path.
-                                if (html.contains("<table") && view.getParent() != null
-                                        && view.getTag(com.gl4a.R.id.wv_table) == id) {
-                                    android.webkit.WebView wvTable =
-                                            ((android.view.View) view.getParent())
-                                                    .findViewById(com.gl4a.R.id.wv_table);
-                                    if (wvTable != null) {
-                                        // Cache server HTML so the table can be re-shown
-                                        // when the ViewHolder is recycled and rebound.
-                                        info.mServerHtml = html;
-                                        showTableInWebView(view, wvTable, html);
-                                        return;
-                                    }
-                                }
-                                // Instance-hosted images are already embedded as data URIs
-                                // above; anything else (external URLs) is still a plain <img
-                                // src="..."> here, so it needs the async loader to actually
-                                // fetch it — encode() alone leaves it stuck on the placeholder.
-                                info.encodeAndLoadImages(mContext, html);
-                            }
-                        },
-                        error -> mMarkdownApiInProgress.remove(id)
-                    );
+        // Very large notes (pasted logs, long lists) are shown as plain text until Phase 2's
+        // rendering arrives: converting them here would block the main thread (#186).
+        if (markdown.length() > LARGE_NOTE_CHARS) {
+            view.setText(markdown);
+        } else {
+            info.encode(view.getContext(), HtmlUtils.markdownToHtml(markdown));
+            info.apply(info.mHtml);
         }
+
+        // Phase 2: server-side GFM rendering with images embedded as data URIs, unless the
+        // note is already being rendered, e.g. ahead of scrolling (#152).
+        if (!mMarkdownApiInProgress.contains(id)) {
+            renderOnServer(info, markdown, id).subscribe();
+        }
+    }
+
+    /**
+     * Renders the notes of a timeline on the server ahead of scrolling, a few at a time, top
+     * first (#152). Rows then show their final text and images as soon as they scroll in,
+     * instead of the local rendering being replaced and images popping in while scrolling,
+     * which moved the content and resized the scrollbar. Notes already rendered or rendering
+     * are skipped; a row bound before its turn renders itself as usual.
+     */
+    public void prerenderMarkdown(List<android.util.Pair<Object, String>> notes) {
+        if (mPrerender != null) {
+            mPrerender.dispose();
+        }
+        mPrerender = io.reactivex.Observable.fromIterable(notes)
+                .flatMap(note -> io.reactivex.Single.defer(() -> {
+                    // Subscribed on the main thread, like bindMarkdown, so the in-progress
+                    // set is only touched there
+                    ObjectInfo info = findOrCreateInfo(note.first);
+                    if (mDestroyed || info.mServerRendered
+                            || mMarkdownApiInProgress.contains(note.first)
+                            || android.text.TextUtils.isEmpty(note.second)) {
+                        return io.reactivex.Single.just(false);
+                    }
+                    return renderOnServer(info, note.second, note.first);
+                }).toObservable(), false, PRERENDER_CONCURRENCY)
+                .subscribe(done -> {}, error -> {});
+    }
+
+    /**
+     * Renders {@code markdown} with GitLab's markdown API, embeds instance images and converts
+     * the HTML off the main thread, then applies it on the main thread to whichever views show
+     * the note by then (possibly none yet). Emits true once applied.
+     */
+    private io.reactivex.Single<Boolean> renderOnServer(ObjectInfo info, String markdown,
+            Object id) {
+        mMarkdownApiInProgress.add(id);
+        final String instanceUrl = com.gl4a.Gl4Application.get().getInstanceUrl();
+        final String tok = com.gl4a.Gl4Application.get().getAuthToken();
+        final Map<String, Object> reqBody = new java.util.HashMap<>();
+        reqBody.put("text", markdown);
+        reqBody.put("gfm", true);
+        final String projectPath = mProjectPath != null ? mProjectPath
+                : com.gl4a.Gl4Application.get().getCurrentProjectPath();
+        if (projectPath != null) reqBody.put("project", projectPath);
+
+        return ServiceFactory.get(GitLabMarkdownService.class, false)
+                .render(reqBody)
+                .map(response -> {
+                    // Runs on IO thread — safe to do blocking image fetches here.
+                    if (!response.isSuccessful() || response.body() == null
+                            || android.text.TextUtils.isEmpty(response.body().html)) {
+                        return new android.util.Pair<String, CharSequence>("", null);
+                    }
+                    String rawHtml = response.body().html;
+                    // Fix lazy-loading: swap data-src → src, make relative absolute.
+                    String html = rawHtml
+                            .replaceAll("src=\"data:[^\"]*\"([^>]*?)data-src=\"([^\"]+)\"",
+                                    "src=\"$2\"$1")
+                            .replaceAll("data-src=\"([^\"]+)\"([^>]*?)src=\"data:[^\"]*\"",
+                                    "src=\"$1\"$2")
+                            .replaceAll("\\s*data-src=\"[^\"]*\"", "")
+                            .replaceAll("\\s*data-canonical-src=\"[^\"]*\"", "")
+                            .replaceAll("\\s*data-sourcepos=\"[^\"]*\"", "")
+                            .replaceAll("\\s*class=\"[^\"]*\"", "")
+                            .replaceAll("\\s*dir=\"[^\"]*\"", "")
+                            .replaceAll("\\s*decoding=\"[^\"]*\"", "");
+                    // Make relative src absolute.
+                    html = html.replaceAll("src=\"(/[^\"]+)\"",
+                            "src=\"" + instanceUrl + "$1\"");
+
+                    // Embed all instance images as data URIs so they display immediately
+                    // without any further async loading or auth complexity.
+                    // Only <img> sources: videos matched too and were downloaded whole
+                    // and embedded (hangs, memory, a 1.9 MB link that crashed; #187).
+                    java.util.regex.Matcher imgM = java.util.regex.Pattern
+                            .compile("(<img\\b[^>]*?\\ssrc=\")("
+                                    + java.util.regex.Pattern.quote(instanceUrl)
+                                    + "[^\"]+)\"")
+                            .matcher(html);
+                    java.lang.StringBuffer imgSb = new java.lang.StringBuffer();
+                    while (imgM.find()) {
+                        String prefix = imgM.group(1);
+                        String imgUrl = imgM.group(2);
+                        // Rewrite /uploads/ and /-/raw/ to API endpoints first.
+                        imgUrl = imgUrl.replaceAll(
+                                "/-/project/(\\d+)/uploads/",
+                                "/api/v4/projects/$1/uploads/");
+                        imgUrl = rewriteRawUrl(imgUrl, instanceUrl);
+                        // Fetch and embed.
+                        String dataUri = fetchAsDataUri(imgUrl, tok);
+                        if (dataUri != null) {
+                            imgM.appendReplacement(imgSb,
+                                    java.util.regex.Matcher.quoteReplacement(
+                                            prefix + dataUri + "\""));
+                        } else {
+                            imgM.appendReplacement(imgSb,
+                                    java.util.regex.Matcher.quoteReplacement(
+                                            prefix + imgUrl + "\""));
+                        }
+                    }
+                    imgM.appendTail(imgSb);
+                    String embedded = imgSb.toString();
+                    // Convert to styled text here, off the main thread: for long notes the
+                    // HTML parse took seconds and caused an ANR (#186). The main thread
+                    // only applies the result.
+                    return new android.util.Pair<String, CharSequence>(embedded,
+                            embedded.isEmpty() ? null : HtmlUtils.encode(mContext, embedded, info));
+                })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .map(rendered -> {
+                    mMarkdownApiInProgress.remove(id);
+                    final String html = rendered.first;
+                    if (mDestroyed || html.isEmpty()) {
+                        return false;
+                    }
+                    info.mServerRendered = true;
+                    // If HTML contains a table, render in a companion WebView (wv_table) for
+                    // proper grid display. Otherwise use Html.fromHtml() via the existing
+                    // encode/apply path.
+                    if (html.contains("<table")) {
+                        // Cache server HTML so the table can be re-shown when the ViewHolder
+                        // is recycled and rebound.
+                        info.mServerHtml = html;
+                        boolean shown = false;
+                        for (TextView view : info.views()) {
+                            android.webkit.WebView wvTable = view.getParent() != null
+                                    && view.getTag(com.gl4a.R.id.wv_table) == id
+                                    ? ((android.view.View) view.getParent())
+                                            .findViewById(com.gl4a.R.id.wv_table)
+                                    : null;
+                            if (wvTable != null) {
+                                showTableInWebView(view, wvTable, html);
+                                shown = true;
+                            }
+                        }
+                        if (shown) {
+                            return true;
+                        }
+                    }
+                    // Instance-hosted images are already embedded as data URIs above; anything
+                    // else (external URLs) is still a plain <img src="..."> here, so it needs
+                    // the async loader to actually fetch it — encode() alone leaves it stuck on
+                    // the placeholder.
+                    info.applyEncodedAndLoadImages(rendered.second);
+                    return true;
+                })
+                .onErrorReturn(error -> {
+                    mMarkdownApiInProgress.remove(id);
+                    return false;
+                })
+                // Pre-rendering is cancelled on reload; let a later bind render the note
+                .doOnDispose(() -> mMarkdownApiInProgress.remove(id));
     }
 
     private void showTableInWebView(android.view.View tvDesc,
@@ -634,42 +756,32 @@ public class HttpImageGetter {
                 return true;
             }
         });
-        int[] attrs = {android.R.attr.colorBackground,
-                android.R.attr.textColorPrimary,
-                android.R.attr.textColorSecondary};
+        // Transparent, with header and borders as tints of the text colour, so the table sits
+        // on whatever is behind it (a timeline card, the issue header) in either theme, like
+        // the rest of the note (#192). colorBackground differs from the cards' colour.
+        int[] attrs = {android.R.attr.textColorPrimary, android.R.attr.textColorLink};
         android.content.res.TypedArray ta = mContext.obtainStyledAttributes(attrs);
-        int bgInt = ta.getColor(0, 0xFF212121);
-        int fgInt = ta.getColor(1, 0xFFFFFFFF);
-        int fgSecInt = ta.getColor(2, 0xFF9E9E9E);
+        int fgInt = ta.getColor(0, 0xFF212121);
+        int linkInt = ta.getColor(1, 0xFFE24329);
         ta.recycle();
-        int[] la = {android.R.attr.textColorLink};
-        android.content.res.TypedArray taLink = mContext.obtainStyledAttributes(la);
-        int linkInt = taLink.getColor(0, 0xFFE24329);
-        taLink.recycle();
-        String bg = String.format("#%06X", 0xFFFFFF & bgInt);
         String fg = String.format("#%06X", 0xFFFFFF & fgInt);
-        String headerBg = String.format("#%06X", 0xFFFFFF & blendColors(bgInt, fgInt, 0.08f));
-        String border = String.format("#%06X", 0xFFFFFF & fgSecInt);
+        String fgRgb = android.graphics.Color.red(fgInt) + ","
+                + android.graphics.Color.green(fgInt) + "," + android.graphics.Color.blue(fgInt);
         String link = String.format("#%06X", 0xFFFFFF & linkInt);
         String wrapped = "<html><head><style>"
-                + "body{font-size:14px;font-family:sans-serif;background:" + bg
-                + ";color:" + fg + ";margin:0;padding:4px;overflow:hidden}"
+                + "body{font-size:14px;font-family:sans-serif;background:transparent"
+                + ";color:" + fg + ";margin:0;padding:0;overflow:hidden}"
                 + "table{border-collapse:collapse;width:100%;margin-bottom:12px}"
-                + "th,td{border:1px solid " + border + ";padding:6px 10px;text-align:left}"
-                + "th{background:" + headerBg + ";color:" + fg + ";font-weight:bold}"
+                + "th,td{border:1px solid rgba(" + fgRgb + ",0.25);padding:6px 10px;"
+                + "text-align:left}"
+                + "th{background:rgba(" + fgRgb + ",0.06);color:" + fg + ";font-weight:bold}"
                 + "td{color:" + fg + "}"
+                + "code{background:rgba(" + fgRgb + ",0.08);border-radius:3px;padding:0 3px}"
                 + "a,a:visited{color:" + link + "}"
                 + "::-webkit-scrollbar{display:none}"
                 + "</style></head><body>" + html + "</body></html>";
-        wvTable.setBackgroundColor(bgInt);
+        wvTable.setBackgroundColor(android.graphics.Color.TRANSPARENT);
         wvTable.loadDataWithBaseURL(null, wrapped, "text/html", "utf-8", null);
-    }
-
-    private static int blendColors(int bg, int fg, float ratio) {
-        int r = (int) (android.graphics.Color.red(bg) * (1 - ratio) + android.graphics.Color.red(fg) * ratio);
-        int g = (int) (android.graphics.Color.green(bg) * (1 - ratio) + android.graphics.Color.green(fg) * ratio);
-        int b = (int) (android.graphics.Color.blue(bg) * (1 - ratio) + android.graphics.Color.blue(fg) * ratio);
-        return android.graphics.Color.rgb(r, g, b);
     }
 
     private String rewriteRawUrl(String url, String instanceUrl) {
@@ -693,8 +805,16 @@ public class HttpImageGetter {
             if (tok != null) rb.header("PRIVATE-TOKEN", tok);
             try (Response resp = mClient.newCall(rb.build()).execute()) {
                 if (!resp.isSuccessful() || resp.body() == null) return null;
+                // Embed small images only; big ones keep their URL for the async loader (#187).
+                long declared = resp.body().contentLength();
+                if (declared > MAX_EMBEDDED_IMAGE_BYTES) return null;
+                MediaType declaredType = resp.body().contentType();
+                if (declaredType != null && !"image".equals(declaredType.type())
+                        && !"application".equals(declaredType.type())) {
+                    return null;
+                }
                 byte[] bytes = resp.body().bytes();
-                if (bytes.length == 0) return null;
+                if (bytes.length == 0 || bytes.length > MAX_EMBEDDED_IMAGE_BYTES) return null;
                 MediaType mt = resp.body().contentType();
                 String mime = mt != null ? mt.toString() : null;
                 if (mime == null || mime.startsWith("application/octet-stream")
@@ -706,6 +826,7 @@ public class HttpImageGetter {
                     mime = URLConnection.guessContentTypeFromStream(is);
                 }
                 if (mime == null) mime = "image/png";
+                if (!mime.startsWith("image/")) return null;
                 // Strip charset suffix if present (e.g. "image/svg+xml; charset=utf-8")
                 int semi = mime.indexOf(';');
                 if (semi > 0) mime = mime.substring(0, semi).trim();
@@ -716,6 +837,11 @@ public class HttpImageGetter {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** Detaches a view from any pending render, before it shows other text (#180). */
+    public void unbindView(final TextView view) {
+        unbind(view);
     }
 
     private void unbind(final TextView view) {
@@ -762,6 +888,9 @@ public class HttpImageGetter {
     }
 
     private Drawable loadImageForUrl(String source) {
+        if (source != null && source.startsWith(VIDEO_THUMBNAIL_PREFIX)) {
+            return loadVideoThumbnail(source.substring(VIDEO_THUMBNAIL_PREFIX.length()));
+        }
         HttpUrl url = source != null ? HttpUrl.parse(source) : null;
         Bitmap bitmap = null;
 
@@ -828,6 +957,109 @@ public class HttpImageGetter {
         BitmapDrawable drawable = new LoadedBitmapDrawable(mContext.getResources(), bitmap);
         drawable.setBounds(0, 0, bitmap.getWidth(), bitmap.getHeight());
         return drawable;
+    }
+
+    /**
+     * The video's first frame with a play button over it, or a plain tile with the play
+     * button if the frame can't be read. A fresh bitmap each time, as loaded bitmaps are
+     * recycled when the text is rebound; the cached frame never is.
+     */
+    private Drawable loadVideoThumbnail(String videoUrl) {
+        Bitmap frame;
+        synchronized (sVideoFrames) {
+            frame = sVideoFrames.get(videoUrl);
+        }
+        if (frame == null && !mDestroyed) {
+            frame = readFirstFrame(videoUrl);
+            if (frame != null) {
+                synchronized (sVideoFrames) {
+                    sVideoFrames.put(videoUrl, frame);
+                }
+            }
+        }
+        float density = mContext.getResources().getDisplayMetrics().density;
+        int tileWidth = Math.min(Math.round(320 * density), mMaxWidth / 2);
+        int width = frame != null ? frame.getWidth() : tileWidth;
+        int height = frame != null ? frame.getHeight() : tileWidth * 9 / 16;
+        Bitmap thumbnail = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(thumbnail);
+        if (frame != null) {
+            canvas.drawBitmap(frame, 0, 0, null);
+        } else {
+            canvas.drawColor(0xff303030);
+        }
+        drawPlayButton(canvas, width, height, density);
+
+        BitmapDrawable drawable = new LoadedBitmapDrawable(mContext.getResources(), thumbnail);
+        drawable.setBounds(0, 0, width, height);
+        return drawable;
+    }
+
+    @androidx.annotation.Nullable
+    private Bitmap readFirstFrame(String videoUrl) {
+        String instanceUrl = Gl4Application.get().getInstanceUrl();
+        Map<String, String> headers = new HashMap<>();
+        HttpUrl url = HttpUrl.parse(videoUrl);
+        String instanceHost = instanceUrl != null ? android.net.Uri.parse(instanceUrl).getHost() : null;
+        if (url != null && instanceHost != null && instanceHost.equalsIgnoreCase(url.host())) {
+            String tok = Gl4Application.get().getAuthToken();
+            if (tok != null) headers.put("PRIVATE-TOKEN", tok);
+        }
+        // The uploads API first, like images; the web URL still works for public uploads.
+        String apiUrl = videoUrl.replaceAll("/-/project/(\\d+)/uploads/",
+                "/api/v4/projects/$1/uploads/");
+        String[] urls = apiUrl.equals(videoUrl)
+                ? new String[] { videoUrl } : new String[] { apiUrl, videoUrl };
+        for (String candidate : urls) {
+            // The retriever reads only the parts of the file it needs, using range requests.
+            MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+            try {
+                retriever.setDataSource(candidate, headers);
+                Bitmap frame = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                if (frame != null) {
+                    return scaleToMaxWidth(frame);
+                }
+            } catch (RuntimeException e) {
+                Log.d(Gl4Application.LOG_TAG, "Couldn't read a frame of " + candidate, e);
+            } finally {
+                try {
+                    retriever.release();
+                } catch (Exception e) {
+                    // nothing to clean up
+                }
+            }
+        }
+        return null;
+    }
+
+    private Bitmap scaleToMaxWidth(Bitmap frame) {
+        int maxWidth = mMaxWidth / 2;
+        if (frame.getWidth() <= maxWidth) {
+            return frame;
+        }
+        int height = Math.round(frame.getHeight() * (maxWidth / (float) frame.getWidth()));
+        Bitmap scaled = Bitmap.createScaledBitmap(frame, maxWidth, Math.max(height, 1), true);
+        if (scaled != frame) {
+            frame.recycle();
+        }
+        return scaled;
+    }
+
+    private static void drawPlayButton(Canvas canvas, int width, int height, float density) {
+        float radius = Math.min(28 * density, Math.min(width, height) / 3f);
+        float cx = width / 2f;
+        float cy = height / 2f;
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setColor(0x99000000);
+        canvas.drawCircle(cx, cy, radius, paint);
+        paint.setColor(Color.WHITE);
+        Path triangle = new Path();
+        float side = radius * 0.9f;
+        triangle.moveTo(cx - side * 0.4f, cy - side * 0.5f);
+        triangle.lineTo(cx - side * 0.4f, cy + side * 0.5f);
+        triangle.lineTo(cx + side * 0.5f, cy);
+        triangle.close();
+        canvas.drawPath(triangle, paint);
     }
 
     private boolean canLoadGif() {

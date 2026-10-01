@@ -1,5 +1,6 @@
 package com.gl4a.gitlab.service;
 
+import com.gl4a.gitlab.model.GitLabDescriptionEditResponse;
 import com.gl4a.gitlab.model.GitLabGraphQLAwardEmojiMutationResponse;
 import com.gl4a.gitlab.model.GitLabGraphQLNoteAwardEmojiResponse;
 import com.gl4a.gitlab.model.GitLabGroupActivityResponse;
@@ -32,6 +33,10 @@ public interface GitLabGraphQLService {
 
     @POST("graphql")
     Single<Response<GitLabNotesByIdResponse>> getNotesById(@Body Map<String, Object> body);
+
+    @POST("graphql")
+    Single<Response<GitLabDescriptionEditResponse>> getDescriptionEdit(
+            @Body Map<String, Object> body);
 
     @POST("graphql")
     Single<Response<GitLabGraphQLNoteAwardEmojiResponse>> queryNoteAwardEmoji(

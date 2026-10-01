@@ -498,7 +498,7 @@ public class IssueEditActivity extends BasePagerActivity implements
             for (GitLabUser assignee : mAssignees) {
                 View row = inflater.inflate(R.layout.row_assignee, mSelectedAssigneeContainer, false);
                 TextView tvAssignee = row.findViewById(R.id.tv_assignee);
-                tvAssignee.setText(ApiHelpers.getUserLogin(this, assignee));
+                tvAssignee.setText(ApiHelpers.getUserDisplayName(this, assignee));
 
                 ImageView ivAssignee = row.findViewById(R.id.iv_assignee);
                 AvatarHandler.assignAvatar(ivAssignee, assignee);
@@ -1098,7 +1098,7 @@ public class IssueEditActivity extends BasePagerActivity implements
                 } else {
                     selectedNames.add(name);
                     int idx = allNames.indexOf(name);
-                    int color = android.graphics.Color.parseColor(allColors.get(idx));
+                    int color = com.gl4a.utils.ApiHelpers.parseGitLabColor(allColors.get(idx));
                     setLabelSelection((TextView) view, true, color);
                 }
             };
@@ -1106,7 +1106,7 @@ public class IssueEditActivity extends BasePagerActivity implements
             for (int i = 0; i < allNames.size(); i++) {
                 String name = allNames.get(i);
                 String colorStr = allColors.get(i);
-                int color = android.graphics.Color.parseColor(colorStr);
+                int color = com.gl4a.utils.ApiHelpers.parseGitLabColor(colorStr);
 
                 final View rowView = inflater.inflate(R.layout.row_issue_create_label, container, false);
                 View viewColor = rowView.findViewById(R.id.view_color);

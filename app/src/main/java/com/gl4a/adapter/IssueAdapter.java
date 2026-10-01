@@ -55,7 +55,7 @@ public class IssueAdapter extends RootAdapter<GitLabIssue, IssueAdapter.ViewHold
         String numPrefix = issue.webUrl != null && issue.webUrl.contains("/-/merge_requests/") ? "!" : "#";
         holder.tvNumber.setText(numPrefix + issue.number());
         holder.tvDesc.setText(issue.title());
-        holder.tvCreator.setText(ApiHelpers.getUserLoginWithType(mContext, issue.user()));
+        holder.tvCreator.setText(ApiHelpers.getUserNameWithType(mContext, issue.user()));
         holder.tvTimestamp.setText(StringUtils.formatRelativeTime(mContext,
                 issue.createdAt(), true));
 

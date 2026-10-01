@@ -68,7 +68,9 @@ public class IntentUtils {
 
     public static void openLinkInternallyOrExternally(FragmentActivity activity, Uri uri) {
         String uriScheme = uri.getScheme();
-        if (uriScheme == null || uriScheme.equals("file") || uriScheme.equals("content")) {
+        if (uriScheme == null || uriScheme.equals("file") || uriScheme.equals("content")
+                // Inlined media: a multi-MB data: URI overflows the binder when launched (#187)
+                || uriScheme.equals("data")) {
             // We can't do anything about relative or anchor URLs here, and there are no good reasons to
             // try to open file or content provider URIs (the former ones would raise an exception on API 24+)
             return;

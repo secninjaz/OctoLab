@@ -66,6 +66,10 @@ public class UserActivity extends BaseFragmentPagerActivity {
     @Nullable
     @Override
     protected String getActionBarTitle() {
+        if (mUser != null) {
+            // The display name once loaded, like GitLab web (#195)
+            return ApiHelpers.getUserDisplayName(this, mUser);
+        }
         if (mUserLogin != null && mUserLogin.endsWith("[bot]")) {
             return mUserLogin.substring(0, mUserLogin.length() - 5);
         }
@@ -232,6 +236,9 @@ public class UserActivity extends BaseFragmentPagerActivity {
                 .subscribe(result -> {
                     mUser = result;
                     mUserId = result.id();
+                    if (getSupportActionBar() != null) {
+                        getSupportActionBar().setTitle(getActionBarTitle());
+                    }
                     invalidateTabs();
                     setContentShown(true);
                     invalidateOptionsMenu();

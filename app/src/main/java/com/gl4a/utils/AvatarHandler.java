@@ -286,7 +286,8 @@ public class AvatarHandler {
      */
     public static void assignProjectLogo(ImageView view, com.gl4a.gitlab.model.GitLabProject project) {
         String name = projectLogoName(project);
-        String inlineUrl = inlineProjectLogoUrl(project);
+        String inlineUrl = inlineProjectLogoUrl(project,
+                com.gl4a.Gl4Application.get().getApiBaseUrl());
         if (inlineUrl != null) {
             assignAvatarLogo(view, name, inlineLogoId(project), inlineUrl);
         } else if (needsProjectLogoLookup(project)) {
@@ -301,17 +302,22 @@ public class AvatarHandler {
      * Performs blocking network I/O — call from a background thread only.
      */
     public static Bitmap loadProjectLogoSynchronously(
-            @Nullable com.gl4a.gitlab.model.GitLabProject project, int placeholderSizePx) {
+            @Nullable com.gl4a.gitlab.model.GitLabProject project, int placeholderSizePx,
+            @Nullable String accountApiBaseUrl) {
         String name = project != null ? projectLogoName(project) : "GitLab";
         long id = project != null ? project.id : 0;
+        // The notification's own account, not the active one: they can be on different
+        // instances, and project ids are per instance (#182).
+        String apiBase = accountApiBaseUrl != null
+                ? accountApiBaseUrl : com.gl4a.Gl4Application.get().getApiBaseUrl();
         if (project != null) {
             try {
-                String url = inlineProjectLogoUrl(project);
+                String url = inlineProjectLogoUrl(project, apiBase);
                 if (url == null && needsProjectLogoLookup(project)) {
-                    url = fetchProjectAvatarUrl(project.id);
+                    url = fetchProjectAvatarUrl(project.id, apiBase);
                 }
                 if (url != null) {
-                    Bitmap bitmap = fetchBitmap(url);
+                    Bitmap bitmap = fetchBitmap(url, instanceOf(apiBase));
                     if (bitmap != null) return fitLogoToSquare(bitmap);
                 }
             } catch (IOException e) {
@@ -319,6 +325,12 @@ public class AvatarHandler {
             }
         }
         return renderProjectPlaceholder(name, id, placeholderSizePx);
+    }
+
+    /** "https://host/api/v4/" → "https://host" */
+    private static String instanceOf(String apiBase) {
+        int api = apiBase.indexOf("/api/v4");
+        return api > 0 ? apiBase.substring(0, api) : apiBase;
     }
 
     /** The name the initials tile uses: always the project's own name (#176). */
@@ -329,13 +341,13 @@ public class AvatarHandler {
 
     /** A logo URL available in the project data itself, or null. */
     @Nullable
-    private static String inlineProjectLogoUrl(com.gl4a.gitlab.model.GitLabProject project) {
+    private static String inlineProjectLogoUrl(com.gl4a.gitlab.model.GitLabProject project,
+            String apiBase) {
         if (project.avatarUrl != null && !project.avatarUrl.isEmpty()) return project.avatarUrl;
         if (project.namespace != null && "group".equals(project.namespace.kind)
                 && project.namespace.avatarUrl != null && !project.namespace.avatarUrl.isEmpty()
                 && project.namespace.id > 0) {
-            return com.gl4a.Gl4Application.get().getApiBaseUrl()
-                    + "groups/" + project.namespace.id + "/avatar";
+            return apiBase + "groups/" + project.namespace.id + "/avatar";
         }
         return null;
     }
@@ -579,10 +591,14 @@ public class AvatarHandler {
      * only one API call; each subsequent ancestor level costs one /groups/{id} call (max 5).
      */
     private static String fetchProjectAvatarUrl(long projectId) throws IOException {
-        com.gl4a.Gl4Application app = com.gl4a.Gl4Application.get();
+        return fetchProjectAvatarUrl(projectId, com.gl4a.Gl4Application.get().getApiBaseUrl());
+    }
+
+    private static String fetchProjectAvatarUrl(long projectId, String apiBase)
+            throws IOException {
         OkHttpClient client = ServiceFactory.getImageHttpClient();
 
-        String projectJson = fetchJsonString(client, app.getApiBaseUrl() + "projects/" + projectId);
+        String projectJson = fetchJsonString(client, apiBase + "projects/" + projectId);
         if (projectJson == null) return null;
 
         try {
@@ -606,7 +622,7 @@ public class AvatarHandler {
             long parentId = ns.optLong("parent_id", 0);
             for (int depth = 0; depth < 5 && parentId > 0; depth++) {
                 String groupJson = fetchJsonString(client,
-                        app.getApiBaseUrl() + "groups/" + parentId);
+                        apiBase + "groups/" + parentId);
                 if (groupJson == null) break;
                 org.json.JSONObject group = new org.json.JSONObject(groupJson);
                 avatarUrl = jsonAvatarUrl(group);
@@ -892,11 +908,15 @@ public class AvatarHandler {
     }
 
     private static Bitmap fetchBitmap(String url) throws IOException {
+        return fetchBitmap(url, com.gl4a.Gl4Application.get().getInstanceUrl());
+    }
+
+    private static Bitmap fetchBitmap(String url, @Nullable String instanceBase)
+            throws IOException {
         // gitlab.com and some self-hosted instances return relative avatar URLs (e.g. /uploads/...).
         // OkHttp requires an absolute URL; prepend the instance base URL when the path is relative.
         if (url != null && url.startsWith("/")) {
-            String base = com.gl4a.Gl4Application.get().getInstanceUrl();
-            if (base != null) url = base + url;
+            if (instanceBase != null) url = instanceBase + url;
         }
         OkHttpClient client = ServiceFactory.getImageHttpClient();
         okhttp3.Request request = new okhttp3.Request.Builder()

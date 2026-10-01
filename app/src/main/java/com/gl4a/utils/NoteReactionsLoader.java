@@ -21,33 +21,48 @@ import io.reactivex.Single;
 import retrofit2.Response;
 
 /**
- * Loads the award emoji of every note on an issue or MR in one paged GraphQL query, so the
- * timeline can show reactions from loaded data instead of fetching them per row while
- * scrolling (#162). REST's notes API does not include award emoji.
+ * Loads the award emoji and edit details of every note on an issue or MR in one paged GraphQL
+ * query, so the timeline can show reactions (#162) and "Edited … by …" (#151) from loaded data
+ * instead of fetching them per row while scrolling. REST's notes API has neither.
  */
 public final class NoteReactionsLoader {
+    /** A note's reactions and who last edited it (null editor: never edited). */
+    public static final class NoteDetails {
+        final List<GitLabReaction> reactions;
+        final String lastEditedAt;
+        final GitLabUser lastEditedBy;
+
+        NoteDetails(List<GitLabReaction> reactions, String lastEditedAt, GitLabUser lastEditedBy) {
+            this.reactions = reactions;
+            this.lastEditedAt = lastEditedAt;
+            this.lastEditedBy = lastEditedBy;
+        }
+    }
+
+    private static final String NOTE_FIELDS = "id lastEditedAt lastEditedBy { username name }"
+            + " awardEmoji { nodes { name user { username } } }";
     private static final String QUERY =
             "query($id: %s!, $after: String) {"
             + " noteable: %s(id: $id) {"
             + " notes(first: 100, after: $after) {"
             + " pageInfo { hasNextPage endCursor }"
-            + " nodes { id awardEmoji { nodes { name user { username } } } }"
+            + " nodes { " + NOTE_FIELDS + " }"
             + " } } }";
     private static final int NOTES_PER_QUERY = 50;
 
     private NoteReactionsLoader() {}
 
     /**
-     * Returns note ID → reactions for every note of the issue or MR with the given global
-     * (non-iid) ID. Emits an empty map if GraphQL is unavailable or the query fails; notes
+     * Returns note ID → reactions and edit details for every note of the issue or MR with the
+     * given global (non-iid) ID. Emits an empty map if GraphQL is unavailable or the query fails; notes
      * missing from the map fall back to the per-note REST fetch.
      */
-    public static Single<Map<Long, List<GitLabReaction>>> load(boolean isMergeRequest,
+    public static Single<Map<Long, NoteDetails>> load(boolean isMergeRequest,
             long globalId, boolean bypassCache) {
         return Single.fromCallable(() -> loadAllPages(isMergeRequest, globalId, bypassCache))
                 .onErrorReturn(error -> {
                     Log.d(Gl4Application.LOG_TAG, "GraphQL note reactions unavailable", error);
-                    return Collections.<Long, List<GitLabReaction>>emptyMap();
+                    return Collections.<Long, NoteDetails>emptyMap();
                 });
     }
 
@@ -56,17 +71,17 @@ public final class NoteReactionsLoader {
      * looks the notes up by ID, batched into aliased note(id:) fields in as few queries as
      * possible. Emits an empty map if GraphQL is unavailable or the query fails.
      */
-    public static Single<Map<Long, List<GitLabReaction>>> loadForNotes(List<Long> noteIds) {
+    public static Single<Map<Long, NoteDetails>> loadForNotes(List<Long> noteIds) {
         return Single.fromCallable(() -> loadByIds(noteIds))
                 .onErrorReturn(error -> {
                     Log.d(Gl4Application.LOG_TAG, "GraphQL note reactions unavailable", error);
-                    return Collections.<Long, List<GitLabReaction>>emptyMap();
+                    return Collections.<Long, NoteDetails>emptyMap();
                 });
     }
 
-    private static Map<Long, List<GitLabReaction>> loadByIds(List<Long> noteIds) {
+    private static Map<Long, NoteDetails> loadByIds(List<Long> noteIds) {
         GitLabGraphQLService service = ServiceFactory.getGraphQL(GitLabGraphQLService.class);
-        Map<Long, List<GitLabReaction>> result = new HashMap<>();
+        Map<Long, NoteDetails> result = new HashMap<>();
         for (int start = 0; start < noteIds.size(); start += NOTES_PER_QUERY) {
             List<Long> batch = noteIds.subList(start,
                     Math.min(start + NOTES_PER_QUERY, noteIds.size()));
@@ -74,7 +89,7 @@ public final class NoteReactionsLoader {
             for (int i = 0; i < batch.size(); i++) {
                 query.append(" n").append(i).append(": note(id: \"gid://gitlab/Note/")
                         .append(batch.get(i)).append("\") {")
-                        .append(" id awardEmoji { nodes { name user { username } } } }");
+                        .append(" ").append(NOTE_FIELDS).append(" }");
             }
             query.append(" }");
             Map<String, Object> body = new HashMap<>();
@@ -92,26 +107,27 @@ public final class NoteReactionsLoader {
             for (GitLabNoteReactionsResponse.Note note : payload.data.values()) {
                 if (note == null) continue;
                 long noteId = parseNoteId(note.id);
-                if (noteId > 0) result.put(noteId, toReactions(note));
+                if (noteId > 0) result.put(noteId, toDetails(note));
             }
         }
         return result;
     }
 
-    /** Stores the loaded reactions on each comment that has an entry in {@code reactions}. */
+    /** Stores the loaded reactions and edit details on each comment that has an entry. */
     public static List<GitLabComment> apply(List<GitLabComment> comments,
-            Map<Long, List<GitLabReaction>> reactions) {
+            Map<Long, NoteDetails> details) {
         String ownLogin = Gl4Application.get().getAuthLogin();
         for (GitLabComment comment : comments) {
-            List<GitLabReaction> details = reactions.get(comment.id());
-            if (details != null) {
-                comment.withReactionDetails(details, ownLogin);
+            NoteDetails note = details.get(comment.id());
+            if (note != null) {
+                comment.withReactionDetails(note.reactions, ownLogin);
+                comment.withEditInfo(note.lastEditedAt, note.lastEditedBy);
             }
         }
         return comments;
     }
 
-    private static Map<Long, List<GitLabReaction>> loadAllPages(boolean isMergeRequest,
+    private static Map<Long, NoteDetails> loadAllPages(boolean isMergeRequest,
             long globalId, boolean bypassCache) throws Exception {
         GitLabGraphQLService service = ServiceFactory.getGraphQL(GitLabGraphQLService.class);
         String query = isMergeRequest
@@ -120,7 +136,7 @@ public final class NoteReactionsLoader {
         String gid = (isMergeRequest ? "gid://gitlab/MergeRequest/" : "gid://gitlab/Issue/")
                 + globalId;
 
-        Map<Long, List<GitLabReaction>> result = new HashMap<>();
+        Map<Long, NoteDetails> result = new HashMap<>();
         String cursor = null;
         do {
             Map<String, Object> variables = new HashMap<>();
@@ -145,7 +161,7 @@ public final class NoteReactionsLoader {
             if (notes.nodes != null) {
                 for (GitLabNoteReactionsResponse.Note note : notes.nodes) {
                     long noteId = parseNoteId(note.id);
-                    if (noteId > 0) result.put(noteId, toReactions(note));
+                    if (noteId > 0) result.put(noteId, toDetails(note));
                 }
             }
             cursor = notes.pageInfo != null && notes.pageInfo.hasNextPage
@@ -154,16 +170,22 @@ public final class NoteReactionsLoader {
         return result;
     }
 
-    private static List<GitLabReaction> toReactions(GitLabNoteReactionsResponse.Note note) {
+    private static NoteDetails toDetails(GitLabNoteReactionsResponse.Note note) {
         List<GitLabReaction> reactions = new ArrayList<>();
-        if (note.awardEmoji == null || note.awardEmoji.nodes == null) return reactions;
-        for (GitLabNoteReactionsResponse.AwardEmoji emoji : note.awardEmoji.nodes) {
-            GitLabReaction r = new GitLabReaction();
-            r.name = emoji.name;
-            r.user = emoji.user != null ? GitLabUser.create(emoji.user.username, 0) : null;
-            reactions.add(r);
+        if (note.awardEmoji != null && note.awardEmoji.nodes != null) {
+            for (GitLabNoteReactionsResponse.AwardEmoji emoji : note.awardEmoji.nodes) {
+                GitLabReaction r = new GitLabReaction();
+                r.name = emoji.name;
+                r.user = emoji.user != null ? GitLabUser.create(emoji.user.username, 0) : null;
+                reactions.add(r);
+            }
         }
-        return reactions;
+        GitLabUser editor = null;
+        if (note.lastEditedBy != null) {
+            editor = GitLabUser.create(note.lastEditedBy.username, 0);
+            editor.name = note.lastEditedBy.name;
+        }
+        return new NoteDetails(reactions, note.lastEditedAt, editor);
     }
 
     /** Extracts the numeric note ID from gid://gitlab/{Note,DiscussionNote,DiffNote}/123. */

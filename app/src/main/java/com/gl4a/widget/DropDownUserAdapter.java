@@ -96,7 +96,7 @@ public class DropDownUserAdapter extends BaseAdapter implements Filterable {
         final GitLabUser user = getItem(position);
         final ViewHolder holder = (ViewHolder) view.getTag();
 
-        holder.tvUser.setText(ApiHelpers.getUserLogin(mContext, user));
+        holder.tvUser.setText(ApiHelpers.getUserNameWithLogin(mContext, user));
         AvatarHandler.assignAvatar(holder.ivUser, user);
 
         return view;

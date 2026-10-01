@@ -182,8 +182,8 @@ public class NotificationAdapter extends
 
     /** Formats the action line matching GitLab web: "Jay mentioned you in Issue #34" */
     private String formatActionText(com.gl4a.gitlab.model.GitLabTodo todo) {
-        String authorName = todo.author != null ? todo.author.name() : null;
-        if (authorName == null) authorName = "";
+        String authorName = todo.author != null
+                ? com.gl4a.utils.ApiHelpers.getUserDisplayName(mContext, todo.author) : "";
 
         String targetType = todo.targetType;
         String typeLabel = "Issue";

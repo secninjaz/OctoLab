@@ -19,6 +19,10 @@ public class GitLabComment implements Parcelable {
     @Json(name = "created_at") public String createdAt;
     @Json(name = "updated_at") public String updatedAt;
     @Json(name = "system") public boolean system;
+    // When a resolvable discussion was resolved; resolved/resolvable/resolved_by are below (#179)
+    @Json(name = "resolved_at") public String resolvedAt;
+    // True when a push resolved the thread: "Automatically resolved" (#179)
+    @Json(name = "resolved_by_push") public boolean resolvedByPush;
     @Json(name = "noteable_type") public String noteableType;
     @Json(name = "noteable_id") public long noteableId;
     @Json(name = "noteable_iid") public long noteableIid;
@@ -56,9 +60,11 @@ public class GitLabComment implements Parcelable {
         if (s == null) return null;
         String[] fmts = {
             "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            // Before the 'Z'-literal patterns, which parse as local time: GraphQL times
+            // have no milliseconds ("2026-08-17T11:54:42Z") and would be off by the UTC offset
+            "yyyy-MM-dd'T'HH:mm:ssXXX",
             "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-            "yyyy-MM-dd'T'HH:mm:ss'Z'",
-            "yyyy-MM-dd'T'HH:mm:ssXXX"
+            "yyyy-MM-dd'T'HH:mm:ss'Z'"
         };
         for (String fmt : fmts) {
             try { return new SimpleDateFormat(fmt, Locale.US).parse(s); }
@@ -74,15 +80,65 @@ public class GitLabComment implements Parcelable {
     public void setMrWebUrl(String url) { this.mrWebUrl = url != null ? url : ""; }
 
     // Transient reaction cache — populated asynchronously from the award emoji API
+    /** Set when this "note" stands for resource events (labels/milestone/state), #180. */
+    public static class EventInfo {
+        public final String kind;  // "label", "milestone", "state"
+        public final java.util.List<GitLabLabel> added = new java.util.ArrayList<>();
+        public final java.util.List<GitLabLabel> removed = new java.util.ArrayList<>();
+        public String milestone;
+        public boolean milestoneRemoved;
+        public String state;
+        public String sourceCommit;
+
+        public EventInfo(String kind) {
+            this.kind = kind;
+        }
+    }
+    public transient EventInfo eventInfo;
+
     // Thread info from the discussions API (#123). A reply is any note after the first in a
     // non-individual discussion; GitLab threads are one level deep.
     private transient String mDiscussionId;
     private transient boolean mThreadReply;
     public String discussionId() { return mDiscussionId; }
     public boolean isThreadReply() { return mThreadReply; }
+    /** On a thread's first note: its replies, for the collapsed "N replies" row (#179). */
+    public static class ThreadSummary {
+        public int replyCount;
+        public GitLabUser lastReplyAuthor;
+        public String lastReplyAt;
+        public final java.util.List<GitLabUser> replyAuthors = new java.util.ArrayList<>();
+    }
+    public transient ThreadSummary threadSummary;
+    /** The thread's resolved state, on every note of it, incl. system notes (#179). */
+    public transient boolean threadResolved;
+
+    public Date resolvedAtDate() { return parseIso(resolvedAt); }
+
+    /** Place in a thread, for its card shape (#179): see THREAD_* constants. */
+    public static final int THREAD_NONE = 0, THREAD_FIRST = 1, THREAD_MIDDLE = 2, THREAD_LAST = 3;
+    private transient int mThreadPosition;
+    public int threadPosition() { return mThreadPosition; }
+    public void setThreadPosition(int position) { mThreadPosition = position; }
+
     public GitLabComment withThread(String discussionId, boolean reply) {
         mDiscussionId = discussionId;
         mThreadReply = reply;
+        return this;
+    }
+
+    // Who last edited the note and when, from GraphQL (REST has no such fields); the editor is
+    // null if the note was never edited. Not loaded when GraphQL is unavailable (#151).
+    private transient boolean mEditInfoLoaded;
+    private transient String mLastEditedAt;
+    private transient GitLabUser mLastEditedBy;
+    public boolean editInfoLoaded() { return mEditInfoLoaded; }
+    public Date lastEditedAtDate() { return parseIso(mLastEditedAt); }
+    public GitLabUser lastEditedBy() { return mLastEditedBy; }
+    public GitLabComment withEditInfo(String lastEditedAt, GitLabUser lastEditedBy) {
+        mEditInfoLoaded = true;
+        mLastEditedAt = lastEditedAt;
+        mLastEditedBy = lastEditedBy;
         return this;
     }
 

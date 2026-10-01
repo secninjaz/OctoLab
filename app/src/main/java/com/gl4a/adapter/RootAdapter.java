@@ -175,6 +175,11 @@ public abstract class RootAdapter<T, VH extends RecyclerView.ViewHolder>
         return mObjects.get(position);
     }
 
+    /** Adapter position of the item at {@code index} in the data (accounts for a header). */
+    public int getAdapterPositionForIndex(int index) {
+        return index + (mHeaderView != null ? 1 : 0);
+    }
+
     public T getItemFromAdapterPosition(int position) {
         return mObjects.get(position - (mHeaderView != null ? 1 : 0));
     }

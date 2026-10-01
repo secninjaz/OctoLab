@@ -79,14 +79,6 @@ public class StringUtils {
      * @param name the name
      * @return the string
      */
-    public static String formatName(String userLogin, String name) {
-        if (StringUtils.isBlank(userLogin)) {
-            return name;
-        }
-
-        return userLogin + (!StringUtils.isBlank(name) ? " - " + name : "");
-    }
-
     public static CharSequence formatRelativeTime(Context context, Date date, boolean showDateIfLongAgo) {
         if (date == null) {
             return null;
@@ -111,6 +103,16 @@ public class StringUtils {
         if (isoDate == null) {
             return null;
         }
+        Date date = parseIsoDate(isoDate);
+        return date != null ? formatRelativeTime(context, date, showDateIfLongAgo)
+                : isoDate; // fallback: return raw string
+    }
+
+    /** Parses an ISO 8601 date as GitLab returns it; null if it can't be parsed. */
+    public static Date parseIsoDate(String isoDate) {
+        if (isoDate == null) {
+            return null;
+        }
         // Try common GitLab ISO-8601 formats
         String[] formats = {
             "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
@@ -125,13 +127,13 @@ public class StringUtils {
                 sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
                 Date date = sdf.parse(isoDate);
                 if (date != null) {
-                    return formatRelativeTime(context, date, showDateIfLongAgo);
+                    return date;
                 }
             } catch (ParseException ignored) {
                 // try next format
             }
         }
-        return isoDate; // fallback: return raw string
+        return null;
     }
 
     public static CharSequence formatExactTime(Context context, Date date) {

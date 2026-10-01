@@ -452,7 +452,7 @@ public class ReactionBar extends HorizontalScrollView implements View.OnClickLis
                     convertView.setTag(mOwnReaction);
                 } else {
                     avatar.setAlpha(1.0f);
-                    name.setText(ApiHelpers.getUserLoginWithType(mContext, user));
+                    name.setText(ApiHelpers.getUserNameWithType(mContext, user));
                     convertView.setTag(user);
                 }
             }

@@ -46,13 +46,26 @@
                         android:layout_alignParentTop="true"
                         android:layout_toRightOf="@id/iv_gravatar"
                         android:textAppearance="@style/TextAppearance.HeaderTitle"
-                        tools:text="Username" />
+                        tools:text="Display Name" />
+
+                    <!-- @username under the display name, like GitLab web (#195) -->
+                    <TextView
+                        android:id="@+id/tv_username"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_below="@id/tv_name"
+                        android:layout_toRightOf="@id/iv_gravatar"
+                        android:fontFamily="monospace"
+                        android:textAppearance="@style/TextAppearance.VerySmall"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:visibility="gone"
+                        tools:text="\@username" />
 
                     <com.gl4a.widget.LinkHandlingTextView
                         android:id="@+id/tv_email"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_below="@id/tv_name"
+                        android:layout_below="@id/tv_username"
                         android:layout_marginTop="2dp"
                         android:layout_toRightOf="@id/iv_gravatar"
                         android:autoLink="email"

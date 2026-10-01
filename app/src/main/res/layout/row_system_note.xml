@@ -1,25 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- System note / event like GitLab web (#179): a dot on the timeline line in the avatar
+     column, then the text (author in bold) and time in muted colour. No left bar. -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:paddingLeft="@dimen/content_padding"
-    android:paddingRight="@dimen/content_padding"
-    android:paddingTop="6dp"
-    android:paddingBottom="6dp">
+    android:paddingLeft="@dimen/timeline_side_padding"
+    android:paddingRight="@dimen/timeline_side_padding"
+    android:paddingTop="@dimen/timeline_row_gap"
+    android:paddingBottom="@dimen/timeline_row_gap">
 
-    <View
-        android:layout_width="2dp"
-        android:layout_height="match_parent"
-        android:layout_marginRight="10dp"
-        android:background="?android:attr/textColorSecondary"
-        android:alpha="0.3" />
+    <FrameLayout
+        android:layout_width="@dimen/timeline_avatar_size"
+        android:layout_height="wrap_content">
 
+        <View
+            android:id="@+id/sn_dot"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/timeline_dot" />
+
+    </FrameLayout>
+
+    <!-- Inside a thread (e.g. "changed this line in version 6 of the diff") this becomes a
+         segment of the thread's card, with the dot drawn beside the text (#179) -->
     <LinearLayout
+        android:id="@+id/sn_body"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginLeft="@dimen/timeline_content_gap"
         android:orientation="vertical">
 
         <com.gl4a.widget.LinkHandlingTextView
@@ -28,7 +41,6 @@
             android:layout_height="wrap_content"
             android:textAppearance="?android:attr/textAppearanceSmall"
             android:textColor="?android:attr/textColorSecondary"
-            android:textStyle="italic"
             app:needsLinkHandling="true" />
 
         <TextView
@@ -36,9 +48,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textColor="?android:attr/textColorSecondary"
-            android:alpha="0.6" />
+            android:textAppearance="@style/TextAppearance.VerySmall" />
 
     </LinearLayout>
 

@@ -38,6 +38,10 @@ public abstract class LoadingListFragmentBase extends LoadingFragmentBase implem
 
     }
 
+    protected LinearLayoutManager createLayoutManager(android.content.Context context) {
+        return new LinearLayoutManager(context);
+    }
+
     @Override
     protected View onCreateContentView(LayoutInflater inflater, ViewGroup parent) {
         View view = inflater.inflate(R.layout.list_fragment_content, parent, false);
@@ -49,7 +53,7 @@ public abstract class LoadingListFragmentBase extends LoadingFragmentBase implem
             emptyView.setText(emptyTextResId);
         }
 
-        mLayoutManager = new LinearLayoutManager(view.getContext());
+        mLayoutManager = createLayoutManager(view.getContext());
         mRecyclerView = view.findViewById(R.id.list);
         mRecyclerView.setLayoutManager(mLayoutManager);
         onRecyclerViewInflated(mRecyclerView, inflater);

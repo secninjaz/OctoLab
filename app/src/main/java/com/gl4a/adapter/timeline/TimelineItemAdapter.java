@@ -20,6 +20,7 @@ import com.gl4a.utils.HttpImageGetter;
 import com.gl4a.utils.IntentUtils;
 import com.gl4a.widget.ReactionBar;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -62,6 +63,8 @@ public class TimelineItemAdapter
         void replyToThread(GitLabComment comment);
         /** Discussion id of the thread being replied to, or null. */
         String getSelectedReplyDiscussionId();
+        /** The MR's current head commit, to tell threads on older versions (#179); null otherwise. */
+        default String getMergeRequestHeadSha() { return null; }
         String getShareSubject(GitLabComment comment);
         Single<List<GitLabReaction>> loadReactionDetails(GitLabComment comment, boolean bypassCache);
         Single<GitLabReaction> addReaction(GitLabComment comment, String content);
@@ -99,6 +102,39 @@ public class TimelineItemAdapter
         @Override
         public void addText(CharSequence text) {
             mActionCallback.addText(text);
+        }
+
+        @Override
+        public Single<java.util.List<com.gl4a.utils.DiffSnippetLoader.Line>> loadDiffSnippet(
+                TimelineItem.TimelineComment comment) {
+            return com.gl4a.utils.DiffSnippetLoader.load(mRepoOwner, mRepoName,
+                    comment.comment().diffPosition);
+        }
+
+        @Override
+        public boolean isOutdatedDiff(TimelineItem.TimelineComment comment) {
+            String head = mActionCallback.getMergeRequestHeadSha();
+            GitLabComment.DiffPosition pos = comment.comment().diffPosition;
+            return head != null && pos != null && pos.headSha != null && !head.equals(pos.headSha);
+        }
+
+        @Override
+        public boolean isThreadCollapsed(TimelineItem.TimelineComment comment) {
+            return TimelineItemAdapter.this.isThreadCollapsed(comment.comment());
+        }
+
+        @Override
+        public void toggleThread(TimelineItem.TimelineComment comment) {
+            String id = comment.comment().discussionId();
+            if (id == null) return;
+            if (isThreadCollapsed(comment)) {
+                mCollapsedThreads.remove(id);
+                mExpandedThreads.add(id);
+            } else {
+                mExpandedThreads.remove(id);
+                mCollapsedThreads.add(id);
+            }
+            notifyThreadChanged(id);
         }
 
         @Override
@@ -193,9 +229,41 @@ public class TimelineItemAdapter
         notifyDataSetChanged();
     }
 
+    // The project the notes belong to, for linking their references (#197)
+    private String mProjectPath;
+
+    /** The project the notes belong to, for linking their references (#197). */
+    public void setProjectPath(String projectPath) {
+        mProjectPath = projectPath;
+        mImageGetter.setProjectPath(projectPath);
+    }
+
     public void destroy() {
         mImageGetter.destroy();
         mReactionDetailsCache.destroy();
+    }
+
+    /**
+     * Starts rendering every note's markdown ahead of scrolling, top first, with the same
+     * text and cache keys the rows bind with, so rows don't change height as they scroll in
+     * (#152). Label/milestone/state events are built locally and need no rendering.
+     */
+    public void prerenderMarkdown(List<TimelineItem> items) {
+        List<android.util.Pair<Object, String>> notes = new ArrayList<>();
+        for (TimelineItem item : items) {
+            if (!(item instanceof TimelineItem.TimelineComment)) continue;
+            TimelineItem.TimelineComment comment = (TimelineItem.TimelineComment) item;
+            if (comment.comment().isSystemNote()) {
+                if (comment.comment().eventInfo == null) {
+                    notes.add(android.util.Pair.create(comment.comment().id(),
+                            systemNoteMarkdown(comment.getUser(), comment.comment().body())));
+                }
+            } else {
+                notes.add(android.util.Pair.create(comment.comment().id(),
+                        comment.comment().body()));
+            }
+        }
+        mImageGetter.prerenderMarkdown(notes);
     }
 
     public void pause() {
@@ -265,7 +333,7 @@ public class TimelineItemAdapter
                 break;
             case VIEW_TYPE_SYSTEM_NOTE:
                 view = inflater.inflate(R.layout.row_system_note, parent, false);
-                holder = new SystemNoteViewHolder(view, mImageGetter);
+                holder = new SystemNoteViewHolder(view, mImageGetter, this);
                 break;
             default:
                 throw new IllegalArgumentException("viewType: Unknown timeline item type.");
@@ -322,6 +390,52 @@ public class TimelineItemAdapter
         holder.updateReactions(reactions);
     }
 
+    // Threads the user expanded or collapsed; others follow GitLab web: resolved threads start
+    // collapsed to their first note, unresolved ones expanded (#179).
+    private final java.util.Set<String> mExpandedThreads = new java.util.HashSet<>();
+    private final java.util.Set<String> mCollapsedThreads = new java.util.HashSet<>();
+
+    boolean isThreadCollapsed(GitLabComment note) {
+        String id = note.discussionId();
+        if (id == null) return false;
+        if (mExpandedThreads.contains(id)) return false;
+        // The thread's state, not the note's: system notes in a thread aren't resolvable.
+        return mCollapsedThreads.contains(id) || note.threadResolved || note.resolved;
+    }
+
+    /**
+     * Whether the row at an adapter position is a reply or system note inside a collapsed
+     * thread, which takes no space; the scrollbar counts it as such before it's laid out (#152).
+     */
+    public boolean isRowCollapsed(int position) {
+        int index = position - getAdapterPositionForIndex(0);
+        if (index < 0 || index >= getCount()) return false;
+        TimelineItem item = getItem(index);
+        if (!(item instanceof TimelineItem.TimelineComment)) return false;
+        GitLabComment note = ((TimelineItem.TimelineComment) item).comment();
+        int threadPosition = note.threadPosition();
+        return threadPosition != GitLabComment.THREAD_NONE
+                && threadPosition != GitLabComment.THREAD_FIRST && isThreadCollapsed(note);
+    }
+
+    /** Expands a thread, e.g. before scrolling to one of its replies from a link. */
+    public void expandThread(String discussionId) {
+        if (discussionId == null) return;
+        mCollapsedThreads.remove(discussionId);
+        if (mExpandedThreads.add(discussionId)) notifyThreadChanged(discussionId);
+    }
+
+    private void notifyThreadChanged(String discussionId) {
+        // Data indices, converted to adapter positions: the header/footer rows aren't items.
+        for (int i = 0; i < getCount(); i++) {
+            TimelineItem item = getItem(i);
+            if (item instanceof TimelineItem.TimelineComment && discussionId.equals(
+                    ((TimelineItem.TimelineComment) item).comment().discussionId())) {
+                notifyItemChanged(getAdapterPositionForIndex(i));
+            }
+        }
+    }
+
     /** Whether a timeline row is a reply inside a comment thread (#123). */
     public static boolean isThreadReplyRow(RecyclerView.ViewHolder holder) {
         return holder instanceof CommentViewHolder && ((CommentViewHolder) holder).isThreadReply();
@@ -376,9 +490,82 @@ public class TimelineItemAdapter
         markdown = markdown.replace("](/",
                 "](" + com.gl4a.Gl4Application.get().getInstanceUrl() + "/");
         if (author != null && author.name() != null && !author.name().isEmpty()) {
-            markdown = author.name() + " " + markdown;
+            // Author in bold, like GitLab web (#179).
+            markdown = "**" + author.name().replace("*", "\\*") + "** " + markdown;
         }
         return markdown;
+    }
+
+    /**
+     * Text for a resource event, like GitLab web: "Jay added [New App] [waiting-on-response]
+     * labels and removed [bug] label", "set milestone to v1.4", "closed via commit abc12345".
+     */
+    static CharSequence eventText(android.content.Context context,
+            com.gl4a.gitlab.model.GitLabUser user,
+            com.gl4a.gitlab.model.GitLabComment.EventInfo info, String projectPath) {
+        android.text.SpannableStringBuilder text = new android.text.SpannableStringBuilder();
+        if (user != null) {
+            // Author in bold, like other system notes and GitLab web (#179).
+            text.append(com.gl4a.utils.ApiHelpers.getUserDisplayName(context, user));
+            text.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                    0, text.length(), 0);
+            text.append(' ');
+        }
+        switch (info.kind) {
+            case "label":
+                if (!info.added.isEmpty()) {
+                    text.append(context.getString(R.string.event_added)).append(' ');
+                    appendChips(context, text, info.added);
+                    text.append(context.getResources().getQuantityString(
+                            R.plurals.event_labels, info.added.size()));
+                }
+                if (!info.removed.isEmpty()) {
+                    if (!info.added.isEmpty()) {
+                        text.append(' ').append(context.getString(R.string.event_and)).append(' ');
+                    }
+                    text.append(context.getString(R.string.event_removed)).append(' ');
+                    appendChips(context, text, info.removed);
+                    text.append(context.getResources().getQuantityString(
+                            R.plurals.event_labels, info.removed.size()));
+                }
+                break;
+            case "milestone":
+                text.append(context.getString(info.milestoneRemoved
+                        ? R.string.event_milestone_removed : R.string.event_milestone_set,
+                        info.milestone != null ? info.milestone : ""));
+                break;
+            default:
+                String state = info.state != null ? info.state : "";
+                text.append(state);
+                if (info.sourceCommit != null && info.sourceCommit.length() >= 8) {
+                    String shortSha = info.sourceCommit.substring(0, 8);
+                    text.append(' ');
+                    int start = text.length();
+                    text.append(context.getString(R.string.event_via_commit, shortSha));
+                    // The commit links to it, like on GitLab web (#197)
+                    int shaStart = text.toString().indexOf(shortSha, start);
+                    if (projectPath != null && shaStart >= 0) {
+                        text.setSpan(new com.gl4a.widget.LinkSpan(
+                                com.gl4a.Gl4Application.get().getInstanceUrl() + "/"
+                                        + projectPath + "/-/commit/" + info.sourceCommit),
+                                shaStart, shaStart + shortSha.length(), 0);
+                    }
+                }
+                break;
+        }
+        return text;
+    }
+
+    private static void appendChips(android.content.Context context,
+            android.text.SpannableStringBuilder text,
+            java.util.List<com.gl4a.gitlab.model.GitLabLabel> labels) {
+        for (com.gl4a.gitlab.model.GitLabLabel label : labels) {
+            int start = text.length();
+            text.append(label.name);
+            text.setSpan(new com.gl4a.widget.IssueLabelSpan(context, label, true),
+                    start, text.length(), 0);
+            text.append(' ');
+        }
     }
 
     /** Minimal view holder for GitLab system notes — no avatar, menu, or reactions. */
@@ -388,20 +575,84 @@ public class TimelineItemAdapter
         private final android.widget.TextView tvTimestamp;
         private final HttpImageGetter mImageGetter;
 
-        SystemNoteViewHolder(android.view.View itemView, HttpImageGetter imageGetter) {
+        private final TimelineItemAdapter mAdapter;
+        private final android.view.View mDot;
+        private final android.view.View mBody;
+
+        SystemNoteViewHolder(android.view.View itemView, HttpImageGetter imageGetter,
+                TimelineItemAdapter adapter) {
             super(itemView);
             tvNote = itemView.findViewById(R.id.tv_system_note);
             tvTimestamp = itemView.findViewById(R.id.tv_timestamp);
             mImageGetter = imageGetter;
+            mAdapter = adapter;
+            mDot = itemView.findViewById(R.id.sn_dot);
+            mBody = itemView.findViewById(R.id.sn_body);
+        }
+
+        /**
+         * A system note that is part of a thread is drawn inside the thread's card and
+         * collapses with it, like GitLab web (#179). Returns false if it's hidden.
+         */
+        private boolean bindThreadPlacement(GitLabComment note) {
+            int position = note.threadPosition();
+            boolean inThread = position != GitLabComment.THREAD_NONE;
+            boolean hidden = inThread && position != GitLabComment.THREAD_FIRST
+                    && mAdapter.isThreadCollapsed(note);
+            itemView.setVisibility(hidden ? android.view.View.GONE : android.view.View.VISIBLE);
+            android.view.ViewGroup.LayoutParams lp = itemView.getLayoutParams();
+            if (lp != null) {
+                int height = hidden ? 0 : android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+                if (lp.height != height) {
+                    lp.height = height;
+                    itemView.setLayoutParams(lp);
+                }
+            }
+            if (hidden) return false;
+            android.content.res.Resources res = itemView.getResources();
+            int gap = res.getDimensionPixelSize(R.dimen.timeline_row_gap);
+            int pad = Math.round(12 * res.getDisplayMetrics().density);
+            if (inThread) {
+                mDot.setVisibility(android.view.View.INVISIBLE);
+                mBody.setBackgroundResource(position == GitLabComment.THREAD_FIRST
+                        ? R.drawable.timeline_card_top
+                        : position == GitLabComment.THREAD_LAST ? R.drawable.timeline_card_bottom
+                        : R.drawable.timeline_card_middle);
+                mBody.setPadding(pad, pad / 2, pad, pad / 2);
+                tvNote.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                        R.drawable.timeline_dot, 0, 0, 0);
+                tvNote.setCompoundDrawablePadding(pad / 2);
+                itemView.setPadding(itemView.getPaddingLeft(),
+                        position == GitLabComment.THREAD_FIRST ? gap : 0,
+                        itemView.getPaddingRight(),
+                        position == GitLabComment.THREAD_LAST ? gap : 0);
+            } else {
+                mDot.setVisibility(android.view.View.VISIBLE);
+                mBody.setBackground(null);
+                mBody.setPadding(0, 0, 0, 0);
+                tvNote.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0);
+                itemView.setPadding(itemView.getPaddingLeft(), gap, itemView.getPaddingRight(), gap);
+            }
+            return true;
         }
 
         @Override
         public void bind(TimelineItem.TimelineComment item) {
+            if (!bindThreadPlacement(item.comment())) {
+                return;
+            }
             // The body is markdown/HTML (lists, links, commit SHAs, references), so render
             // it like a comment (#165).
-            mImageGetter.bindMarkdown(tvNote,
-                    systemNoteMarkdown(item.getUser(), item.comment().body()),
-                    item.comment().id());
+            if (item.comment().eventInfo != null) {
+                // Resource event (#180): built locally, with GitLab-coloured label chips.
+                mImageGetter.unbindView(tvNote);
+                tvNote.setText(eventText(tvNote.getContext(), item.getUser(),
+                        item.comment().eventInfo, mAdapter.mProjectPath));
+            } else {
+                mImageGetter.bindMarkdown(tvNote,
+                        systemNoteMarkdown(item.getUser(), item.comment().body()),
+                        item.comment().id());
+            }
             java.util.Date createdAt = item.getCreatedAt();
             tvTimestamp.setText(com.gl4a.utils.StringUtils.formatRelativeTime(
                     itemView.getContext(), createdAt, true));

@@ -27,7 +27,7 @@ import com.gl4a.R;
 import com.gl4a.activities.UserActivity;
 import com.gl4a.gitlab.model.GitLabUser;
 import com.gl4a.utils.AvatarHandler;
-import com.gl4a.utils.StringUtils;
+import com.gl4a.utils.ApiHelpers;
 
 public class UserAdapter extends RootAdapter<GitLabUser, UserAdapter.ViewHolder> {
     public UserAdapter(Context context) {
@@ -47,7 +47,7 @@ public class UserAdapter extends RootAdapter<GitLabUser, UserAdapter.ViewHolder>
         AvatarHandler.assignAvatar(holder.ivGravatar, user);
         holder.ivGravatar.setTag(user);
 
-        holder.tvTitle.setText(StringUtils.formatName(user.login(), user.name()));
+        holder.tvTitle.setText(ApiHelpers.getUserNameWithLogin(mContext, user));
     }
 
     @Override

@@ -215,8 +215,8 @@
     <string name="no_followers_found">No followers found.</string>
     <string name="no_following_found">No users are followed so far.</string>
     <string name="no_forks_found">This repository wasn\'t forked yet.</string>
-    <string name="no_issues_found">No issues were reported so far.</string>
-    <string name="no_search_issues_found">No issues found matching the criteria.</string>
+    <string name="no_issues_found">No work items so far.</string>
+    <string name="no_search_issues_found">No work items found matching the criteria.</string>
     <string name="no_search_pull_requests_found">No merge requests found matching the criteria.</string>
     <string name="no_events_found">No events found.</string>
     <string name="no_pull_requests_found">No merge requests were opened so far.</string>
@@ -409,10 +409,10 @@
     <string name="release_type_prerelease">Pre-release</string>
     <string name="release_no_releasenotes">No release notes were given.</string>
 
-    <string name="issues">Issues</string>
+    <string name="issues">Work items</string>
     <string name="issue">Issue</string>
-    <string name="issues_open">Open Issues</string>
-    <string name="issues_closed">Closed Issues</string>
+    <string name="issues_open">Open work items</string>
+    <string name="issues_closed">Closed work items</string>
     <string name="issues_menu_show_open">Show Open</string>
     <string name="issues_menu_show_closed">Show Closed</string>
     <string name="issue_comments">Comments</string>
@@ -716,4 +716,22 @@
     <string name="role_planner">Planner</string>
     <string name="role_minimal_access">Minimal access</string>
     <string name="group_tree_loading_failed">Could not load subgroups and projects</string>
+    <!-- Timeline resource events (#180) -->
+    <string name="event_added">added</string>
+    <string name="event_removed">removed</string>
+    <string name="event_and">and</string>
+    <string name="event_milestone_set">changed milestone to %1$s</string>
+    <string name="event_milestone_removed">removed milestone %1$s</string>
+    <string name="event_via_commit">via commit %1$s</string>
+    <!-- Threads (#179) -->
+    <string name="thread_last_reply">Last reply by %1$s</string>
+    <string name="thread_hide_replies">Hide replies</string>
+    <string name="thread_resolved_by">Resolved %1$s by %2$s</string>
+    <!-- "Edited 2 days ago by Jay B" (#151) -->
+    <string name="comment_edited_by">Edited %1$s by %2$s</string>
+    <string name="thread_on_diff">started a thread on the diff</string>
+    <string name="thread_on_old_diff">started a thread on an old version of the diff</string>
+    <string name="thread_resolved_by_push">Automatically resolved %1$s by %2$s</string>
+    <string name="view_video_named">Play video: %1$s</string>
+    <string name="media_not_playable">This video or audio file couldn\'t be played</string>
 </resources>

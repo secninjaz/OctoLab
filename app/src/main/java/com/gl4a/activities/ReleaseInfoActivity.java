@@ -189,7 +189,7 @@ public class ReleaseInfoActivity extends BaseActivity implements
 
         TextView details = findViewById(R.id.tv_releaseinfo);
         String detailsText = getString(R.string.release_details,
-                ApiHelpers.getUserLogin(this, mRelease.author()),
+                ApiHelpers.getUserDisplayName(this, mRelease.author()),
                 StringUtils.formatRelativeTime(this, mRelease.publishedAt(), true));
         StringUtils.applyBoldTagsAndSetText(details, detailsText);
 

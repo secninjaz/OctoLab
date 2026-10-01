@@ -30,7 +30,9 @@ public interface GitLabWikiService {
     @GET("projects/{id}/wikis/{slug}")
     Single<Response<GitLabWikiPage>> getWikiPage(
             @Path("id") long projectId,
-            @Path(value = "slug", encoded = true) String slug
+            @Path(value = "slug", encoded = true) String slug,
+            // true: content is GitLab's own rendered HTML, as on GitLab web (#170)
+            @Query("render_html") boolean renderHtml
     );
 
     // Create a new wiki page

@@ -5,6 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.8] - 2026-10-01
+
+### Added
+- Timeline looks like GitLab web: comments in cards, resolved threads collapsed to their first note with "N replies · Last reply by…", "Resolved by…", diff threads with the file and code lines they're about, and quotes that stand out (#179)
+- Label, milestone and state changes show in the timeline, with coloured label chips (#180)
+- Attachments open in-app with your account, never needing a browser login: images in a viewer with pinch-zoom, videos and audio in a player, text files as text, and other files handed to an installed app (#190)
+- Videos in comments show a thumbnail of their first frame with a play button (#191)
+- Edited comments and issue descriptions read "Edited 2 days ago by Jay B", like GitLab web (#151)
+- Wiki page links open in-app, showing GitLab's rendered page (#170)
+- "Compare with previous version" on an MR opens that version's diff, and the Files tab shows real line counts (#184)
+
+### Changed
+- People are shown by their display name everywhere, like GitLab web; the issue/MR header and user profile add the @username in smaller, faded text, and "Member since" is a date (#194, #195)
+- Issue lists, counts and empty states say "work items", like the navigation drawer (#196)
+
+### Fixed
+- Scrolling an issue or MR no longer makes comments jump as they render, and the scrollbar keeps its size (#152)
+- Tapping an image or video opened it as a project and failed with "404 Project Not Found" (#190)
+- Opening an issue with long comments could freeze the app (#186)
+- Issues with videos hung, ran out of memory and crashed when a link was tapped (#187)
+- Crash opening issues or MRs whose labels use a short colour code such as #efe (#185)
+- Notification project logos were looked up on the active account's instance instead of the notification's (#182)
+- Comments with a table showed as a white box in the card, and descriptions with a table ran to the screen edges (#192)
+- Bot users showed as "****" in comments, system notes, label changes and activity (#193)
+- Issue and commit references (#N, commit SHAs) in comments and system notes were plain text when the issue was opened from the Work items or merge request list, and the commit in "closed via commit" wasn't a link (#197)
+
 ## [1.3.7] - 2026-09-28
 
 ### Added

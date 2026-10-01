@@ -69,6 +69,12 @@
             android:exported="false"
             android:configChanges="orientation|screenSize" />
         <activity android:name=".activities.BlogListActivity" android:exported="false" />
+        <activity android:name=".activities.AttachmentViewerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize" />
+        <activity android:name=".activities.MediaViewerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
         <activity android:name=".activities.BookmarkListActivity" android:exported="false" />
         <activity android:name=".activities.CollaboratorListActivity" android:exported="false" />
         <activity android:name=".activities.CommitActivity" android:exported="false" />

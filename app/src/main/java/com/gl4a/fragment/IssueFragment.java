@@ -75,13 +75,17 @@ public class IssueFragment extends IssueFragmentBase {
                             }
                             return retrofit2.Response.success(ApiHelpers.toPage(response));
                         }))
-                .map(com.gl4a.gitlab.model.GitLabDiscussion::flatten)
+                // Label/milestone/state changes live in resource events, not notes (#180).
+                .zipWith(com.gl4a.utils.TimelineEvents.load(projectId, false, issueIid, bypassCache),
+                        com.gl4a.gitlab.model.GitLabDiscussion::flattenWithEvents)
                 // Include system notes (mentions in commits, state changes, etc.)
                 // so the issue timeline matches GitLab web. System notes render with
                 // a distinct appearance via CommentViewHolder.isSystemNote().
                 // Reactions for all notes come from one GraphQL query instead of per row (#162).
                 .zipWith(NoteReactionsLoader.load(false, mIssue.id(), bypassCache),
                         NoteReactionsLoader::apply)
+                // Some users (e.g. token bots) come back named "****" (#193)
+                .map(com.gl4a.utils.MaskedNames::unmask)
                 .compose(RxUtils.<GitLabComment, TimelineItem>mapList(
                         c -> new TimelineItem.TimelineComment(c)))
                 .subscribeOn(Schedulers.io());

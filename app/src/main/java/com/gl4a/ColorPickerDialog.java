@@ -56,7 +56,7 @@ public class ColorPickerDialog extends AlertDialog {
      *         The RGB value of a color
      */
     private void setColor(String color) {
-        int colorValue = Color.parseColor("#" + color);
+        int colorValue = com.gl4a.utils.ApiHelpers.parseGitLabColor(color);
         mColorPicker.setColor(colorValue);
         mColorPicker.setOldCenterColor(colorValue);
     }

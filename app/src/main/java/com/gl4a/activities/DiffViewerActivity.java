@@ -279,7 +279,8 @@ public abstract class DiffViewerActivity<C extends GitLabComment> extends WebVie
                     }
                     content.append("><div class=\"change\">");
                     content.append(getString(R.string.commit_comment_header,
-                            "<b>" + ApiHelpers.getUserLogin(this, comment.user()) + "</b>",
+                            "<b>" + android.text.TextUtils.htmlEncode(
+                                    ApiHelpers.getUserDisplayName(this, comment.user())) + "</b>",
                             StringUtils.formatRelativeTime(DiffViewerActivity.this,
                                     comment.createdAt(), true)));
                     content.append("</div>").append(comment.bodyHtml());

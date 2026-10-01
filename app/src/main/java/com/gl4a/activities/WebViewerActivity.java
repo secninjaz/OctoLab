@@ -39,6 +39,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import androidx.annotation.Nullable;
 
 import com.gl4a.BaseActivity;
 import com.gl4a.BuildConfig;
@@ -130,35 +131,57 @@ public abstract class WebViewerActivity extends BaseActivity implements
             urlStr = urlStr.replaceAll("/-/project/(\\d+)/uploads/",
                     "/api/v4/projects/$1/uploads/");
 
-            try {
-                okhttp3.OkHttpClient client = com.gl4a.ServiceFactory.getImageHttpClient();
-                String tok = com.gl4a.Gl4Application.get().getAuthToken();
-                okhttp3.Request req = new okhttp3.Request.Builder()
-                        .url(urlStr)
-                        .header("PRIVATE-TOKEN", tok != null ? tok : "")
-                        .build();
-                try (okhttp3.Response resp = client.newCall(req).execute()) {
-                    if (!resp.isSuccessful() || resp.body() == null) return null;
-                    // Read all bytes first — the stream must outlive the Response object.
-                    byte[] bytes = resp.body().bytes();
-                    String ct = resp.header("Content-Type", "application/octet-stream");
-                    // Guess MIME for octet-stream (GitLab returns this for PNG uploads).
-                    if (ct == null || ct.startsWith("application/octet-stream")) {
-                        String guessed = java.net.URLConnection.guessContentTypeFromName(urlStr);
-                        if (guessed != null) ct = guessed;
-                    }
-                    // Strip charset suffix — encoding for binary must be null.
-                    int semi = ct != null ? ct.indexOf(';') : -1;
-                    if (semi > 0) ct = ct.substring(0, semi).trim();
-                    // null encoding = binary/raw; never use "utf-8" for image content.
-                    return new WebResourceResponse(ct, null,
-                            new java.io.ByteArrayInputStream(bytes));
-                }
-            } catch (Exception e) {
-                return null;
+            WebResourceResponse response = proxyRequest(urlStr, request);
+            if (response == null && !urlStr.equals(uri.toString())) {
+                // The uploads API needs a role some users lack; public uploads still
+                // load from their web URL.
+                response = proxyRequest(uri.toString(), request);
             }
+            return response;
         }
     };
+
+    @Nullable
+    private static WebResourceResponse proxyRequest(String urlStr, WebResourceRequest request) {
+        okhttp3.Response resp = null;
+        try {
+            okhttp3.OkHttpClient client = com.gl4a.ServiceFactory.getImageHttpClient();
+            String tok = com.gl4a.Gl4Application.get().getAuthToken();
+            okhttp3.Request.Builder rb = new okhttp3.Request.Builder()
+                    .url(urlStr)
+                    .header("PRIVATE-TOKEN", tok != null ? tok : "");
+            // Videos are fetched in ranges, so they play and seek without being downloaded whole
+            String range = request.getRequestHeaders().get("Range");
+            if (range != null) rb.header("Range", range);
+            resp = client.newCall(rb.build()).execute();
+            if (!resp.isSuccessful() || resp.body() == null) {
+                resp.close();
+                return null;
+            }
+            String ct = resp.header("Content-Type", "application/octet-stream");
+            // Guess MIME for octet-stream (GitLab returns this for PNG uploads).
+            if (ct == null || ct.startsWith("application/octet-stream")) {
+                String guessed = java.net.URLConnection.guessContentTypeFromName(urlStr);
+                if (guessed != null) ct = guessed;
+            }
+            // Strip charset suffix — encoding for binary must be null.
+            int semi = ct != null ? ct.indexOf(';') : -1;
+            if (semi > 0) ct = ct.substring(0, semi).trim();
+            java.util.Map<String, String> headers = new java.util.HashMap<>();
+            for (String name : new String[] { "Content-Length", "Content-Range", "Accept-Ranges" }) {
+                String value = resp.header(name);
+                if (value != null) headers.put(name, value);
+            }
+            String reason = !TextUtils.isEmpty(resp.message()) ? resp.message() : "OK";
+            // Streamed rather than read into memory; the WebView closes the stream, which
+            // releases the response. null encoding = binary/raw.
+            return new WebResourceResponse(ct, null, resp.code(), reason, headers,
+                    resp.body().byteStream());
+        } catch (Exception e) {
+            if (resp != null) resp.close();
+            return null;
+        }
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {

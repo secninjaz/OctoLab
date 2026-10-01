@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dot on the timeline line for system notes and events, like GitLab web (#179). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <solid android:color="@color/timeline_dot" />
+    <size android:width="8dp" android:height="8dp" />
+</shape>

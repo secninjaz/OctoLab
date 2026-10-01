@@ -60,16 +60,30 @@
         app:needsLinkHandling="true"
         tools:text="Description of the issue." />
 
-    <!-- Used instead of tv_desc when content contains a table -->
+    <!-- Used instead of tv_desc when content contains a table. Margins, not padding: a
+         WebView draws its page under its padding, so the text touched the screen edges -->
     <WebView
         android:id="@+id/wv_table"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/content_padding"
+        android:layout_marginLeft="@dimen/content_padding"
+        android:layout_marginRight="@dimen/content_padding"
+        android:layout_marginTop="@dimen/content_padding"
+        android:visibility="gone" />
+
+    <!-- "Edited 2 days ago by Jay B" under the description, like GitLab web (#151) -->
+    <TextView
+        android:id="@+id/tv_edited"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="-8dp"
         android:paddingBottom="@dimen/content_padding"
         android:paddingLeft="@dimen/content_padding"
         android:paddingRight="@dimen/content_padding"
-        android:paddingTop="@dimen/content_padding"
-        android:visibility="gone" />
+        android:textAppearance="@style/TextAppearance.VerySmall"
+        android:visibility="gone"
+        tools:text="Edited 2 days ago by Jay B" />
 
     <com.gl4a.widget.MergeRequestBranchInfoView
         android:id="@+id/branch_container"

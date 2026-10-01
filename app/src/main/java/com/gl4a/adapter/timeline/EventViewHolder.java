@@ -227,11 +227,11 @@ class EventViewHolder
                 if (event.requestedReviewers() != null) {
                     ArrayList<String> reviewers = new ArrayList<>();
                     for (GitLabUser reviewer : event.requestedReviewers()) {
-                        reviewers.add(ApiHelpers.getUserLogin(mContext, reviewer));
+                        reviewers.add(ApiHelpers.getUserDisplayName(mContext, reviewer));
                     }
                     reviewerNames = TextUtils.join(", ", reviewers);
                 } else {
-                    reviewerNames = ApiHelpers.getUserLogin(mContext, event.requestedReviewer());
+                    reviewerNames = ApiHelpers.getUserDisplayName(mContext, event.requestedReviewer());
                 }
                 @StringRes int stringResId = GitLabIssueEventType.ReviewRequested.equals(e)
                         ? R.string.pull_request_event_review_requested
@@ -380,9 +380,6 @@ class EventViewHolder
     }
 
     private String getUserLoginWithBotSuffix(GitLabUser user) {
-        if (user != null && user.login() != null) {
-            return user.login();
-        }
-        return mContext.getString(R.string.deleted);
+        return ApiHelpers.getUserDisplayName(mContext, user);
     }
 }

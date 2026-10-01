@@ -91,6 +91,21 @@ public interface GitLabIssueService {
             @Body Map<String, Object> body
     );
 
+    /**
+     * Label, milestone or state events of an issue or MR (#180).
+     * @param noteableType "issues" or "merge_requests"
+     * @param kind "label", "milestone" or "state"
+     */
+    @GET("projects/{id}/{type}/{iid}/resource_{kind}_events")
+    Single<Response<List<com.gl4a.gitlab.model.GitLabResourceEvent>>> getResourceEvents(
+            @Path("id") long projectId,
+            @Path("type") String noteableType,
+            @Path("iid") int iid,
+            @Path("kind") String kind,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
     // Issue discussions: notes grouped into threads (#123)
     @GET("projects/{id}/issues/{iid}/discussions")
     Single<Response<List<GitLabDiscussion>>> getDiscussions(

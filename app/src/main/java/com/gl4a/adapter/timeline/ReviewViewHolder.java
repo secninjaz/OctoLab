@@ -231,7 +231,7 @@ class ReviewViewHolder
                 break;
         }
 
-        String login = ApiHelpers.getUserLogin(mContext, review.user());
+        String login = ApiHelpers.getUserDisplayName(mContext, review.user());
         String textBase = mContext.getString(textResId, login);
         SpannableStringBuilder text = StringUtils.applyBoldTags(textBase);
 

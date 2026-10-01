@@ -42,7 +42,35 @@ public class WikiActivity extends WebViewerActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        onDataReady();
+        if (mWikiPageFeed.getContent() != null) {
+            onDataReady();
+        } else {
+            loadPage();
+        }
+    }
+
+    /**
+     * The wiki list is loaded without page bodies, so fetch the page, rendered to HTML by
+     * GitLab, by its slug; without this
+     * every page showed "null" (#170). Nested slugs ("Internal/Reviewing-new-apps") are
+     * URL-encoded into one path segment.
+     */
+    private void loadPage() {
+        com.gl4a.utils.SingleFactory.getProjectId(mUserLogin, mRepoName)
+                .flatMap(projectId -> com.gl4a.ServiceFactory
+                        .get(com.gl4a.gitlab.service.GitLabWikiService.class, false)
+                        .getWikiPage(projectId, android.net.Uri.encode(mWikiPageFeed.getId()), true)
+                        .map(com.gl4a.utils.ApiHelpers::throwOnFailure))
+                .compose(makeLoaderSingle(0, false))
+                .subscribe(page -> {
+                    // Rendered HTML; make any root-relative links/images absolute so they open
+                    // and load from the instance.
+                    String base = com.gl4a.Gl4Application.get().getInstanceUrl();
+                    String html = page.content() != null ? page.content() : "";
+                    html = html.replaceAll("(href|src)=\"/(?!/)", "$1=\"" + base + "/");
+                    mWikiPageFeed.setContent(html);
+                    onDataReady();
+                }, this::handleLoadFailure);
     }
 
     @Nullable

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package com.gl4a.adapter;
+import com.gl4a.adapter.timeline.CommentViewHolder;
 import com.gl4a.gitlab.model.GitLabComment;
 import com.gl4a.gitlab.model.GitLabGraphQLAwardEmoji;
 import com.gl4a.gitlab.model.GitLabGraphQLError;
@@ -193,7 +194,6 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
     private void bindComment(ViewHolder holder, GitLabComment item) {
         final GitLabUser user = item.user();
         final Date createdAt = item.createdAtDate();
-        final Date updatedAt = item.updatedAtDate();
 
         holder.mBoundItem = item;
 
@@ -201,8 +201,7 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
         holder.ivGravatar.setTag(user);
 
         holder.tvTimestamp.setText(StringUtils.formatRelativeTime(mContext, createdAt, true));
-        // Commit comments cannot be edited (no note ID), so never show the edit timestamp.
-        holder.tvEditTimestamp.setVisibility(View.GONE);
+        CommentViewHolder.bindEdited(holder.tvEdited, item);
 
         // System notes have no note id in some responses; fall back to createdAt so each
         // comment still gets its own ObjectInfo in HttpImageGetter.
@@ -210,7 +209,7 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
                 : (item.createdAt() != null ? item.createdAt() : System.identityHashCode(item));
         mImageGetter.bindMarkdown(holder.tvDesc, item.body(), cacheKey);
 
-        final SpannableStringBuilder login = ApiHelpers.getUserLoginWithType(mContext, user, true);
+        final SpannableStringBuilder login = ApiHelpers.getUserNameWithType(mContext, user, true);
         holder.tvExtra.setText(login);
         holder.tvExtra.setTag(user);
 
@@ -405,7 +404,7 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
 
             tvExtra = view.findViewById(R.id.tv_extra);
             tvTimestamp = view.findViewById(R.id.tv_timestamp);
-            tvEditTimestamp = view.findViewById(R.id.tv_edit_timestamp);
+            tvEdited = view.findViewById(R.id.tv_edited);
             ivMenu = view.findViewById(R.id.iv_menu);
             ivMenu.setOnClickListener(this);
             reactions = view.findViewById(R.id.reactions);
@@ -427,7 +426,7 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
         private final TextView tvDesc;
         private final TextView tvExtra;
         private final TextView tvTimestamp;
-        private final TextView tvEditTimestamp;
+        private final TextView tvEdited;
         final ImageView ivMenu;
         private final ReactionBar reactions;
         private final PopupMenu mPopupMenu;

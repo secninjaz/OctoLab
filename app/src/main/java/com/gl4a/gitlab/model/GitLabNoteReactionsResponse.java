@@ -5,7 +5,8 @@ import com.squareup.moshi.Json;
 import java.util.List;
 
 /**
- * Response of the GraphQL query that loads award emoji for every note of an issue or MR.
+ * Response of the GraphQL query that loads award emoji and edit details for every note of an
+ * issue or MR.
  * The issue/mergeRequest root field is aliased to "noteable" so one model covers both.
  */
 public class GitLabNoteReactionsResponse {
@@ -34,6 +35,9 @@ public class GitLabNoteReactionsResponse {
         // Global ID, e.g. gid://gitlab/Note/123, gid://gitlab/DiffNote/123
         @Json(name = "id") public String id;
         @Json(name = "awardEmoji") public AwardEmojiConnection awardEmoji;
+        // Equal to the creation time until edited; lastEditedBy is null if never edited (#151)
+        @Json(name = "lastEditedAt") public String lastEditedAt;
+        @Json(name = "lastEditedBy") public User lastEditedBy;
     }
 
     public static class AwardEmojiConnection {
@@ -47,5 +51,6 @@ public class GitLabNoteReactionsResponse {
 
     public static class User {
         @Json(name = "username") public String username;
+        @Json(name = "name") public String name;
     }
 }

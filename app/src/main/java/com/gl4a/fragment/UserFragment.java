@@ -112,7 +112,12 @@ public class UserFragment extends LoadingFragmentBase implements
 
         OverviewRow joinDateRow = mContentView.findViewById(R.id.join_date_row);
         if (mUser.createdAt != null) {
-            joinDateRow.setText(getString(R.string.user_created_at, mUser.createdAt));
+            // A date, not the raw timestamp (2026-09-30T05:23:10.085Z)
+            java.util.Date joined = StringUtils.parseIsoDate(mUser.createdAt);
+            joinDateRow.setText(getString(R.string.user_created_at, joined != null
+                    ? java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM)
+                            .format(joined)
+                    : mUser.createdAt));
             joinDateRow.setVisibility(View.VISIBLE);
         } else {
             joinDateRow.setVisibility(View.GONE);
@@ -148,11 +153,16 @@ public class UserFragment extends LoadingFragmentBase implements
         OverviewRow typeRow = mContentView.findViewById(R.id.type_row);
         typeRow.setVisibility(View.GONE);
 
+        // Display name, with the @username under it, like GitLab web (#195)
         TextView tvName = mContentView.findViewById(R.id.tv_name);
-        if (StringUtils.isBlank(mUser.name())) {
-            tvName.setText(ApiHelpers.getUserLogin(getActivity(), mUser));
+        String displayName = ApiHelpers.getUserDisplayName(getActivity(), mUser);
+        tvName.setText(displayName);
+        TextView tvUsername = mContentView.findViewById(R.id.tv_username);
+        if (mUser.login() != null && !mUser.login().equals(displayName)) {
+            tvUsername.setText("@" + mUser.login());
+            tvUsername.setVisibility(View.VISIBLE);
         } else {
-            tvName.setText(mUser.name());
+            tvUsername.setVisibility(View.GONE);
         }
 
         fillTextView(R.id.tv_email, mUser.email());

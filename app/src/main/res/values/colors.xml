@@ -107,4 +107,11 @@
     <color name="launcher_background">#1E1E2E</color>
     <!-- Comment thread line (#123); translucent grey, readable on light and dark -->
     <color name="thread_line">#66888888</color>
+    <!-- Timeline like GitLab web (#179): comment cards, timeline line and dots, quotes -->
+    <color name="timeline_card_bg">#08000000</color>
+    <color name="timeline_card_stroke">#1F000000</color>
+    <color name="timeline_line">#33000000</color>
+    <color name="timeline_dot">#FF8A8A8A</color>
+    <color name="quote_bar">#FF6E7F91</color>
+    <color name="quote_bg">#0F1068BF</color>
 </resources>

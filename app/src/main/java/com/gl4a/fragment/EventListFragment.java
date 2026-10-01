@@ -111,7 +111,20 @@ public abstract class EventListFragment extends PagedDataBaseFragment<GitLabEven
 
     @Override
     protected Single<Response<GitLabPage<GitLabEvent>>> loadPage(int page, boolean bypassCache) {
-        return loadRawPage(page, bypassCache);
+        return loadRawPage(page, bypassCache)
+                .map(response -> {
+                    // The events API names some users "****" too (#193, #195)
+                    GitLabPage<GitLabEvent> body = response.body();
+                    if (response.isSuccessful() && body != null && body.items() != null) {
+                        java.util.List<com.gl4a.gitlab.model.GitLabUser> authors =
+                                new java.util.ArrayList<>();
+                        for (GitLabEvent event : body.items()) {
+                            if (event.actor() != null) authors.add(event.actor());
+                        }
+                        com.gl4a.utils.MaskedNames.unmaskUsers(authors);
+                    }
+                    return response;
+                });
     }
 
     protected abstract Single<Response<GitLabPage<GitLabEvent>>> loadRawPage(int page, boolean bypassCache);

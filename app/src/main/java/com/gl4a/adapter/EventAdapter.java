@@ -64,7 +64,7 @@ public class EventAdapter extends RootAdapter<GitLabEvent, EventAdapter.EventVie
         AvatarHandler.assignAvatar(holder.ivGravatar, actor);
         holder.ivGravatar.setTag(actor);
 
-        holder.tvActor.setText(ApiHelpers.getUserLoginWithType(mContext, actor));
+        holder.tvActor.setText(ApiHelpers.getUserNameWithType(mContext, actor));
 
         SpannableStringBuilder title = StringUtils.applyBoldTags(formatTitle(event));
         holder.tvTitle.setText(title);

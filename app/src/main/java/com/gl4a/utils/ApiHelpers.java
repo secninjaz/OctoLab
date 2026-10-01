@@ -97,18 +97,55 @@ public class ApiHelpers {
         return context.getString(R.string.deleted);
     }
 
-    public static SpannableStringBuilder getUserLoginWithType(Context context, GitLabUser user) {
-        return getUserLoginWithType(context, user, false);
+    /**
+     * The name to show for a user: the display name, like GitLab web, or the username if
+     * there's none (#195). Use {@link #getUserLogin} where the username itself is needed,
+     * e.g. for @mentions or URLs.
+     */
+    public static String getUserDisplayName(Context context, GitLabUser user) {
+        if (user != null && !TextUtils.isEmpty(user.name) && !user.name.matches("\\*+")) {
+            return user.name;
+        }
+        return getUserLogin(context, user);
     }
 
-    public static SpannableStringBuilder getUserLoginWithType(Context context, GitLabUser user,
+    public static SpannableStringBuilder getUserNameWithType(Context context, GitLabUser user) {
+        return getUserNameWithType(context, user, false);
+    }
+
+    public static SpannableStringBuilder getUserNameWithType(Context context, GitLabUser user,
             boolean boldifyLogin) {
         final SpannableStringBuilder builder =
-                new SpannableStringBuilder(getUserLogin(context, user));
+                new SpannableStringBuilder(getUserDisplayName(context, user));
         if (boldifyLogin) {
             builder.setSpan(new StyleSpan(Typeface.BOLD), 0, builder.length(), 0);
         }
         // GitLab does not have bot/mannequin user type distinctions; return login only
+        return builder;
+    }
+
+    /**
+     * "Jay B @jayb", like an author on GitLab web (desktop): the display name, then the
+     * username in smaller, faded, fixed-width text (#194). Just the username if the user has
+     * no display name.
+     */
+    public static SpannableStringBuilder getUserNameWithLogin(Context context, GitLabUser user) {
+        if (user == null || TextUtils.isEmpty(user.name) || user.name.equals(user.username)
+                || user.name.matches("\\*+")) {
+            return new SpannableStringBuilder(getUserLogin(context, user));
+        }
+        SpannableStringBuilder builder = new SpannableStringBuilder(user.name);
+        if (!TextUtils.isEmpty(user.username)) {
+            builder.append("  ");
+            int start = builder.length();
+            builder.append("@").append(user.username);
+            int end = builder.length();
+            builder.setSpan(new android.text.style.RelativeSizeSpan(0.85f), start, end, 0);
+            builder.setSpan(new android.text.style.TypefaceSpan("monospace"), start, end, 0);
+            builder.setSpan(new android.text.style.ForegroundColorSpan(
+                    UiUtils.resolveColor(context, android.R.attr.textColorSecondary)),
+                    start, end, 0);
+        }
         return builder;
     }
 
@@ -125,7 +162,37 @@ public class ApiHelpers {
     }
 
     public static int colorForLabel(GitLabLabel label) {
-        return Color.parseColor("#" + label.color());
+        return parseGitLabColor(label.color());
+    }
+
+    private static final int FALLBACK_LABEL_COLOR = 0xFFEEEEEE;
+
+    /**
+     * Parses a colour as GitLab stores it, never throwing (#185): with or without '#', CSS
+     * shorthand #rgb/#rgba (e.g. "#efe" on fdroid/fdroidclient) expanded, anything else
+     * Color.parseColor() rejects falls back to neutral grey instead of crashing the list.
+     */
+    public static int parseGitLabColor(String value) {
+        if (value == null) return FALLBACK_LABEL_COLOR;
+        String color = value.trim();
+        if (color.isEmpty()) return FALLBACK_LABEL_COLOR;
+        if (!color.startsWith("#") && color.matches("[0-9A-Fa-f]{3,8}")) color = "#" + color;
+        if (color.matches("#[0-9A-Fa-f]{3,4}")) {
+            StringBuilder expanded = new StringBuilder("#");
+            for (int i = 1; i < color.length(); i++) {
+                expanded.append(color.charAt(i)).append(color.charAt(i));
+            }
+            color = expanded.toString();
+            if (color.length() == 9) {
+                // CSS #rrggbbaa -> Android #aarrggbb
+                color = "#" + color.substring(7) + color.substring(1, 7);
+            }
+        }
+        try {
+            return Color.parseColor(color);
+        } catch (IllegalArgumentException e) {
+            return FALLBACK_LABEL_COLOR;
+        }
     }
 
     public static boolean userEquals(GitLabUser lhs, GitLabUser rhs) {

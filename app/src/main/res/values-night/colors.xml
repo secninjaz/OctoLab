@@ -79,4 +79,11 @@
     <color name="icon_foreground">#ccffffff</color>
     <!-- Breadcrumb: consistent with dark nav -->
     <color name="breadcrumb_background">#2B2838</color>
+    <!-- Timeline like GitLab web (#179) -->
+    <color name="timeline_card_bg">#12FFFFFF</color>
+    <color name="timeline_card_stroke">#29FFFFFF</color>
+    <color name="timeline_line">#33FFFFFF</color>
+    <color name="timeline_dot">#FF9A9A9A</color>
+    <color name="quote_bar">#FF8FA0B2</color>
+    <color name="quote_bg">#1A9DC7F1</color>
 </resources>

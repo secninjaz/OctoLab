@@ -31,7 +31,7 @@ import java.util.List;
 import androidx.annotation.Nullable;
 import io.reactivex.Single;
 
-class CommentViewHolder
+public class CommentViewHolder
         extends TimelineItemAdapter.TimelineItemViewHolder<TimelineItem.TimelineComment>
         implements View.OnClickListener, ReactionBar.Item, ReactionBar.Callback,
         PopupMenu.OnMenuItemClickListener {
@@ -46,14 +46,25 @@ class CommentViewHolder
     private android.webkit.WebView mWvTable;
     private final TextView tvExtra;
     private final TextView tvTimestamp;
-    private final TextView tvEditTimestamp;
+    private final TextView tvEdited;
     private final ImageView ivMenu;
     private final ReactionBar reactions;
     private final PopupMenu mPopupMenu;
     private final ReactionBar.AddReactionMenuHelper mReactionMenuHelper;
 
     private TimelineItem.TimelineComment mBoundItem;
-    private final android.graphics.drawable.Drawable mDefaultBackground;
+    private final View mCard;
+    private final ImageView mReplyAvatar;
+    private final View mThreadToggle;
+    private final ImageView mThreadChevron;
+    private final android.view.ViewGroup mThreadAvatars;
+    private final TextView mThreadToggleText;
+    private final TextView mResolved;
+    private final TextView mThreadContext;
+    private final TextView mDiffFile;
+    private final View mSnippetScroll;
+    private final TextView mSnippet;
+    private io.reactivex.disposables.Disposable mSnippetLoad;
 
     private final UiUtils.QuoteActionModeCallback mQuoteActionModeCallback;
 
@@ -65,6 +76,14 @@ class CommentViewHolder
         boolean onMenItemClick(TimelineItem.TimelineComment comment, MenuItem menuItem);
         /** Whether "Reply" (add a note to this comment's thread) is offered (#123). */
         boolean canReplyToThread(TimelineItem.TimelineComment comment);
+        /** Whether this comment's thread shows only its first note (#179). */
+        boolean isThreadCollapsed(TimelineItem.TimelineComment comment);
+        void toggleThread(TimelineItem.TimelineComment comment);
+        /** The code lines a diff thread is about, as GitLab web shows them (#179). */
+        Single<List<com.gl4a.utils.DiffSnippetLoader.Line>> loadDiffSnippet(
+                TimelineItem.TimelineComment comment);
+        /** Whether a diff thread was started on an older version than the MR's current one. */
+        boolean isOutdatedDiff(TimelineItem.TimelineComment comment);
         boolean isReplyThreadSelected(TimelineItem.TimelineComment comment);
         Single<List<GitLabReaction>> loadReactionDetails(TimelineItem.TimelineComment item, boolean bypassCache);
         Single<GitLabReaction> addReaction(TimelineItem.TimelineComment item, String content);
@@ -76,7 +95,17 @@ class CommentViewHolder
         super(view);
 
         mContext = view.getContext();
-        mDefaultBackground = view.getBackground();
+        mCard = view.findViewById(R.id.card);
+        mReplyAvatar = view.findViewById(R.id.iv_reply_avatar);
+        mThreadToggle = view.findViewById(R.id.ll_thread_toggle);
+        mThreadChevron = view.findViewById(R.id.iv_thread_chevron);
+        mThreadAvatars = view.findViewById(R.id.ll_thread_avatars);
+        mThreadToggleText = view.findViewById(R.id.tv_thread_toggle);
+        mResolved = view.findViewById(R.id.tv_resolved);
+        mThreadContext = view.findViewById(R.id.tv_thread_context);
+        mDiffFile = view.findViewById(R.id.tv_diff_file);
+        mSnippetScroll = view.findViewById(R.id.sv_diff_snippet);
+        mSnippet = view.findViewById(R.id.tv_diff_snippet);
         mImageGetter = imageGetter;
         mCallback = callback;
         mRepoOwner = repoOwner;
@@ -88,7 +117,7 @@ class CommentViewHolder
         tvExtra = view.findViewById(R.id.tv_extra);
         tvExtra.setOnClickListener(this);
         tvTimestamp = view.findViewById(R.id.tv_timestamp);
-        tvEditTimestamp = view.findViewById(R.id.tv_edit_timestamp);
+        tvEdited = view.findViewById(R.id.tv_edited);
         reactions = view.findViewById(R.id.reactions);
         reactions.setCallback(this, this);
         reactions.setDetailsCache(reactionDetailsCache);
@@ -117,6 +146,26 @@ class CommentViewHolder
         };
     }
 
+    /**
+     * Shows "Edited 2 days ago by Jay B" under a comment that was edited, like GitLab web
+     * (#151). Only from GraphQL's edit details: REST's updated_at also changes when a note is
+     * resolved or re-rendered, and on commit comments when their diff becomes outdated, so it
+     * can't tell an edit apart.
+     */
+    public static void bindEdited(TextView view, GitLabComment comment) {
+        GitLabUser editor = comment.lastEditedBy();
+        Date editedAt = comment.lastEditedAtDate();
+        if (editor == null || editedAt == null) {
+            view.setVisibility(View.GONE);
+            return;
+        }
+        Context context = view.getContext();
+        String name = !StringUtils.isBlank(editor.name) ? editor.name : editor.username;
+        view.setText(context.getString(R.string.comment_edited_by,
+                StringUtils.formatRelativeTime(context, editedAt, true), name));
+        view.setVisibility(View.VISIBLE);
+    }
+
     @Override
     public void bind(TimelineItem.TimelineComment item) {
         // If rebinding the same comment (scroll back up), keep WebView state as-is to
@@ -124,7 +173,20 @@ class CommentViewHolder
         boolean sameItem = mBoundItem != null
                 && mBoundItem.comment().id() == item.comment().id();
         mBoundItem = item;
-        bindThreadIndent(item.comment().isThreadReply());
+        // Replies of a collapsed thread take no space; the first note shows "N replies" (#179).
+        GitLabComment threadNote = item.comment();
+        boolean collapsed = threadNote.threadPosition() != GitLabComment.THREAD_NONE
+                && mCallback.isThreadCollapsed(item);
+        boolean replyRow = threadNote.threadPosition() == GitLabComment.THREAD_MIDDLE
+                || threadNote.threadPosition() == GitLabComment.THREAD_LAST;
+        setRowShown(!(replyRow && collapsed));
+        if (replyRow && collapsed) {
+            return;
+        }
+        bindThreadCard(threadNote, collapsed);
+        bindThreadToggle(item, collapsed);
+        bindResolved(threadNote);
+        bindDiffContext(item, collapsed);
         if (!sameItem) {
             // Different comment: hide WebView but do NOT load about:blank — that triggers
             // an extra layout pass. The WebView keeps its previous content invisibly.
@@ -136,7 +198,6 @@ class CommentViewHolder
 
         GitLabUser user = item.getUser();
         Date createdAt = item.getCreatedAt();
-        Date updatedAt = item.comment().updatedAtDate();
 
         tvExtra.setTag(user);
 
@@ -144,22 +205,18 @@ class CommentViewHolder
         ivGravatar.setTag(user);
 
         tvTimestamp.setText(StringUtils.formatRelativeTime(mContext, createdAt, true));
-        if (createdAt == null || updatedAt == null || createdAt.equals(updatedAt) || item.getReviewComment() != null) {
-            // Unlike issue comments, the update timestamp for commit comments also changes
-            // when e.g. the line number changes due to the diff the comment was made on
-            // becoming outdated. As we can't distinguish those updates from comment body
-            // updates, hide the edit timestamp for all commit comments.
-            tvEditTimestamp.setVisibility(View.GONE);
-        } else {
-            tvEditTimestamp.setText(StringUtils.formatRelativeTime(mContext, updatedAt, true));
-            tvEditTimestamp.setVisibility(View.VISIBLE);
-        }
+        bindEdited(tvEdited, item.comment());
 
         // Body — system notes route to SystemNoteViewHolder, not here.
         mImageGetter.bindMarkdown(tvDesc, item.comment().body(), item.comment().id());
 
         // Extra view
-        SpannableStringBuilder userName = ApiHelpers.getUserLoginWithType(mContext, user, true);
+        // Display name in bold, like GitLab web on mobile, which shows no @username (#179).
+        SpannableStringBuilder userName = new SpannableStringBuilder(
+                user != null && !StringUtils.isBlank(user.name()) ? user.name()
+                        : ApiHelpers.getUserNameWithType(mContext, user, true));
+        userName.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                0, userName.length(), 0);
 
         String association = getString(item);
         if (association != null) {
@@ -222,22 +279,142 @@ class CommentViewHolder
                 ? R.string.reply_selected : R.string.reply);
     }
 
+    private void setRowShown(boolean shown) {
+        itemView.setVisibility(shown ? View.VISIBLE : View.GONE);
+        android.view.ViewGroup.LayoutParams lp = itemView.getLayoutParams();
+        if (lp != null) {
+            int height = shown ? android.view.ViewGroup.LayoutParams.WRAP_CONTENT : 0;
+            if (lp.height != height) {
+                lp.height = height;
+                itemView.setLayoutParams(lp);
+            }
+        }
+    }
+
+    /** "▸ 7 replies · Last reply by Jay B · 3 weeks ago" / "▾ Hide replies", like GitLab web. */
+    private void bindThreadToggle(TimelineItem.TimelineComment item, boolean collapsed) {
+        GitLabComment.ThreadSummary summary = item.comment().threadSummary;
+        boolean show = item.comment().threadPosition() == GitLabComment.THREAD_FIRST
+                && summary != null;
+        mThreadToggle.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (!show) return;
+        mThreadToggle.setOnClickListener(v -> mCallback.toggleThread(item));
+        mThreadChevron.setRotation(collapsed ? -90 : 0);
+        mThreadAvatars.removeAllViews();
+        mThreadAvatars.setVisibility(collapsed ? View.VISIBLE : View.GONE);
+        if (collapsed) {
+            int size = Math.round(18 * mContext.getResources().getDisplayMetrics().density);
+            int overlap = Math.round(-4 * mContext.getResources().getDisplayMetrics().density);
+            for (int i = 0; i < Math.min(3, summary.replyAuthors.size()); i++) {
+                ImageView avatar = new ImageView(mContext);
+                android.widget.LinearLayout.LayoutParams lp =
+                        new android.widget.LinearLayout.LayoutParams(size, size);
+                if (i > 0) lp.leftMargin = overlap;
+                mThreadAvatars.addView(avatar, lp);
+                AvatarHandler.assignAvatar(avatar, summary.replyAuthors.get(i));
+            }
+            StringBuilder text = new StringBuilder(mContext.getResources().getQuantityString(
+                    R.plurals.thread_replies, summary.replyCount, summary.replyCount));
+            if (summary.lastReplyAuthor != null) {
+                text.append(" · ").append(mContext.getString(R.string.thread_last_reply,
+                        displayName(summary.lastReplyAuthor)));
+            }
+            GitLabComment probe = new GitLabComment();
+            probe.createdAt = summary.lastReplyAt;
+            if (probe.createdAtDate() != null) {
+                text.append(" · ").append(StringUtils.formatRelativeTime(
+                        mContext, probe.createdAtDate(), true));
+            }
+            mThreadToggleText.setText(text);
+        } else {
+            mThreadToggleText.setText(R.string.thread_hide_replies);
+        }
+    }
+
+    /** "Resolved 1 day ago by linsui" on a resolved thread, like GitLab web. */
+    private void bindResolved(GitLabComment comment) {
+        boolean show = comment.resolved && comment.resolvedBy != null
+                && comment.threadPosition() != GitLabComment.THREAD_MIDDLE
+                && comment.threadPosition() != GitLabComment.THREAD_LAST;
+        mResolved.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show) {
+            CharSequence when = comment.resolvedAtDate() != null
+                    ? StringUtils.formatRelativeTime(mContext, comment.resolvedAtDate(), true) : "";
+            mResolved.setText(mContext.getString(comment.resolvedByPush
+                    ? R.string.thread_resolved_by_push : R.string.thread_resolved_by, when,
+                    displayName(comment.resolvedBy)));
+        }
+    }
+
+    /**
+     * Diff threads: "started a thread on (an old version of) the diff", and, while expanded,
+     * the file and the code lines the thread is about, like GitLab web (#179).
+     */
+    private void bindDiffContext(TimelineItem.TimelineComment item, boolean collapsed) {
+        GitLabComment comment = item.comment();
+        boolean diffThread = comment.diffPosition != null
+                && comment.threadPosition() != GitLabComment.THREAD_MIDDLE
+                && comment.threadPosition() != GitLabComment.THREAD_LAST;
+        mThreadContext.setVisibility(diffThread ? View.VISIBLE : View.GONE);
+        if (mSnippetLoad != null) {
+            mSnippetLoad.dispose();
+            mSnippetLoad = null;
+        }
+        mSnippetScroll.setVisibility(View.GONE);
+        boolean showCode = diffThread && !collapsed;
+        mDiffFile.setVisibility(showCode ? View.VISIBLE : View.GONE);
+        if (!diffThread) return;
+        mThreadContext.setText(mCallback.isOutdatedDiff(item)
+                ? R.string.thread_on_old_diff : R.string.thread_on_diff);
+        if (!showCode) return;
+        GitLabComment.DiffPosition pos = comment.diffPosition;
+        mDiffFile.setText(pos.newLine != null || pos.oldPath == null ? pos.newPath : pos.oldPath);
+        mSnippetLoad = mCallback.loadDiffSnippet(item)
+                .compose(com.gl4a.utils.RxUtils::doInBackground)
+                .subscribe(lines -> {
+                    if (mBoundItem != item || lines.isEmpty()) return;
+                    // Rendered with this row's context so the diff colours follow the app theme.
+                    mSnippet.setText(com.gl4a.utils.DiffSnippetLoader.render(mContext, lines));
+                    mSnippetScroll.setVisibility(View.VISIBLE);
+                }, error -> { /* the thread still shows without the code */ });
+    }
+
+    private String displayName(GitLabUser user) {
+        return ApiHelpers.getUserDisplayName(mContext, user);
+    }
+
     /** Whether this row is a reply inside a thread (drawn without a divider above, #123). */
     public boolean isThreadReply() {
         return mBoundItem != null && mBoundItem.comment().isThreadReply();
     }
 
-    /** Indents replies under their thread's first comment, with a thread line (#123). */
-    private void bindThreadIndent(boolean reply) {
-        int padding = mContext.getResources().getDimensionPixelSize(R.dimen.content_padding);
-        int indent = reply
-                ? mContext.getResources().getDimensionPixelSize(R.dimen.thread_reply_indent) : 0;
-        itemView.setPaddingRelative(padding + indent, itemView.getPaddingTop(),
-                itemView.getPaddingEnd(), itemView.getPaddingBottom());
+    /**
+     * Thread notes share one card, like GitLab web's discussion box (#179): the first note is
+     * the card's top, replies its middle/bottom, with no gap between them. Replies show a small
+     * avatar in the card header instead of one in the timeline column.
+     */
+    private void bindThreadCard(GitLabComment comment, boolean collapsed) {
+        int position = comment.threadPosition();
+        if (collapsed && position == GitLabComment.THREAD_FIRST) {
+            // Only the first note is shown, so it's a complete card.
+            position = GitLabComment.THREAD_NONE;
+        }
+        boolean reply = position == GitLabComment.THREAD_MIDDLE
+                || position == GitLabComment.THREAD_LAST;
+        mCard.setBackgroundResource(position == GitLabComment.THREAD_FIRST
+                ? R.drawable.timeline_card_top
+                : position == GitLabComment.THREAD_MIDDLE ? R.drawable.timeline_card_middle
+                : position == GitLabComment.THREAD_LAST ? R.drawable.timeline_card_bottom
+                : R.drawable.timeline_card);
+        int gap = mContext.getResources().getDimensionPixelSize(R.dimen.timeline_row_gap);
+        itemView.setPaddingRelative(itemView.getPaddingStart(),
+                reply ? 0 : gap, itemView.getPaddingEnd(),
+                position == GitLabComment.THREAD_FIRST || position == GitLabComment.THREAD_MIDDLE
+                        ? 0 : gap);
+        ivGravatar.setVisibility(reply ? View.INVISIBLE : View.VISIBLE);
+        mReplyAvatar.setVisibility(reply ? View.VISIBLE : View.GONE);
         if (reply) {
-            itemView.setBackgroundResource(R.drawable.timeline_thread_reply_background);
-        } else {
-            itemView.setBackground(mDefaultBackground);
+            AvatarHandler.assignAvatar(mReplyAvatar, comment.user());
         }
     }
 

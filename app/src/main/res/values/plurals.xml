@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <plurals name="issue">
-        <item quantity="one">1 issue</item>
-        <item quantity="other">%d issues</item>
+        <item quantity="one">1 work item</item>
+        <item quantity="other">%d work items</item>
     </plurals>
 
     <plurals name="pull_request">
@@ -63,5 +63,15 @@
     <plurals name="contributor_extra_data">
         <item quantity="one">%1$d contribution</item>
         <item quantity="other">%1$d contributions</item>
+    </plurals>
+    <!-- "added [chips] label(s)" in timeline label events (#180) -->
+    <plurals name="event_labels">
+        <item quantity="one">label</item>
+        <item quantity="other">labels</item>
+    </plurals>
+    <!-- Collapsed thread row (#179) -->
+    <plurals name="thread_replies">
+        <item quantity="one">%d reply</item>
+        <item quantity="other">%d replies</item>
     </plurals>
 </resources>
