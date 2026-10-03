@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.9] - 2026-10-03
+
+### Added
+- Resolve and unresolve comment threads from a comment's menu, in issues and merge requests (#206)
+- Issues closed by a merge request show "closed with merge request fmd-server!44 (merged)", linked to the MR, like GitLab web (#200)
+- "Compare with previous version" on a merge request opens that version's changes directly on the commit screen, titled "Version 6 compared with version 5", with its commits listed (#198)
+
+### Changed
+- Comments, system notes and descriptions show GitLab's own stored rendering, as GitLab web does, so references stay linked (also to renamed or moved projects), and no rendering request is made per comment (#199)
+- Merge requests are numbered with "!" instead of "#", like GitLab (#204)
+
+### Fixed
+- Lighter loading of issues and merge requests: images and video thumbnails load when they come into view, video frames are read one at a time, and photos use half the memory. This addresses slowdowns of the whole phone on issues with many images and videos (#202)
+- "Compare with previous version" froze on versions with thousands of commits, e.g. after a rebase (#198)
+- Links to issues, merge requests and commits weren't clickable on issues of moved or renamed projects, and tables in issue and MR descriptions showed as plain text (#199)
+- Issue and MR screens opened from a link to a moved project showed its old name; they now show the current one (#205)
+- Old-style links without "/-/" (e.g. gitlab.com/Nulide/findmydevice/issues/216) opened as a project and showed 404 (#203)
+- User profiles showed at most 5 repositories; they now show the real count (#201)
+
 ## [1.3.8] - 2026-10-01
 
 ### Added

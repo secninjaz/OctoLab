@@ -446,6 +446,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         TextView descriptionView = mListHeaderView.findViewById(R.id.tv_desc);
         if (!StringUtils.isBlank(body)) {
             mImageGetter.bindMarkdown(descriptionView, body, mIssue.id());
+            loadDescriptionHtml(descriptionView, body);
 
             if (!isLocked()) {
                 descriptionView.setCustomSelectionActionModeCallback(
@@ -565,23 +566,67 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
     }
 
     /**
+     * Shows GitLab's stored rendering of the description, as GitLab web does, once loaded:
+     * REST has none, so it comes over GraphQL. Its references stay linked even to renamed
+     * projects, which rendering the markdown again can't resolve (#199).
+     */
+    private void loadDescriptionHtml(TextView descriptionView, String markdown) {
+        String projectPath = getProjectPath();
+        if (projectPath == null) {
+            return;
+        }
+        String field = isMergeRequestView() ? "mergeRequest" : "issue";
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("path", projectPath);
+        variables.put("iid", String.valueOf(mIssue.number()));
+        Map<String, Object> body = new HashMap<>();
+        body.put("query", "query($path: ID!, $iid: String!) { project(fullPath: $path) {"
+                + " item: " + field + "(iid: $iid) { descriptionHtml } } }");
+        body.put("variables", variables);
+        Object id = mIssue.id();
+        ServiceFactory.getGraphQL(com.gl4a.gitlab.service.GitLabGraphQLService.class)
+                .getDescriptionHtml(body)
+                .map(response -> {
+                    com.gl4a.gitlab.model.GitLabDescriptionHtmlResponse payload =
+                            response.body();
+                    String html = payload != null && payload.data != null
+                            && payload.data.project != null && payload.data.project.item != null
+                            ? payload.data.project.item.descriptionHtml : null;
+                    return html != null ? html : "";
+                })
+                .compose(RxUtils::doInBackground)
+                .subscribe(html -> {
+                    if (isAdded() && !html.isEmpty() && mImageGetter != null) {
+                        mImageGetter.bindMarkdown(descriptionView, markdown, id, html);
+                    }
+                }, error -> android.util.Log.d(Gl4Application.LOG_TAG,
+                        "Stored description rendering unavailable", error));
+    }
+
+    /**
      * The issue's or MR's project path: from owner/repo, or, when opened from a cross-project
      * list with only a project ID, from its web URL (namespace/repo before "/-/"). Notes are
      * rendered against it so their references link to the right project (#197).
      */
     @androidx.annotation.Nullable
     private String getProjectPath() {
+        // The web URL first: it's the project's current path. owner/repo can be an old one, from
+        // a link to a moved or renamed project (Nulide/findmydevice → fmd-foss/fmd-android); the
+        // REST API follows those redirects, but the markdown API answers 404, so no note got its
+        // links (#199)
+        String webUrl = mIssue != null ? mIssue.webUrl : null;
+        if (webUrl != null) {
+            List<String> segments = android.net.Uri.parse(webUrl).getPathSegments();
+            int dash = segments.indexOf("-");
+            if (dash >= 2) {
+                return android.text.TextUtils.join("/", segments.subList(0, dash));
+            }
+        }
         if (!android.text.TextUtils.isEmpty(mRepoOwner)
                 && !android.text.TextUtils.isEmpty(mRepoName)) {
             return mRepoOwner + "/" + mRepoName;
         }
-        String webUrl = mIssue != null ? mIssue.webUrl : null;
-        if (webUrl == null) {
-            return null;
-        }
-        List<String> segments = android.net.Uri.parse(webUrl).getPathSegments();
-        int dash = segments.indexOf("-");
-        return dash >= 2 ? android.text.TextUtils.join("/", segments.subList(0, dash)) : null;
+        return null;
     }
 
     /** Subclasses override to true when displaying a merge request rather than an issue. */
@@ -927,6 +972,23 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
     protected abstract void bindSpecialViews(View headerView);
     protected abstract void assignHighlightColor();
     protected abstract Single<Response<Void>> doDeleteComment(GitLabComment comment);
+
+    @Override
+    public void resolveThread(GitLabComment comment, boolean resolve) {
+        if (comment.discussionId() == null) {
+            return;
+        }
+        ServiceFactory.get(com.gl4a.gitlab.service.GitLabIssueService.class, false)
+                .resolveDiscussion(mIssue.projectId,
+                        isMergeRequestView() ? "merge_requests" : "issues", mIssue.number(),
+                        comment.discussionId(), resolve)
+                .map(ApiHelpers::mapToBooleanOrThrowOnFailure)
+                .compose(RxUtils.wrapForBackgroundTask(getBaseActivity(),
+                        R.string.resolving_thread_msg, R.string.error_resolve_thread))
+                // Reloaded, so the thread collapses or opens and shows "Resolved by" (#206)
+                .subscribe(result -> reloadEvents(false),
+                        error -> handleActionFailure("Updating the thread failed", error));
+    }
 
     private void handleDeleteComment(GitLabComment comment) {
         doDeleteComment(comment)

@@ -207,7 +207,7 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
         // comment still gets its own ObjectInfo in HttpImageGetter.
         Object cacheKey = item.id() != 0 ? item.id()
                 : (item.createdAt() != null ? item.createdAt() : System.identityHashCode(item));
-        mImageGetter.bindMarkdown(holder.tvDesc, item.body(), cacheKey);
+        mImageGetter.bindMarkdown(holder.tvDesc, item.body(), cacheKey, item.storedHtml());
 
         final SpannableStringBuilder login = ApiHelpers.getUserNameWithType(mContext, user, true);
         holder.tvExtra.setText(login);
@@ -374,7 +374,9 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
         void bind(GitLabComment item) {
             // System note bodies are markdown/HTML; render them like comments (#165).
             mImageGetter.bindMarkdown(tvNote, com.gl4a.adapter.timeline.TimelineItemAdapter
-                    .systemNoteMarkdown(item.user(), item.body()), item.id());
+                    .systemNoteMarkdown(item.user(), item.body()), item.id(),
+                    com.gl4a.adapter.timeline.TimelineItemAdapter.systemNoteHtml(item.user(),
+                            item.storedHtml()));
             tvTimestamp.setText(StringUtils.formatRelativeTime(
                     itemView.getContext(), item.createdAtDate(), true));
         }

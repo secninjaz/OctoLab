@@ -128,6 +128,15 @@ public class LinkParser {
         // Find the "/-/" separator at any position to support nested group repos
         // e.g. [it, int, proxmox, -, issues, 1] → dashIndex=3, projectEnd=3
         // e.g. [testg, testp, -, issues, 1]     → dashIndex=2, projectEnd=2
+        // Older links have no "/-/": /Nulide/findmydevice/issues/216. GitLab still redirects them;
+        // add the separator so they open like current links instead of as a project named
+        // "Nulide/findmydevice/issues" (404, #203)
+        if (!parts.contains("-")) {
+            int legacy = legacyActionIndex(parts);
+            if (legacy > 0) {
+                parts.add(legacy, "-");
+            }
+        }
         int dashIndex = parts.indexOf("-");
 
         // Derive owner and repo from everything before the "-" (or from all parts if no "-").
@@ -192,6 +201,37 @@ public class LinkParser {
             slug = null;
         }
         return new ParseResult(WikiListActivity.makeIntent(activity, user, repo, slug));
+    }
+
+    /**
+     * Where a pre-"/-/" link's action starts ([ns.., repo, "issues", "216"] → 2), or -1. Needs a
+     * namespace and project before it, and for issues, MRs and commits an id after it, so a
+     * group or project that happens to be called "tree" isn't mistaken for one.
+     */
+    private static int legacyActionIndex(List<String> parts) {
+        for (int i = 2; i < parts.size(); i++) {
+            String action = parts.get(i);
+            String next = i + 1 < parts.size() ? parts.get(i + 1) : null;
+            switch (action) {
+                case "issues":
+                case "merge_requests":
+                case "work_items":
+                    if (next == null || next.matches("\\d+")) return i;
+                    break;
+                case "commit":
+                    if (next != null && next.matches("[0-9a-fA-F]{7,40}")) return i;
+                    break;
+                case "commits":
+                case "tree":
+                case "blob":
+                case "compare":
+                case "wikis":
+                case "releases":
+                    if (next != null) return i;
+                    break;
+            }
+        }
+        return -1;
     }
 
     private static boolean isUploadLink(List<String> parts) {

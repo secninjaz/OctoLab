@@ -143,7 +143,8 @@ public static Intent makeIntent(Context context, String repoOwner, String repoNa
 
     @NonNull
     protected String getActionBarTitle() {
-        return getString(R.string.pull_request_title) + " #" + mMergeRequestNumber;
+        // "!" like GitLab: "#" is for issues (#204)
+        return getString(R.string.pull_request_title) + " !" + mMergeRequestNumber;
     }
 
     @Nullable
@@ -455,6 +456,23 @@ public static Intent makeIntent(Context context, String repoOwner, String repoNa
                 }, error -> handleActionFailure("Merging merge request failed", error));
     }
 
+    /**
+     * Switches to the project's current path once the MR is loaded: opened from a link to a
+     * moved project, the title and everything opened from here showed the old one (#205).
+     */
+    private void useCurrentProjectPath(String webUrl) {
+        String[] current = ApiHelpers.projectFromWebUrl(webUrl);
+        if (current == null
+                || (current[0].equals(mRepoOwner) && current[1].equals(mRepoName))) {
+            return;
+        }
+        mRepoOwner = current[0];
+        mRepoName = current[1];
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setSubtitle(getActionBarSubtitle());
+        }
+    }
+
     private void load(boolean force) {
         GitLabMergeRequestService mrService = ServiceFactory.get(GitLabMergeRequestService.class, force);
 
@@ -476,6 +494,7 @@ public static Intent makeIntent(Context context, String repoOwner, String repoNa
                 .subscribe(result -> {
                     mMergeRequest = result.first;
                     mIsCollaborator = result.second;
+                    useCurrentProjectPath(mMergeRequest.webUrl);
                     fillHeader();
                     setContentShown(true);
                     // Guard against "Fragment already added" if invalidateTabs was

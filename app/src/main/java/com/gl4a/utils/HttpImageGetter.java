@@ -81,6 +81,7 @@ public class HttpImageGetter {
     private static final int MAX_EMBEDDED_IMAGE_BYTES = 2 * 1024 * 1024;
     /** Image source for a video's thumbnail: this prefix, then the video's URL. */
     public static final String VIDEO_THUMBNAIL_PREFIX = "octolab-video-thumbnail:";
+    private static final Object VIDEO_FRAME_LOCK = new Object();
     /** First frames by video URL, so rebinding a comment doesn't fetch them again. */
     private static final LruCache<String, Bitmap> sVideoFrames = new LruCache<String, Bitmap>(
             8 * 1024 * 1024) {
@@ -191,6 +192,10 @@ public class HttpImageGetter {
         String mServerHtml;
         // Phase 2 (server) rendering has been applied, so it isn't requested again (#152)
         boolean mServerRendered;
+        // Phase 2 requests made, so a failing one is retried only a few times (#199)
+        int mServerAttempts;
+        // GitLab's stored rendering of the note, when the API returned it (#199)
+        String mStoredHtml;
         private ImageGetterAsyncTask mTask;
         private boolean mHasStartedImageLoad;
         private boolean mResumed = true;
@@ -237,6 +242,33 @@ public class HttpImageGetter {
                 mHtml = encoded;
             }
             apply(mHtml);
+            startImageLoad();
+        }
+
+        /**
+         * Like {@link #applyEncodedAndLoadImages}, without loading the images: for notes
+         * rendered ahead of scrolling, whose images load once the note is shown (#202).
+         */
+        void applyEncoded(CharSequence encoded) {
+            if (encoded == null) return;
+            if (mTask != null) {
+                mTask.cancel(true);
+                mTask = null;
+            }
+            mHasStartedImageLoad = false;
+            synchronized (this) {
+                mHtml = encoded;
+            }
+            apply(mHtml);
+        }
+
+        boolean hasViews() {
+            return !views().isEmpty();
+        }
+
+        /** Starts loading the images still showing a placeholder, once per rendering. */
+        void startImageLoad() {
+            if (mHasStartedImageLoad) return;
             ImageSpan[] spans = getImageSpans();
             if (spans.length > 0) {
                 ArrayList<PlaceholderDrawable> imagesToLoad = new ArrayList<>();
@@ -341,6 +373,7 @@ public class HttpImageGetter {
             }
             mHtml = null;
             mServerRendered = false;
+            mServerAttempts = 0;
             mHasStartedImageLoad = false;
         }
 
@@ -432,6 +465,8 @@ public class HttpImageGetter {
     private final Set<Object> mMarkdownApiInProgress = new HashSet<>();
     /** Notes rendered on the server at once while pre-rendering a timeline (#152). */
     private static final int PRERENDER_CONCURRENCY = 3;
+    /** Phase 2 requests per note before giving up on its server rendering (#199). */
+    private static final int MAX_SERVER_ATTEMPTS = 3;
     private io.reactivex.disposables.Disposable mPrerender;
     // The project GitLab resolves #N, !N and commit references against (#197)
     private String mProjectPath;
@@ -520,6 +555,16 @@ public class HttpImageGetter {
     }
 
     public void bindMarkdown(final TextView view, final String markdown, final Object id) {
+        bindMarkdown(view, markdown, id, null);
+    }
+
+    /**
+     * Like {@link #bindMarkdown(TextView, String, Object)}, with GitLab's stored rendering of
+     * the note when the API returned it: shown instead of rendering the markdown again, so
+     * references match GitLab web (also to renamed projects) and no request is made (#199).
+     */
+    public void bindMarkdown(final TextView view, final String markdown, final Object id,
+            @androidx.annotation.Nullable final String storedHtml) {
         unbind(view);
         if (android.text.TextUtils.isEmpty(markdown)) {
             view.setText("");
@@ -527,6 +572,15 @@ public class HttpImageGetter {
         }
 
         ObjectInfo info = findOrCreateInfo(id);
+        if (storedHtml != null && !storedHtml.equals(info.mStoredHtml)) {
+            info.mStoredHtml = storedHtml;
+            if (info.mServerRendered) {
+                // Arrived after the markdown API's rendering (e.g. a description): show
+                // GitLab's stored one instead, as GitLab web does
+                info.mServerRendered = false;
+                info.mServerAttempts = 0;
+            }
+        }
         info.addView(view);
 
         // Tag the view with this content id so the async Phase 2 callback can detect
@@ -536,6 +590,12 @@ public class HttpImageGetter {
         if (info.mHtml != null) {
             // Already rendered — apply cached content immediately.
             info.addView(view);
+            // GitLab's rendering failed earlier, or its stored one has just arrived: request it,
+            // even if a table from an earlier rendering is shown below (#199)
+            if (!info.mServerRendered && info.mServerAttempts < MAX_SERVER_ATTEMPTS
+                    && !mMarkdownApiInProgress.contains(id)) {
+                requestServerHtml(info, markdown, id, true).subscribe();
+            }
             if (info.mServerHtml != null && info.mServerHtml.contains("<table")
                     && view.getParent() != null) {
                 // Re-populate the table WebView from cached server HTML.
@@ -547,6 +607,10 @@ public class HttpImageGetter {
                 }
             }
             info.apply(info.mHtml);
+            // Rendered ahead of scrolling, without its images: load them now it's shown (#202)
+            if (info.mServerRendered) {
+                info.startImageLoad();
+            }
             return;
         }
 
@@ -566,7 +630,7 @@ public class HttpImageGetter {
         // Phase 2: server-side GFM rendering with images embedded as data URIs, unless the
         // note is already being rendered, e.g. ahead of scrolling (#152).
         if (!mMarkdownApiInProgress.contains(id)) {
-            renderOnServer(info, markdown, id).subscribe();
+            requestServerHtml(info, markdown, id, true).subscribe();
         }
     }
 
@@ -577,7 +641,20 @@ public class HttpImageGetter {
      * which moved the content and resized the scrollbar. Notes already rendered or rendering
      * are skipped; a row bound before its turn renders itself as usual.
      */
-    public void prerenderMarkdown(List<android.util.Pair<Object, String>> notes) {
+    /** A note to render ahead of scrolling: its cache key, markdown and GitLab's stored HTML. */
+    public static final class PrerenderNote {
+        final Object id;
+        final String markdown;
+        final String storedHtml;
+
+        public PrerenderNote(Object id, String markdown, String storedHtml) {
+            this.id = id;
+            this.markdown = markdown;
+            this.storedHtml = storedHtml;
+        }
+    }
+
+    public void prerenderMarkdown(List<PrerenderNote> notes) {
         if (mPrerender != null) {
             mPrerender.dispose();
         }
@@ -585,15 +662,37 @@ public class HttpImageGetter {
                 .flatMap(note -> io.reactivex.Single.defer(() -> {
                     // Subscribed on the main thread, like bindMarkdown, so the in-progress
                     // set is only touched there
-                    ObjectInfo info = findOrCreateInfo(note.first);
+                    ObjectInfo info = findOrCreateInfo(note.id);
+                    if (note.storedHtml != null) {
+                        info.mStoredHtml = note.storedHtml;
+                    }
                     if (mDestroyed || info.mServerRendered
-                            || mMarkdownApiInProgress.contains(note.first)
-                            || android.text.TextUtils.isEmpty(note.second)) {
+                            || mMarkdownApiInProgress.contains(note.id)
+                            || android.text.TextUtils.isEmpty(note.markdown)) {
                         return io.reactivex.Single.just(false);
                     }
-                    return renderOnServer(info, note.second, note.first);
+                    // Text only: downloading and decoding every image (and reading every
+                    // video's frame) up front slowed the whole phone down (#202)
+                    return requestServerHtml(info, note.markdown, note.id, false);
                 }).toObservable(), false, PRERENDER_CONCURRENCY)
                 .subscribe(done -> {}, error -> {});
+    }
+
+    /**
+     * GitLab's rendering of a note: its stored HTML if the API returned it, as GitLab web
+     * shows (no request, and references to renamed projects stay linked, #199), else the
+     * markdown API's.
+     */
+    private io.reactivex.Single<Boolean> requestServerHtml(ObjectInfo info, String markdown,
+            Object id, boolean embedImages) {
+        if (info.mStoredHtml == null) {
+            return renderOnServer(info, markdown, id, embedImages);
+        }
+        mMarkdownApiInProgress.add(id);
+        info.mServerAttempts++;
+        return applyServerHtml(info, io.reactivex.Single.just(info.mStoredHtml), id,
+                embedImages, com.gl4a.Gl4Application.get().getInstanceUrl(),
+                com.gl4a.Gl4Application.get().getAuthToken(), true);
     }
 
     /**
@@ -602,8 +701,9 @@ public class HttpImageGetter {
      * the note by then (possibly none yet). Emits true once applied.
      */
     private io.reactivex.Single<Boolean> renderOnServer(ObjectInfo info, String markdown,
-            Object id) {
+            Object id, boolean embedImages) {
         mMarkdownApiInProgress.add(id);
+        info.mServerAttempts++;
         final String instanceUrl = com.gl4a.Gl4Application.get().getInstanceUrl();
         final String tok = com.gl4a.Gl4Application.get().getAuthToken();
         final Map<String, Object> reqBody = new java.util.HashMap<>();
@@ -613,15 +713,50 @@ public class HttpImageGetter {
                 : com.gl4a.Gl4Application.get().getCurrentProjectPath();
         if (projectPath != null) reqBody.put("project", projectPath);
 
-        return ServiceFactory.get(GitLabMarkdownService.class, false)
+        GitLabMarkdownService markdownService =
+                ServiceFactory.get(GitLabMarkdownService.class, false);
+        io.reactivex.Single<String> rendered = markdownService
                 .render(reqBody)
+                // An unknown project (e.g. an old path) fails the whole request: render without
+                // it, so the note is at least formatted, if without its #N links (#199)
+                .flatMap(response -> {
+                    if (response.code() != 404 || !reqBody.containsKey("project")) {
+                        return io.reactivex.Single.just(response);
+                    }
+                    Log.w(Gl4Application.LOG_TAG, "Markdown project " + projectPath
+                            + " not found; rendering note " + id + " without it");
+                    Map<String, Object> withoutProject = new java.util.HashMap<>(reqBody);
+                    withoutProject.remove("project");
+                    return markdownService.render(withoutProject);
+                })
                 .map(response -> {
-                    // Runs on IO thread — safe to do blocking image fetches here.
                     if (!response.isSuccessful() || response.body() == null
                             || android.text.TextUtils.isEmpty(response.body().html)) {
+                        // Logged, as the note silently kept its local rendering (#199)
+                        Log.w(Gl4Application.LOG_TAG, "Markdown rendering failed for note " + id
+                                + " (project " + projectPath + "): HTTP " + response.code());
+                        return "";
+                    }
+                    return response.body().html;
+                });
+        return applyServerHtml(info, rendered, id, embedImages, instanceUrl, tok, false);
+    }
+
+    /**
+     * Applies GitLab-rendered HTML to a note: GitLab's stored rendering when it came with the
+     * note (#199), otherwise the markdown API's. Fixes lazy images and relative URLs, embeds
+     * instance images (unless rendering ahead of scrolling), and converts the HTML off the
+     * main thread, then applies it on the main thread. Emits true once applied.
+     */
+    private io.reactivex.Single<Boolean> applyServerHtml(ObjectInfo info,
+            io.reactivex.Single<String> rawHtmlSingle, Object id, boolean embedImages,
+            String instanceUrl, String tok, boolean stored) {
+        return rawHtmlSingle
+                .map(rawHtml -> {
+                    // Runs on IO thread — safe to do blocking image fetches here.
+                    if (rawHtml.isEmpty()) {
                         return new android.util.Pair<String, CharSequence>("", null);
                     }
-                    String rawHtml = response.body().html;
                     // Fix lazy-loading: swap data-src → src, make relative absolute.
                     String html = rawHtml
                             .replaceAll("src=\"data:[^\"]*\"([^>]*?)data-src=\"([^\"]+)\"",
@@ -637,6 +772,9 @@ public class HttpImageGetter {
                     // Make relative src absolute.
                     html = html.replaceAll("src=\"(/[^\"]+)\"",
                             "src=\"" + instanceUrl + "$1\"");
+                    // GitLab's stored rendering links root-relative (/group/project/-/issues/1)
+                    html = html.replaceAll("href=\"(/[^/\"][^\"]*)\"",
+                            "href=\"" + instanceUrl + "$1\"");
 
                     // Embed all instance images as data URIs so they display immediately
                     // without any further async loading or auth complexity.
@@ -656,8 +794,9 @@ public class HttpImageGetter {
                                 "/-/project/(\\d+)/uploads/",
                                 "/api/v4/projects/$1/uploads/");
                         imgUrl = rewriteRawUrl(imgUrl, instanceUrl);
-                        // Fetch and embed.
-                        String dataUri = fetchAsDataUri(imgUrl, tok);
+                        // Fetch and embed, unless rendering ahead of scrolling (#202): then the
+                        // image loads from its URL, with the token, once the note is shown.
+                        String dataUri = embedImages ? fetchAsDataUri(imgUrl, tok) : null;
                         if (dataUri != null) {
                             imgM.appendReplacement(imgSb,
                                     java.util.regex.Matcher.quoteReplacement(
@@ -695,7 +834,10 @@ public class HttpImageGetter {
                         boolean shown = false;
                         for (TextView view : info.views()) {
                             android.webkit.WebView wvTable = view.getParent() != null
-                                    && view.getTag(com.gl4a.R.id.wv_table) == id
+                                    // equals, not ==: each bind boxes the long id anew,
+                                    // so a re-bind (e.g. with the stored description,
+                                    // #199) never matched and tables showed as text
+                                    && id.equals(view.getTag(com.gl4a.R.id.wv_table))
                                     ? ((android.view.View) view.getParent())
                                             .findViewById(com.gl4a.R.id.wv_table)
                                     : null;
@@ -712,10 +854,22 @@ public class HttpImageGetter {
                     // else (external URLs) is still a plain <img src="..."> here, so it needs
                     // the async loader to actually fetch it — encode() alone leaves it stuck on
                     // the placeholder.
-                    info.applyEncodedAndLoadImages(rendered.second);
+                    if (embedImages || info.hasViews()) {
+                        info.applyEncodedAndLoadImages(rendered.second);
+                    } else {
+                        // Not on screen yet: its images load when it's bound (#202)
+                        info.applyEncoded(rendered.second);
+                    }
+                    if (!stored && info.mStoredHtml != null) {
+                        // GitLab's stored rendering arrived meanwhile: it wins (#199)
+                        info.mServerRendered = false;
+                        requestServerHtml(info, null, id, embedImages).subscribe();
+                    }
                     return true;
                 })
                 .onErrorReturn(error -> {
+                    Log.w(Gl4Application.LOG_TAG, "Markdown rendering failed for note " + id,
+                            error);
                     mMarkdownApiInProgress.remove(id);
                     return false;
                 })
@@ -970,7 +1124,16 @@ public class HttpImageGetter {
             frame = sVideoFrames.get(videoUrl);
         }
         if (frame == null && !mDestroyed) {
-            frame = readFirstFrame(videoUrl);
+            // One at a time, app-wide: frames are read by the system media service, and many at
+            // once slowed the whole phone down (#202)
+            synchronized (VIDEO_FRAME_LOCK) {
+                synchronized (sVideoFrames) {
+                    frame = sVideoFrames.get(videoUrl);
+                }
+                if (frame == null && !mDestroyed) {
+                    frame = readFirstFrame(videoUrl);
+                }
+            }
             if (frame != null) {
                 synchronized (sVideoFrames) {
                     sVideoFrames.put(videoUrl, frame);
@@ -1091,6 +1254,10 @@ public class HttpImageGetter {
         options.inJustDecodeBounds = false;
         options.inDither = false;
         options.inSampleSize = scale;
+        // JPEGs have no transparency: 2 bytes a pixel instead of 4 halves their memory (#202)
+        if ("image/jpeg".equals(options.outMimeType)) {
+            options.inPreferredConfig = Bitmap.Config.RGB_565;
+        }
 
         return BitmapFactory.decodeByteArray(image, 0, image.length, options);
     }

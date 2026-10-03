@@ -61,6 +61,11 @@
     <string name="delete">Delete</string>
     <string name="reply">Reply</string>
     <string name="reply_selected">Reply (Selected)</string>
+    <!-- Comment menu, on a resolvable thread (#206) -->
+    <string name="resolve_thread">Resolve thread</string>
+    <string name="unresolve_thread">Unresolve thread</string>
+    <string name="resolving_thread_msg">Updating thread…</string>
+    <string name="error_resolve_thread">Updating the thread failed</string>
     <string name="replying_to_thread_by">Replying to thread by %1$s</string>
     <string name="reply_to_thread_hint">Reply to thread</string>
     <string name="add_comment">Add comment</string>
@@ -488,8 +493,8 @@
     <string name="issue_template_dialog_title">Select issue type</string>
 
     <!-- Pull Request -->
-    <string name="pull_request_title">Merge Request</string>
-    <string name="review_title_format">Merge Request #%1$d - Review</string>
+    <string name="pull_request_title">Merge request</string>
+    <string name="review_title_format">Merge request !%1$d - Review</string>
     <string name="pull_request_conversation">Discussion</string>
     <string name="pull_request_add_review">Reviews</string>
     <string name="pull_request_files">Files</string>
@@ -502,8 +507,8 @@
     <string name="pull_request_close">Close</string>
     <string name="pull_request_merge">Merge</string>
     <string name="pull_request_merged">Merged</string>
-    <string name="pull_error_merge">Merging merge request #%1$d failed</string>
-    <string name="pull_message_dialog_title">Merge merge request #%1$d</string>
+    <string name="pull_error_merge">Merging merge request !%1$d failed</string>
+    <string name="pull_message_dialog_title">Merge merge request !%1$d</string>
     <string name="pull_merge_title_description">Merge commit title</string>
     <string name="pull_merge_title_helper">Leave this empty to use the default title provided by GitLab.</string>
     <string name="pull_merge_message_description">Merge commit details</string>
@@ -526,10 +531,10 @@
     <string name="pull_request_to">Into [b][ref][/b]</string>
     <string name="close_pull_request_confirm">Do you really want to close this merge request?</string>
     <string name="reopen_pull_request_confirm">Do you really want to reopen this merge request?</string>
-    <string name="pull_request_edit_title">Edit Merge Request #%1$d</string>
+    <string name="pull_request_edit_title">Edit merge request !%1$d</string>
     <string name="review_reply_hint">Reply to selected group</string>
     <string name="no_reply_group_selected_hint">Select group to reply to</string>
-    <string name="pull_request_review_dialog_title">Review merge request #%1$d</string>
+    <string name="pull_request_review_dialog_title">Review merge request !%1$d</string>
     <string name="pull_request_review_event">Review type</string>
     <string name="pull_request_review_event_comment">Comment</string>
     <string name="pull_request_review_event_approve">Approve</string>
@@ -537,7 +542,7 @@
     <string name="pull_request_review_body">Review Summary</string>
     <string name="pull_request_review_description">Leave a comment about this review below.</string>
     <string name="pull_request_review_button_affirm">Comment</string>
-    <string name="pull_request_review_error">Adding review to merge request #%1$d failed</string>
+    <string name="pull_request_review_error">Adding review to merge request !%1$d failed</string>
     <string name="pull_request_review_changes">Review</string>
     <string name="review_create_error">Review creation failed</string>
 
@@ -588,7 +593,7 @@
     <string name="share_file_subject">%1$s at %2$s</string>
     <string name="share_gist_subject">Snippet %1$s by %2$s</string>
     <string name="share_issue_subject">Issue # %1$d (%2$s) at %3$s</string>
-    <string name="share_pull_subject">Merge Request # %1$d (%2$s) at %3$s</string>
+    <string name="share_pull_subject">Merge request !%1$d (%2$s) at %3$s</string>
     <string name="share_commit_subject">Commit #%1$s at %2$s</string>
     <string name="share_user_subject">User %1$s (%2$s)</string>
     <string name="share_user_subject_loginonly">User %1$s</string>
@@ -723,6 +728,10 @@
     <string name="event_milestone_set">changed milestone to %1$s</string>
     <string name="event_milestone_removed">removed milestone %1$s</string>
     <string name="event_via_commit">via commit %1$s</string>
+    <!-- "closed with merge request fmd-server!44 (merged)" (#200) -->
+    <string name="event_with_merge_request">with merge request</string>
+    <string name="event_mr_merged">(merged)</string>
+    <string name="event_mr_closed">(closed)</string>
     <!-- Threads (#179) -->
     <string name="thread_last_reply">Last reply by %1$s</string>
     <string name="thread_hide_replies">Hide replies</string>
@@ -734,4 +743,12 @@
     <string name="thread_resolved_by_push">Automatically resolved %1$s by %2$s</string>
     <string name="view_video_named">Play video: %1$s</string>
     <string name="media_not_playable">This video or audio file couldn\'t be played</string>
+    <!-- MR version compare (#198) -->
+    <string name="mr_version_title">Version %1$d</string>
+    <string name="mr_version_title_unknown">Merge request version</string>
+    <string name="mr_version_compare">Version %1$d compared with version %2$d</string>
+    <string name="mr_version_compare_target">Version %1$d compared with the target branch</string>
+    <string name="mr_version_compare_previous">Changes since the previous version</string>
+    <string name="mr_version_more_commits">…and %1$d more</string>
+    <string name="mr_version_files_capped">Showing the first %1$d of %2$d changed files.</string>
 </resources>

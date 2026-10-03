@@ -16,6 +16,8 @@ public class GitLabResourceEvent {
     @Json(name = "milestone") public Milestone milestone;
     @Json(name = "state") public String state;              // state events: closed/reopened/merged/…
     @Json(name = "source_commit") public String sourceCommit;
+    // The MR that closed the issue (a global ID, not an iid), #200
+    @Json(name = "source_merge_request_id") public Long sourceMergeRequestId;
 
     public static class Milestone {
         @Json(name = "title") public String title;

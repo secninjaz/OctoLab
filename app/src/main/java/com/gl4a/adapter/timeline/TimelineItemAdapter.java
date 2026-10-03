@@ -63,6 +63,8 @@ public class TimelineItemAdapter
         void replyToThread(GitLabComment comment);
         /** Discussion id of the thread being replied to, or null. */
         String getSelectedReplyDiscussionId();
+        /** Resolves or unresolves the comment's thread (#206). */
+        default void resolveThread(GitLabComment comment, boolean resolve) {}
         /** The MR's current head commit, to tell threads on older versions (#179); null otherwise. */
         default String getMergeRequestHeadSha() { return null; }
         String getShareSubject(GitLabComment comment);
@@ -146,6 +148,19 @@ public class TimelineItemAdapter
         }
 
         @Override
+        public boolean canResolveThread(TimelineItem.TimelineComment comment) {
+            // Any comment of a resolvable thread, like GitLab web; GitLab checks permission
+            GitLabComment note = comment.comment();
+            return !mLocked && note.resolvable && note.discussionId() != null
+                    && !note.isSystemNote();
+        }
+
+        @Override
+        public boolean isThreadResolved(TimelineItem.TimelineComment comment) {
+            return comment.comment().threadResolved || comment.comment().resolved;
+        }
+
+        @Override
         public boolean isReplyThreadSelected(TimelineItem.TimelineComment comment) {
             String selected = mActionCallback.getSelectedReplyDiscussionId();
             return selected != null && selected.equals(comment.comment().discussionId());
@@ -156,6 +171,11 @@ public class TimelineItemAdapter
             switch (menuItem.getItemId()) {
                 case R.id.reply:
                     mActionCallback.replyToThread(comment.comment());
+                    return true;
+
+                case R.id.resolve_thread:
+                    mActionCallback.resolveThread(comment.comment(),
+                            !(comment.comment().threadResolved || comment.comment().resolved));
                     return true;
 
                 case R.id.edit:
@@ -249,21 +269,44 @@ public class TimelineItemAdapter
      * (#152). Label/milestone/state events are built locally and need no rendering.
      */
     public void prerenderMarkdown(List<TimelineItem> items) {
-        List<android.util.Pair<Object, String>> notes = new ArrayList<>();
+        List<HttpImageGetter.PrerenderNote> notes = new ArrayList<>();
         for (TimelineItem item : items) {
             if (!(item instanceof TimelineItem.TimelineComment)) continue;
             TimelineItem.TimelineComment comment = (TimelineItem.TimelineComment) item;
-            if (comment.comment().isSystemNote()) {
-                if (comment.comment().eventInfo == null) {
-                    notes.add(android.util.Pair.create(comment.comment().id(),
-                            systemNoteMarkdown(comment.getUser(), comment.comment().body())));
+            GitLabComment note = comment.comment();
+            if (note.isSystemNote()) {
+                if (note.eventInfo == null) {
+                    notes.add(new HttpImageGetter.PrerenderNote(note.id(),
+                            systemNoteMarkdown(comment.getUser(), note.body()),
+                            systemNoteHtml(comment.getUser(), note.storedHtml())));
                 }
             } else {
-                notes.add(android.util.Pair.create(comment.comment().id(),
-                        comment.comment().body()));
+                notes.add(new HttpImageGetter.PrerenderNote(note.id(), note.body(),
+                        note.storedHtml()));
             }
         }
         mImageGetter.prerenderMarkdown(notes);
+    }
+
+    /**
+     * GitLab's stored rendering of a system note with the author's name in bold in front, as
+     * {@link #systemNoteMarkdown} does for the markdown (#199); null without stored HTML.
+     */
+    public static String systemNoteHtml(com.gl4a.gitlab.model.GitLabUser author,
+            String bodyHtml) {
+        if (bodyHtml == null) {
+            return null;
+        }
+        if (author == null || author.name() == null || author.name().isEmpty()) {
+            return bodyHtml;
+        }
+        String name = "<strong>" + android.text.TextUtils.htmlEncode(author.name())
+                + "</strong> ";
+        // Inside the first paragraph, so the name and the text stay on one line
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^\\s*<p\\b[^>]*>")
+                .matcher(bodyHtml);
+        return m.find() ? bodyHtml.substring(0, m.end()) + name + bodyHtml.substring(m.end())
+                : name + bodyHtml;
     }
 
     public void pause() {
@@ -551,9 +594,45 @@ public class TimelineItemAdapter
                                 shaStart, shaStart + shortSha.length(), 0);
                     }
                 }
+                if (info.sourceMrIid != null) {
+                    // "closed with merge request fmd-server!44 (merged)", like GitLab web (#200)
+                    String reference = mergeRequestReference(info.sourceMrProject,
+                            info.sourceMrIid, projectPath);
+                    text.append(' ').append(context.getString(R.string.event_with_merge_request))
+                            .append(' ');
+                    int start = text.length();
+                    text.append(reference);
+                    if (info.sourceMrUrl != null) {
+                        text.setSpan(new com.gl4a.widget.LinkSpan(info.sourceMrUrl),
+                                start, text.length(), 0);
+                    }
+                    if ("merged".equals(info.sourceMrState)) {
+                        text.append(' ').append(context.getString(R.string.event_mr_merged));
+                    } else if ("closed".equals(info.sourceMrState)) {
+                        text.append(' ').append(context.getString(R.string.event_mr_closed));
+                    }
+                }
                 break;
         }
         return text;
+    }
+
+    /**
+     * An MR reference as GitLab web writes it from this project: "!44" in the same project,
+     * "fmd-server!44" in the same namespace, else the full "group/project!44".
+     */
+    static String mergeRequestReference(String mrProject, String iid, String projectPath) {
+        if (mrProject == null || mrProject.equals(projectPath)) {
+            return "!" + iid;
+        }
+        int slash = mrProject.lastIndexOf('/');
+        String mrNamespace = slash > 0 ? mrProject.substring(0, slash) : "";
+        String namespace = projectPath != null && projectPath.lastIndexOf('/') > 0
+                ? projectPath.substring(0, projectPath.lastIndexOf('/')) : null;
+        if (mrNamespace.equals(namespace)) {
+            return mrProject.substring(slash + 1) + "!" + iid;
+        }
+        return mrProject + "!" + iid;
     }
 
     private static void appendChips(android.content.Context context,
@@ -651,7 +730,8 @@ public class TimelineItemAdapter
             } else {
                 mImageGetter.bindMarkdown(tvNote,
                         systemNoteMarkdown(item.getUser(), item.comment().body()),
-                        item.comment().id());
+                        item.comment().id(),
+                        systemNoteHtml(item.getUser(), item.comment().storedHtml()));
             }
             java.util.Date createdAt = item.getCreatedAt();
             tvTimestamp.setText(com.gl4a.utils.StringUtils.formatRelativeTime(

@@ -89,6 +89,11 @@ public class GitLabComment implements Parcelable {
         public boolean milestoneRemoved;
         public String state;
         public String sourceCommit;
+        // "closed with merge request fmd-server!44 (merged)" (#200)
+        public String sourceMrProject;
+        public String sourceMrIid;
+        public String sourceMrState;
+        public String sourceMrUrl;
 
         public EventInfo(String kind) {
             this.kind = kind;
@@ -139,6 +144,15 @@ public class GitLabComment implements Parcelable {
         mEditInfoLoaded = true;
         mLastEditedAt = lastEditedAt;
         mLastEditedBy = lastEditedBy;
+        return this;
+    }
+
+    // GitLab's stored rendering of the note, from GraphQL (REST has none), shown instead of
+    // rendering the markdown again (#199); null when not loaded
+    private transient String mBodyHtml;
+    public String storedHtml() { return mBodyHtml; }
+    public GitLabComment withStoredHtml(String bodyHtml) {
+        mBodyHtml = bodyHtml;
         return this;
     }
 

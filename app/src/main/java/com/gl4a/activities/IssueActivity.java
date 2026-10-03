@@ -429,6 +429,18 @@ public class IssueActivity extends BaseActivity implements
                     if (mIssue.projectId > 0) {
                         mProjectId = mIssue.projectId;
                     }
+                    // The project's current path, not an old one from a link to a moved
+                    // project, for the title and everything opened from here (#205)
+                    // (opened without one, from a list, the project lookup below sets it)
+                    String[] current = ApiHelpers.projectFromWebUrl(mIssue.webUrl);
+                    if (current != null && mRepoOwner != null && mRepoName != null
+                            && !(current[0].equals(mRepoOwner) && current[1].equals(mRepoName))) {
+                        mRepoOwner = current[0];
+                        mRepoName = current[1];
+                        if (getSupportActionBar() != null) {
+                            getSupportActionBar().setSubtitle(getActionBarSubtitle());
+                        }
+                    }
                     // When opened via the projectId-only path (from issue list), owner/repo
                     // are null. Fetch the project to get the display name (nameWithNamespace)
                     // so the subtitle matches the issue list exactly.

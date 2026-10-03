@@ -5,11 +5,14 @@ import android.util.Log;
 import com.gl4a.Gl4Application;
 import com.gl4a.ServiceFactory;
 import com.gl4a.gitlab.model.GitLabComment;
+import com.gl4a.gitlab.model.GitLabMergeRequestRefsResponse;
 import com.gl4a.gitlab.model.GitLabResourceEvent;
+import com.gl4a.gitlab.service.GitLabGraphQLService;
 import com.gl4a.gitlab.service.GitLabIssueService;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,13 +68,59 @@ public final class TimelineEvents {
             info.milestoneRemoved = "remove".equals(e.action);
             notes.add(makeNote(e, info));
         }
+        Map<Long, List<GitLabComment.EventInfo>> byMergeRequest = new LinkedHashMap<>();
         for (GitLabResourceEvent e : fetch(service, projectId, type, iid, "state")) {
             GitLabComment.EventInfo info = new GitLabComment.EventInfo("state");
             info.state = e.state;
             info.sourceCommit = e.sourceCommit;
+            if (e.sourceMergeRequestId != null) {
+                List<GitLabComment.EventInfo> infos = byMergeRequest.get(e.sourceMergeRequestId);
+                if (infos == null) {
+                    infos = new ArrayList<>();
+                    byMergeRequest.put(e.sourceMergeRequestId, infos);
+                }
+                infos.add(info);
+            }
             notes.add(makeNote(e, info));
         }
+        addMergeRequests(byMergeRequest);
         return notes;
+    }
+
+    /**
+     * Fills in the MRs that closed the issue ("closed with merge request fmd-server!44"),
+     * #200. The events only give the MR's global ID, so they're looked up over GraphQL, all
+     * in one query; best effort, the events still show as "closed" without them.
+     */
+    private static void addMergeRequests(Map<Long, List<GitLabComment.EventInfo>> byId) {
+        if (byId.isEmpty()) return;
+        List<Long> ids = new ArrayList<>(byId.keySet());
+        StringBuilder query = new StringBuilder("query {");
+        for (int i = 0; i < ids.size(); i++) {
+            query.append(" m").append(i).append(": mergeRequest(id: \"gid://gitlab/MergeRequest/")
+                    .append(ids.get(i)).append("\") { iid state webUrl project { fullPath } }");
+        }
+        query.append(" }");
+        Map<String, Object> body = new HashMap<>();
+        body.put("query", query.toString());
+        try {
+            GitLabMergeRequestRefsResponse response = ServiceFactory
+                    .getGraphQL(GitLabGraphQLService.class).getMergeRequestsById(body)
+                    .blockingGet().body();
+            if (response == null || response.data == null) return;
+            for (int i = 0; i < ids.size(); i++) {
+                GitLabMergeRequestRefsResponse.MergeRequest mr = response.data.get("m" + i);
+                if (mr == null || mr.iid == null || mr.project == null) continue;
+                for (GitLabComment.EventInfo info : byId.get(ids.get(i))) {
+                    info.sourceMrProject = mr.project.fullPath;
+                    info.sourceMrIid = mr.iid;
+                    info.sourceMrState = mr.state;
+                    info.sourceMrUrl = mr.webUrl;
+                }
+            }
+        } catch (RuntimeException e) {
+            Log.d(Gl4Application.LOG_TAG, "Closing merge requests unavailable", e);
+        }
     }
 
     private static List<GitLabResourceEvent> fetch(GitLabIssueService service, long projectId,

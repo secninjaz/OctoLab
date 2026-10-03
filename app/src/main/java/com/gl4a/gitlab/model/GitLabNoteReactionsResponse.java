@@ -37,6 +37,8 @@ public class GitLabNoteReactionsResponse {
         @Json(name = "awardEmoji") public AwardEmojiConnection awardEmoji;
         // Equal to the creation time until edited; lastEditedBy is null if never edited (#151)
         @Json(name = "lastEditedAt") public String lastEditedAt;
+        // GitLab's stored rendering of the note (#199)
+        @Json(name = "bodyHtml") public String bodyHtml;
         @Json(name = "lastEditedBy") public User lastEditedBy;
     }
 

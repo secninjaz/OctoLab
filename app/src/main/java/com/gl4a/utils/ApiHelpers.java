@@ -149,6 +149,25 @@ public class ApiHelpers {
         return builder;
     }
 
+    /**
+     * The project's current {owner, repo} from an issue's or MR's web URL
+     * (https://host/group/sub/repo/-/issues/1 → {"group/sub", "repo"}), or null. GitLab keeps
+     * web URLs current, so a project moved since a link was written shows its new path (#205).
+     */
+    @androidx.annotation.Nullable
+    public static String[] projectFromWebUrl(String webUrl) {
+        if (webUrl == null) {
+            return null;
+        }
+        List<String> segments = android.net.Uri.parse(webUrl).getPathSegments();
+        int dash = segments.indexOf("-");
+        if (dash < 2) {
+            return null;
+        }
+        return new String[] { TextUtils.join("/", segments.subList(0, dash - 1)),
+                segments.get(dash - 1) };
+    }
+
     public static String formatRepoName(Context context, GitLabProject project) {
         if (project == null) return context.getString(R.string.deleted);
         // Prefer nameWithNamespace (e.g. "TestG / OctoLab" → "TestG/OctoLab") for proper

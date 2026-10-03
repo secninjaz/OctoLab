@@ -96,6 +96,19 @@ public interface GitLabIssueService {
      * @param noteableType "issues" or "merge_requests"
      * @param kind "label", "milestone" or "state"
      */
+    /**
+     * Resolves or unresolves a thread of an issue or MR (#206).
+     * @param noteableType "issues" or "merge_requests"
+     */
+    @PUT("projects/{id}/{type}/{iid}/discussions/{discussionId}")
+    Single<Response<Void>> resolveDiscussion(
+            @Path("id") long projectId,
+            @Path("type") String noteableType,
+            @Path("iid") int iid,
+            @Path("discussionId") String discussionId,
+            @Query("resolved") boolean resolved
+    );
+
     @GET("projects/{id}/{type}/{iid}/resource_{kind}_events")
     Single<Response<List<com.gl4a.gitlab.model.GitLabResourceEvent>>> getResourceEvents(
             @Path("id") long projectId,

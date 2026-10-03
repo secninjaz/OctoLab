@@ -133,12 +133,13 @@ public interface GitLabMergeRequestService {
             @Path("noteId") long noteId
     );
 
-    /** One MR version (push), for "Compare with previous version" links (#184). */
-    @GET("projects/{id}/merge_requests/{iid}/versions/{versionId}")
-    Single<Response<com.gl4a.gitlab.model.GitLabMergeRequestVersion>> getVersion(
+    /** All MR versions (pushes), newest first, to number them like GitLab web (#198). */
+    @GET("projects/{id}/merge_requests/{iid}/versions")
+    Single<Response<List<com.gl4a.gitlab.model.GitLabMergeRequestVersion>>> getVersions(
             @Path("id") long projectId,
             @Path("iid") int iid,
-            @Path("versionId") long versionId
+            @Query("page") int page,
+            @Query("per_page") int perPage
     );
 
     // MR discussions: notes grouped into threads (#123)

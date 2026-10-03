@@ -83,6 +83,7 @@
             android:configChanges="orientation|screenSize" />
         <activity android:name=".activities.CommitHistoryActivity" android:exported="false" />
         <activity android:name=".activities.CompareActivity" android:exported="false" />
+        <activity android:name=".activities.MergeRequestVersionActivity" android:exported="false" />
         <activity android:name=".activities.ContributorListActivity" android:exported="false" />
         <activity
             android:name=".activities.EditCommitCommentActivity"

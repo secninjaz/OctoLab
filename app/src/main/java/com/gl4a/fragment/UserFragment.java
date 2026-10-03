@@ -74,6 +74,8 @@ public class UserFragment extends LoadingFragmentBase implements
     private View mContentView;
     // GitLab has no follower/following concept; suppress the row
     private boolean mIsSelf;
+    // All of the user's projects, not just the preview's (#201); -1 if unknown
+    private int mRepoTotal = -1;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -261,10 +263,11 @@ public class UserFragment extends LoadingFragmentBase implements
         ll.setVisibility(View.VISIBLE);
         progress.setVisibility(View.GONE);
 
-        // Update repo count in the overview row from actual data (publicRepos() returns 0 for others)
+        // The total from GitLab, not the 5 loaded for this preview, which capped it at 5 (#201);
+        // publicRepos() returns 0 for other users
         if (topRepos != null) {
             OverviewRow reposRow = mContentView.findViewById(R.id.repos_row);
-            int count = topRepos.size();
+            int count = mRepoTotal >= 0 ? mRepoTotal : topRepos.size();
             reposRow.setText(getResources().getQuantityString(R.plurals.repository, count, count));
         }
     }
@@ -307,6 +310,22 @@ public class UserFragment extends LoadingFragmentBase implements
         }
     }
 
+    /**
+     * The number of projects in all pages, from GitLab's X-Total header; -1 if it's missing
+     * (GitLab leaves it out for very large lists).
+     */
+    private static int totalCount(Response<?> response) {
+        String total = response.headers().get("X-Total");
+        if (total != null) {
+            try {
+                return Integer.parseInt(total.trim());
+            } catch (NumberFormatException e) {
+                // fall through
+            }
+        }
+        return -1;
+    }
+
     private void loadTopRepositories(boolean force) {
         GitLabProjectService service = ServiceFactory.get(GitLabProjectService.class, force, 5);
         Single<Response<List<GitLabProject>>> observable;
@@ -321,13 +340,19 @@ public class UserFragment extends LoadingFragmentBase implements
             observable = userService.getUserProjects(mUser.id, 1, 5);
         }
 
-        observable.map(ApiHelpers::throwOnFailure)
+        observable
+                // The total travels with the list, so a cached result after rotation keeps it
+                .map(response -> android.util.Pair.create(ApiHelpers.throwOnFailure(response),
+                        totalCount(response)))
                 .compose(makeLoaderSingle(ID_LOADER_REPO_LIST, force))
                 .doOnSubscribe(disposable -> {
                     mContentView.findViewById(R.id.pb_top_repos).setVisibility(View.VISIBLE);
                     mContentView.findViewById(R.id.ll_top_repos).setVisibility(View.GONE);
                 })
-                .subscribe(this::fillTopRepos, e -> {
+                .subscribe(result -> {
+                    mRepoTotal = result.second;
+                    fillTopRepos(result.first);
+                }, e -> {
                     // Non-fatal: hide the repos section if the API is restricted on this instance
                     mContentView.findViewById(R.id.pb_top_repos).setVisibility(View.GONE);
                     mContentView.findViewById(R.id.ll_top_repos).setVisibility(View.GONE);

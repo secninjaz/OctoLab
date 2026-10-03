@@ -31,15 +31,21 @@ public final class NoteReactionsLoader {
         final List<GitLabReaction> reactions;
         final String lastEditedAt;
         final GitLabUser lastEditedBy;
+        final String bodyHtml;
 
-        NoteDetails(List<GitLabReaction> reactions, String lastEditedAt, GitLabUser lastEditedBy) {
+        NoteDetails(List<GitLabReaction> reactions, String lastEditedAt, GitLabUser lastEditedBy,
+                String bodyHtml) {
             this.reactions = reactions;
             this.lastEditedAt = lastEditedAt;
             this.lastEditedBy = lastEditedBy;
+            this.bodyHtml = bodyHtml;
         }
     }
 
-    private static final String NOTE_FIELDS = "id lastEditedAt lastEditedBy { username name }"
+    // bodyHtml: GitLab's stored rendering, shown as GitLab web does instead of rendering each
+    // note again on the markdown API (#199)
+    private static final String NOTE_FIELDS = "id bodyHtml"
+            + " lastEditedAt lastEditedBy { username name }"
             + " awardEmoji { nodes { name user { username } } }";
     private static final String QUERY =
             "query($id: %s!, $after: String) {"
@@ -122,6 +128,7 @@ public final class NoteReactionsLoader {
             if (note != null) {
                 comment.withReactionDetails(note.reactions, ownLogin);
                 comment.withEditInfo(note.lastEditedAt, note.lastEditedBy);
+                comment.withStoredHtml(note.bodyHtml);
             }
         }
         return comments;
@@ -185,7 +192,7 @@ public final class NoteReactionsLoader {
             editor = GitLabUser.create(note.lastEditedBy.username, 0);
             editor.name = note.lastEditedBy.name;
         }
-        return new NoteDetails(reactions, note.lastEditedAt, editor);
+        return new NoteDetails(reactions, note.lastEditedAt, editor, note.bodyHtml);
     }
 
     /** Extracts the numeric note ID from gid://gitlab/{Note,DiscussionNote,DiffNote}/123. */

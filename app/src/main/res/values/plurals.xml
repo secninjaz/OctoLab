@@ -74,4 +74,8 @@
         <item quantity="one">%d reply</item>
         <item quantity="other">%d replies</item>
     </plurals>
+    <plurals name="mr_version_commits">
+        <item quantity="one">1 commit</item>
+        <item quantity="other">%d commits</item>
+    </plurals>
 </resources>

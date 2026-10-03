@@ -76,6 +76,9 @@ public class CommentViewHolder
         boolean onMenItemClick(TimelineItem.TimelineComment comment, MenuItem menuItem);
         /** Whether "Reply" (add a note to this comment's thread) is offered (#123). */
         boolean canReplyToThread(TimelineItem.TimelineComment comment);
+        /** Whether the comment's thread can be resolved or unresolved (#206). */
+        boolean canResolveThread(TimelineItem.TimelineComment comment);
+        boolean isThreadResolved(TimelineItem.TimelineComment comment);
         /** Whether this comment's thread shows only its first note (#179). */
         boolean isThreadCollapsed(TimelineItem.TimelineComment comment);
         void toggleThread(TimelineItem.TimelineComment comment);
@@ -208,7 +211,9 @@ public class CommentViewHolder
         bindEdited(tvEdited, item.comment());
 
         // Body — system notes route to SystemNoteViewHolder, not here.
-        mImageGetter.bindMarkdown(tvDesc, item.comment().body(), item.comment().id());
+        // GitLab's stored rendering when loaded, as GitLab web shows it (#199)
+        mImageGetter.bindMarkdown(tvDesc, item.comment().body(), item.comment().id(),
+                item.comment().storedHtml());
 
         // Extra view
         // Display name in bold, like GitLab web on mobile, which shows no @username (#179).
@@ -277,6 +282,10 @@ public class CommentViewHolder
         replyItem.setVisible(mCallback.canReplyToThread(item));
         replyItem.setTitle(mCallback.isReplyThreadSelected(item)
                 ? R.string.reply_selected : R.string.reply);
+        MenuItem resolveItem = menu.findItem(R.id.resolve_thread);
+        resolveItem.setVisible(mCallback.canResolveThread(item));
+        resolveItem.setTitle(mCallback.isThreadResolved(item)
+                ? R.string.unresolve_thread : R.string.resolve_thread);
     }
 
     private void setRowShown(boolean shown) {
