@@ -20,6 +20,7 @@ import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.recyclerview.widget.RecyclerView;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
+import android.graphics.drawable.Drawable;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Filter;
@@ -255,10 +256,14 @@ public abstract class RootAdapter<T, VH extends RecyclerView.ViewHolder>
             if (position == mHighlightPosition) {
                 final View v = holder.itemView;
                 v.post(() -> {
-                    if (v.getBackground() != null) {
+                    // Timeline comment rows keep their card as the background, so their
+                    // ripple is the foreground (#215)
+                    Drawable ripple = v.getBackground() != null
+                            ? v.getBackground() : v.getForeground();
+                    if (ripple != null) {
                         final int centerX = v.getWidth() / 2;
                         final int centerY = v.getHeight() / 2;
-                        DrawableCompat.setHotspot(v.getBackground(), centerX, centerY);
+                        DrawableCompat.setHotspot(ripple, centerX, centerY);
                     }
                     v.setPressed(true);
                     v.setPressed(false);

@@ -443,6 +443,7 @@ public class IssueListActivity extends BaseFragmentPagerActivity implements
         searchItem.setOnActionExpandListener(this);
 
         mSearch = (SearchView) searchItem.getActionView();
+        com.gl4a.utils.UiUtils.tintSearchViewIcons(mSearch);
         if (mSearchIsExpanded) {
             searchItem.expandActionView();
             mSearch.setQuery(mSearchQuery, false);

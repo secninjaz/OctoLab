@@ -50,6 +50,10 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         View.OnClickListener, RepositoryListContainerFragment.Callback,
         NotificationListFragment.ParentCallback, LoginModeChooserFragment.ParentCallback {
     public static final String EXTRA_NOTIFICATION_ACCOUNT = "notification_account";
+    /** From a to-do's notification (#178): the to-do's target, opened after the account switch. */
+    public static final String EXTRA_OPEN_URL = "open_url";
+    /** From a to-do's notification (#178): marked done when opened, as in the To-dos list. */
+    public static final String EXTRA_TODO_ID = "todo_id";
 
     public static Intent makeIntent(Context context, @IdRes int initialPageId) {
         String initialPage = START_PAGE_MAPPING.get(initialPageId);
@@ -131,6 +135,29 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         // Navigate to the notifications tab regardless.
         mSelectedFactoryId = R.id.notifications;
         switchTo(mSelectedFactoryId, getFactoryForItem(mSelectedFactoryId));
+        openTodoTarget(intent);
+    }
+
+    /**
+     * Opens a to-do notification's target in-app, with the to-do's account now active, and
+     * marks the to-do done (#178). Without a target URL the To-dos list stays open.
+     */
+    private void openTodoTarget(android.content.Intent intent) {
+        String url = intent.getStringExtra(EXTRA_OPEN_URL);
+        long todoId = intent.getLongExtra(EXTRA_TODO_ID, -1);
+        intent.removeExtra(EXTRA_OPEN_URL);
+        intent.removeExtra(EXTRA_TODO_ID);
+        if (todoId > 0) {
+            com.gl4a.ServiceFactory.get(com.gl4a.gitlab.service.GitLabTodoService.class, false)
+                    .markAsDone(todoId)
+                    .subscribeOn(io.reactivex.schedulers.Schedulers.io())
+                    .subscribe(response -> { }, error -> android.util.Log.d(
+                            Gl4Application.LOG_TAG, "Marking to-do done failed", error));
+        }
+        if (url != null && !url.trim().isEmpty()) {
+            com.gl4a.utils.IntentUtils.openLinkInternallyOrExternally(this,
+                    android.net.Uri.parse(url));
+        }
     }
 
     @Override
@@ -170,6 +197,11 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         loadUserInfo(false);
         loadNotificationIndicator(false);
         mFactory.onStartLoadingData();
+
+        // Opened from a to-do's notification: go to its target (#178)
+        if (savedInstanceState == null && getIntent() != null) {
+            openTodoTarget(getIntent());
+        }
 
         // Request POST_NOTIFICATIONS permission on first launch (Android 13+).
         // Notifications are enabled by default, so we need permission upfront.

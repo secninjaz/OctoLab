@@ -751,4 +751,8 @@
     <string name="mr_version_compare_previous">Changes since the previous version</string>
     <string name="mr_version_more_commits">…and %1$d more</string>
     <string name="mr_version_files_capped">Showing the first %1$d of %2$d changed files.</string>
+    <!-- A to-do with no target or link, e.g. GitLab Duo access (#212) -->
+    <string name="todo_nothing_to_open">This to-do has nothing to open</string>
+    <!-- Action on a to-do's notification (#178) -->
+    <string name="mark_todo_done">Mark as done</string>
 </resources>

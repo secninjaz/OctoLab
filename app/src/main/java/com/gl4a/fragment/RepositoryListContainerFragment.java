@@ -248,6 +248,7 @@ public class RepositoryListContainerFragment extends Fragment implements
             searchItem.setOnActionExpandListener(this);
 
             final SearchView searchView = (SearchView) searchItem.getActionView();
+            com.gl4a.utils.UiUtils.tintSearchViewIcons(searchView);
             if (mSearchIsExpanded) {
                 searchItem.expandActionView();
                 searchView.setQuery(mSearchQuery, false);

@@ -40,16 +40,20 @@ Built and maintained by [SecNinjaz](https://secninjaz.com).
 
 ## Installation
 
+### F-Droid (recommended)
+[<img src="https://f-droid.org/badge/get-it-on.png" alt="Get it on F-Droid" height="75">](https://f-droid.org/packages/com.secninjaz.octolab/)
+
+OctoLab is available in the main [F-Droid](https://f-droid.org/packages/com.secninjaz.octolab/) repository. F-Droid builds it from source and checks that the build matches our release (a reproducible build), then ships our signed APK. Updates arrive through the F-Droid client, usually a few days after a release.
+
+### Obtainium
+[<img src="https://raw.githubusercontent.com/deckerst/common/main/assets/obtainium-badge-english.png" alt="Get it on Obtainium" height="75">](https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/secninjaz/OctoLab)
+
+Fetches APKs directly from GitHub Releases and keeps the app updated automatically, as soon as a release is published.
+
 ### GitHub Releases
 Download the latest signed APK from [Releases](https://github.com/secninjaz/OctoLab/releases).
 
-### Obtainium (recommended for auto-updates)
-[<img src="https://raw.githubusercontent.com/deckerst/common/main/assets/obtainium-badge-english.png" alt="Get it on Obtainium" height="75">](https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/secninjaz/OctoLab)
-
-Fetches APKs directly from GitHub Releases and keeps the app updated automatically.
-
-### F-Droid *(coming soon)*
-Submission to F-Droid is in progress. The F-Droid badge will be added once the app is accepted into the repository.
+All three use the same signing key, so you can switch between them without reinstalling.
 
 ---
 

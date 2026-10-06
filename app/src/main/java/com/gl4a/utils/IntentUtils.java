@@ -177,7 +177,13 @@ public class IntentUtils {
                     .setDefaultColorSchemeParams(colorParams)
                     .build();
             i.intent.setPackage(pkg);
-            i.launchUrl(activity, uri);
+            try {
+                i.launchUrl(activity, uri);
+            } catch (ActivityNotFoundException e) {
+                // e.g. an empty or unsupported URL: try the plain browser, which shows a
+                // message instead of crashing (#212)
+                launchBrowser(activity, uri);
+            }
         } else {
             launchBrowser(activity, uri);
         }

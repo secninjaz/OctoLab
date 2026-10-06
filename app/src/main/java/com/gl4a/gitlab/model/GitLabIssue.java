@@ -34,6 +34,8 @@ public class GitLabIssue implements Parcelable {
     @Json(name = "time_stats") public TimeStats timeStats;
     @Json(name = "confidential") public boolean confidential;
     @Json(name = "references") public GitLabReferences references;
+    // GitLab's own type of a to-do's target, e.g. "ISSUE", "TASK", "INCIDENT"; not parcelled
+    @Json(name = "type") public String type;
 
     // GitHub SDK compatible methods
     public long id() { return id; }

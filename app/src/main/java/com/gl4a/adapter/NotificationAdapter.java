@@ -186,8 +186,11 @@ public class NotificationAdapter extends
                 ? com.gl4a.utils.ApiHelpers.getUserDisplayName(mContext, todo.author) : "";
 
         String targetType = todo.targetType;
-        String typeLabel = "Issue";
-        if ("MergeRequest".equals(targetType)) typeLabel = "MR";
+        // Only a known target is named; GitLab's own to-dos (e.g. Duo access) have none and
+        // were labelled "Issue" (#212)
+        String typeLabel = "";
+        if ("Issue".equals(targetType) || "WorkItem".equals(targetType)) typeLabel = "Issue";
+        else if ("MergeRequest".equals(targetType)) typeLabel = "MR";
         else if ("Commit".equals(targetType)) typeLabel = "Commit";
         else if ("Epic".equals(targetType)) typeLabel = "Epic";
 
@@ -216,7 +219,8 @@ public class NotificationAdapter extends
             default:
                 verb = action.replace('_', ' ');
         }
-        return authorName + " " + verb + " " + typeLabel + iidPart;
+        String target = typeLabel.isEmpty() ? "" : " " + typeLabel + iidPart;
+        return (authorName + " " + verb + target).trim();
     }
 
     private int getIconResId(String targetType) {

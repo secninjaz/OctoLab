@@ -129,6 +129,7 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
         adapter.setFilterQueryProvider(this);
 
         mSearch = (SearchView) menu.findItem(R.id.search).getActionView();
+        com.gl4a.utils.UiUtils.tintSearchViewIcons(mSearch);
         mSearch.setIconifiedByDefault(true);
         mSearch.requestFocus();
         mSearch.onActionViewExpanded();

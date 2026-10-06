@@ -207,6 +207,33 @@ public class UiUtils {
                 .create();
     }
 
+    /**
+     * Gives a toolbar SearchView's icons (clear X, search, go) the theme's text colour. In the
+     * toolbar they resolved to white and the clear X was invisible on the light theme (#211).
+     */
+    public static void tintSearchViewIcons(androidx.appcompat.widget.SearchView searchView) {
+        // The activity's theme, not the toolbar's, which is what made the icons white
+        Context context = searchView.getContext();
+        Context activity = IntentUtils.findActivity(context);
+        if (activity != null) {
+            context = activity;
+        }
+        int color = resolveColor(context, android.R.attr.textColorPrimary);
+        int[] ids = {
+            androidx.appcompat.R.id.search_close_btn,
+            androidx.appcompat.R.id.search_button,
+            androidx.appcompat.R.id.search_go_btn,
+            androidx.appcompat.R.id.search_voice_btn,
+        };
+        for (int id : ids) {
+            android.view.View view = searchView.findViewById(id);
+            if (view instanceof android.widget.ImageView) {
+                ((android.widget.ImageView) view).setColorFilter(color,
+                        android.graphics.PorterDuff.Mode.SRC_IN);
+            }
+        }
+    }
+
     public static @ColorInt int resolveColor(Context context, @AttrRes int styledAttributeId) {
         TypedArray a = context.obtainStyledAttributes(new int[] {
             styledAttributeId

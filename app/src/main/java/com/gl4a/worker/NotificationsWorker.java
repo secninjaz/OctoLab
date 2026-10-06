@@ -67,12 +67,16 @@ public class NotificationsWorker extends Worker {
     private static final String KEY_LAST_NOTIFICATION_CHECK = "last_notification_check";
     private static final String KEY_LAST_NOTIFICATION_SEEN = "last_notification_seen";
     private static final String KEY_LAST_SHOWN_PROJECT_IDS = "last_notification_repo_ids";
+    private static final String KEY_SHOWN_SUMMARY_IDS = "last_notification_summary_ids";
 
     /** SharedPreferences key storing the last 20 worker run log lines (newest first). */
     public static final String KEY_WORKER_LOG = "worker_run_log";
     private static final int MAX_LOG_ENTRIES = 20;
 
     private static final Object sPrefsLock = new Object();
+    // Android drops an app's notifications beyond about 50; the newest to-dos are shown and the
+    // summary counts them (#178)
+    private static final int MAX_TODO_NOTIFICATIONS_PER_ACCOUNT = 20;
 
     public static void schedule(Context context, int intervalMinutes) {
         Constraints constraints = new Constraints.Builder()
@@ -157,10 +161,29 @@ public class NotificationsWorker extends Worker {
             for (String login : logins) {
                 editor.putLong(keyLastSeen(login), now);
                 editor.remove(keyShownIds(login));
+                editor.remove(keyShownSummaries(login));
             }
             // Also update legacy global key for any older code paths.
             editor.putLong(KEY_LAST_NOTIFICATION_SEEN, now);
             editor.putStringSet(KEY_LAST_SHOWN_PROJECT_IDS, null);
+            editor.apply();
+        }
+    }
+
+    /**
+     * The To-dos list was opened: to-dos in it from now on won't be notified, but notifications
+     * already showing are left as they are, and still tracked so that they go once their to-do
+     * is done (#178).
+     */
+    public static void markTodoListSeen(Context context) {
+        synchronized (sPrefsLock) {
+            SharedPreferences prefs = getPrefs(context);
+            long now = System.currentTimeMillis();
+            SharedPreferences.Editor editor = prefs.edit();
+            for (String login : com.gl4a.Gl4Application.get().getAllLogins()) {
+                editor.putLong(keyLastSeen(login), now);
+            }
+            editor.putLong(KEY_LAST_NOTIFICATION_SEEN, now);
             editor.apply();
         }
     }
@@ -185,31 +208,45 @@ public class NotificationsWorker extends Worker {
         return KEY_LAST_SHOWN_PROJECT_IDS + "_" + login;
     }
 
-    // Unique notification ID: combines a stable hash of the account login with the project id
-    // so notifications from different accounts on the same project don't collide.
-    private static int notificationId(String login, long projectId) {
-        return (login.hashCode() & 0x0000FFFF) << 16 | (int) (projectId & 0x0000FFFF);
+    private static String keyShownSummaries(String login) {
+        return KEY_SHOWN_SUMMARY_IDS + "_" + login;
     }
 
+    /** A to-do's notification was swiped away or acted on: don't post it again (#178). */
     public static void handleNotificationDismiss(Context context, int id) {
         SharedPreferences prefs = getPrefs(context);
         String idString = String.valueOf(id);
 
         synchronized (sPrefsLock) {
-            Set<String> lastShownProjectIds = StringUtils.getEditableStringSetFromPrefs(
-                    prefs, KEY_LAST_SHOWN_PROJECT_IDS);
-            if (lastShownProjectIds != null && lastShownProjectIds.contains(idString)) {
-                lastShownProjectIds.remove(idString);
-                if (lastShownProjectIds.isEmpty()) {
-                    NotificationManagerCompat nm = NotificationManagerCompat.from(context);
-                    nm.cancel(0);
-                    lastShownProjectIds = null;
+            SharedPreferences.Editor editor = prefs.edit();
+            for (String login : com.gl4a.Gl4Application.get().getAllLogins()) {
+                Set<String> shown = StringUtils.getEditableStringSetFromPrefs(
+                        prefs, keyShownIds(login));
+                if (shown == null) continue;
+                if (shown.remove(idString)) {
+                    editor.putStringSet(keyShownIds(login), shown);
                 }
-                prefs.edit()
-                        .putStringSet(KEY_LAST_SHOWN_PROJECT_IDS, lastShownProjectIds)
-                        .apply();
             }
+            editor.apply();
+            // Android removes a project's summary itself once its last to-do is gone
         }
+    }
+
+    // One notification per to-do (#178): a stable ID from the account and the to-do; never 0,
+    // which older builds used for their one summary
+    private static int todoNotificationId(String login, long todoId) {
+        int id = (login + ":" + todoId).hashCode();
+        return id == 0 || id == -1 ? 1 : id;
+    }
+
+    // Each project's to-dos are a group of their own, under a summary with the project logo
+    private static int projectSummaryId(String login, long projectId) {
+        int id = ("project:" + login + ":" + projectId).hashCode();
+        return id == 0 || id == -1 ? 2 : id;
+    }
+
+    private static String projectGroupKey(String login, long projectId) {
+        return GROUP_ID_GITLAB + ":" + login + ":" + projectId;
     }
 
     public NotificationsWorker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
@@ -259,64 +296,96 @@ public class NotificationsWorker extends Worker {
                 continue;
             }
 
-            // Group todos by project.
-            Map<Long, List<GitLabTodo>> todosByProject = new HashMap<>();
-            for (GitLabTodo todo : allTodos) {
-                long pid = todo.project != null ? todo.project.id : 0L;
-                List<GitLabTodo> list = todosByProject.get(pid);
-                if (list == null) { list = new ArrayList<>(); todosByProject.put(pid, list); }
-                list.add(todo);
-            }
-
             synchronized (sPrefsLock) {
                 long lastCheck = prefs.getLong(keyLastCheck(login), 0);
                 long lastSeen  = prefs.getLong(keyLastSeen(login), 0);
                 Set<String> lastShown = StringUtils.getEditableStringSetFromPrefs(
                         prefs, keyShownIds(login));
                 Set<String> newShown = new HashSet<>();
-                boolean hasUnseen = false, hasNew = false;
-
-                for (List<GitLabTodo> list : todosByProject.values()) {
-                    for (GitLabTodo todo : list) {
-                        long ts = parseIso8601Ms(todo.createdAt);
-                        hasNew    |= ts > lastCheck;
-                        hasUnseen |= ts > lastSeen;
-                    }
+                boolean hasUnseen, hasNew = false;
+                for (GitLabTodo todo : allTodos) {
+                    hasNew |= parseIso8601Ms(todo.createdAt) > lastCheck;
                 }
 
                 // Always record the successful check time so "Last synced" reflects
                 // the actual last API poll, not just the last notification.
                 prefs.edit().putLong(keyLastCheck(login), System.currentTimeMillis()).apply();
 
-                if (!hasUnseen) continue;
+                // One notification per to-do, newest first, as OctoDroid did (#178): those
+                // newer than when the user last looked, plus those still showing
+                List<GitLabTodo> sorted = new ArrayList<>(allTodos);
+                java.util.Collections.sort(sorted, (a, b) -> Long.compare(
+                        parseIso8601Ms(b.createdAt), parseIso8601Ms(a.createdAt)));
+                Map<Long, android.graphics.Bitmap> logos = new HashMap<>();
+                Map<String, android.graphics.Bitmap> icons = new HashMap<>();
+                // Posted to-dos per project, newest first, in the order projects first appear
+                Map<Long, List<GitLabTodo>> postedByProject = new java.util.LinkedHashMap<>();
+                Map<Long, Boolean> projectHasNew = new HashMap<>();
+                int posted = 0;
+                for (GitLabTodo todo : sorted) {
+                    if (posted >= MAX_TODO_NOTIFICATIONS_PER_ACCOUNT) break;
+                    int nid = todoNotificationId(login, todo.id);
+                    String nidStr = String.valueOf(nid);
+                    long ts = parseIso8601Ms(todo.createdAt);
+                    boolean showing = lastShown != null && lastShown.contains(nidStr);
+                    if (ts <= lastSeen && !showing) continue;
+                    long pid = todo.project != null ? todo.project.id : 0L;
+                    showTodoNotification(nm, todo, nid, ts > lastCheck, login,
+                            projectGroupKey(login, pid), logos, icons);
+                    List<GitLabTodo> group = postedByProject.get(pid);
+                    if (group == null) {
+                        group = new ArrayList<>();
+                        postedByProject.put(pid, group);
+                    }
+                    group.add(todo);
+                    if (ts > lastCheck) projectHasNew.put(pid, true);
+                    if (lastShown != null) lastShown.remove(nidStr);
+                    newShown.add(nidStr);
+                    posted++;
+                }
+                hasUnseen = !newShown.isEmpty();
 
-                for (Map.Entry<Long, List<GitLabTodo>> entry : todosByProject.entrySet()) {
-                    String pidStr = String.valueOf(entry.getKey());
-                    showProjectTodoNotification(nm, entry.getValue(), lastCheck, login);
-                    if (lastShown != null) lastShown.remove(pidStr);
-                    newShown.add(pidStr);
+                // Cancel notifications of to-dos no longer pending (done elsewhere)
+                if (lastShown != null) {
+                    for (String nid : lastShown) {
+                        try { nm.cancel(Integer.parseInt(nid)); }
+                        catch (NumberFormatException ignored) {}
+                    }
                 }
 
-                // Cancel notifications for projects that no longer have pending todos.
-                if (lastShown != null) {
-                    for (String pid : lastShown) {
-                        try { nm.cancel(notificationId(login, Long.parseLong(pid))); }
+                // One summary per project: its logo and name, collapsing the to-dos below it
+                Set<String> lastSummaries = StringUtils.getEditableStringSetFromPrefs(
+                        prefs, keyShownSummaries(login));
+                Set<String> newSummaries = new HashSet<>();
+                for (Map.Entry<Long, List<GitLabTodo>> e : postedByProject.entrySet()) {
+                    int sid = projectSummaryId(login, e.getKey());
+                    showProjectSummaryNotification(nm, sid, e.getValue(),
+                            projectHasNew.containsKey(e.getKey()), login,
+                            projectGroupKey(login, e.getKey()), logos);
+                    newSummaries.add(String.valueOf(sid));
+                    if (lastSummaries != null) lastSummaries.remove(String.valueOf(sid));
+                }
+                if (lastSummaries != null) {
+                    for (String sid : lastSummaries) {
+                        try { nm.cancel(Integer.parseInt(sid)); }
                         catch (NumberFormatException ignored) {}
                     }
                 }
 
                 prefs.edit()
                         .putStringSet(keyShownIds(login), newShown)
+                        .putStringSet(keyShownSummaries(login), newSummaries)
                         .apply();
 
-                totalUnseen += allTodos.size();
+                if (!hasUnseen) continue;
+
+                totalUnseen += newShown.size();
                 anyNew |= hasNew;
             }
         }
 
-        if (totalUnseen > 0) {
-            showSummaryNotification(nm, totalUnseen, anyNew);
-        }
+        // Older builds put every to-do under one app-wide summary (ID 0)
+        nm.cancel(0);
 
         appendWorkerLog(getApplicationContext(), runStart,
                 totalUnseen > 0 ? "Notified: " + totalUnseen + " pending" : "OK — no new todos",
@@ -349,128 +418,178 @@ public class NotificationsWorker extends Worker {
         return getPrefs(ctx).getString(KEY_WORKER_LOG, "");
     }
 
-    private void showProjectTodoNotification(NotificationManagerCompat nm,
-            List<GitLabTodo> todos, long lastCheck, String accountLogin) {
-        if (todos.isEmpty()) return;
+    /**
+     * One expandable notification per to-do, like OctoDroid (#178): the project as title,
+     * "Issue: <title>" collapsed, and expanded the action ("Jay mentioned you in #34"), the
+     * title and GitLab's text for the to-do. Tapping opens the to-do's target in-app with its
+     * account (and marks it done, as in the To-dos list); "Mark as done" acts on it alone.
+     */
+    private void showTodoNotification(NotificationManagerCompat nm, GitLabTodo todo, int id,
+            boolean isNew, String accountLogin, String groupKey,
+            Map<Long, android.graphics.Bitmap> logos, Map<String, android.graphics.Bitmap> icons) {
         final Context context = getApplicationContext();
-        GitLabTodo first = todos.get(0);
-        String projectName = first.project != null ? first.project.nameWithNamespace : "GitLab";
-        long projectId = first.project != null ? first.project.id : 0L;
-        final int id = notificationId(accountLogin, projectId);
-        long when = parseIso8601Ms(first.createdAt);
-        String text = context.getResources().getQuantityString(
-                R.plurals.unread_notifications_summary_text, todos.size(), todos.size());
+        String projectName = projectName(context, todo);
+        String title = todo.title();
 
-        // Intent includes the account login so HomeActivity can switch accounts on tap.
+        // All from what GitLab returns for the to-do: who did what where, the target's title
+        // once, then GitLab's body (the comment) when it isn't just that title again
+        StringBuilder expanded = new StringBuilder(formatTodoMessage(context, todo));
+        if (todo.target != null && title != null && !title.isEmpty()) {
+            expanded.append("\n").append(title);
+        }
+        String body = todo.body != null ? todo.body.trim() : "";
+        if (!body.isEmpty() && !body.equals(title)) {
+            expanded.append("\n\n").append(body.length() > 400
+                    ? body.substring(0, 400) + "\u2026" : body);
+        }
+
         Intent intent = HomeActivity.makeIntent(context, R.id.notifications)
                 .putExtra(HomeActivity.EXTRA_NOTIFICATION_ACCOUNT, accountLogin)
+                .putExtra(HomeActivity.EXTRA_OPEN_URL, todo.targetUrl)
+                .putExtra(HomeActivity.EXTRA_TODO_ID, todo.id)
+                // Distinct data per to-do, so each PendingIntent keeps its own extras
+                .setData(android.net.Uri.parse("octolab-todo://" + accountLogin + "/" + todo.id))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent contentIntent = PendingIntent.getActivity(context, id, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
         PendingIntent deleteIntent = PendingIntent.getService(context, id,
                 NotificationHandlingService.makeHandleDismissIntent(context, id),
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent doneIntent = PendingIntent.getService(context, id,
+                NotificationHandlingService.makeMarkTodoDoneIntent(context, id, accountLogin,
+                        todo.id),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         android.app.Notification publicVersion = makeBaseBuilder()
                 .setContentTitle(context.getString(R.string.unread_notifications_summary_title))
-                .setContentText(text)
-                .setNumber(todos.size())
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .build();
 
         NotificationCompat.Builder builder = makeBaseBuilder()
-                .setGroup(GROUP_ID_GITLAB)
+                .setGroup(groupKey)
                 .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
-                .setWhen(when)
+                .setWhen(parseIso8601Ms(todo.createdAt))
                 .setShowWhen(true)
-                .setNumber(todos.size())
                 .setPublicVersion(publicVersion)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                 .setContentTitle(projectName)
+                .setContentText(collapsedLine(todo))
+                .setStyle(new NotificationCompat.BigTextStyle()
+                        .setBigContentTitle(projectName)
+                        .bigText(expanded.toString()))
                 .setContentIntent(contentIntent)
                 .setDeleteIntent(deleteIntent)
                 .setAutoCancel(true)
-                .setContentText(text);
+                .addAction(R.drawable.icon_notifications,
+                        context.getString(R.string.mark_todo_done), doneIntent);
+        if (!isNew) builder.setOnlyAlertOnce(true);
 
-        // Set project avatar as the large icon so users can identify the project at a glance —
-        // same resolution AvatarHandler uses in-app (own avatar, else inherited from a parent
-        // group, else the colored initials tile), not a separate reimplementation.
-        int iconSizePx = context.getResources()
-                .getDimensionPixelSize(android.R.dimen.notification_large_icon_width);
-        // The one shared project logo, so it matches the app exactly (#176).
-        builder.setLargeIcon(AvatarHandler.loadProjectLogoSynchronously(first.project, iconSizePx,
-                apiBaseForLogin(accountLogin)));
-
-        boolean hasNewTodo = false;
-        NotificationCompat.InboxStyle inbox = new NotificationCompat.InboxStyle()
-                .setBigContentTitle(projectName);
-        for (int i = todos.size() - 1; i >= 0; i--) {
-            GitLabTodo todo = todos.get(i);
-            long todoTs = parseIso8601Ms(todo.createdAt);
-            inbox.addLine(formatTodoMessage(context, todo));
-            hasNewTodo = hasNewTodo || todoTs > lastCheck;
+        // Who and where in Android's one icon slot: the round avatar of whoever caused the
+        // to-do, as GitLab gives it, with the project logo as a badge; made once per run
+        if (todo.author != null) {
+            String key = todo.author.id + ":" + (todo.project != null ? todo.project.id : 0);
+            android.graphics.Bitmap icon = icons.get(key);
+            if (icon == null && !icons.containsKey(key)) {
+                icon = AvatarHandler.withProjectBadge(
+                        AvatarHandler.loadUserAvatarSynchronously(context, todo.author),
+                        projectLogo(todo, accountLogin, logos), largeIconSize(context));
+                icons.put(key, icon);
+            }
+            builder.setLargeIcon(icon);
         }
-        builder.setStyle(inbox);
-
-        if (!hasNewTodo) builder.setOnlyAlertOnce(true);
-
-        // "Mark as read" action — uses the original ACTION_MARK_READ path which calls
-        // handleNotificationDismiss(id) + nm.cancel(id) for THIS notification only.
-        String pns = first.project != null && first.project.pathWithNamespace != null
-                ? first.project.pathWithNamespace : "";
-        int slash = pns.lastIndexOf('/');
-        String repoOwner = slash >= 0 ? pns.substring(0, slash) : pns;
-        String repoName  = slash >= 0 ? pns.substring(slash + 1) : pns;
-        PendingIntent markReadIntent = PendingIntent.getService(context, id,
-                NotificationHandlingService.makeMarkReposNotificationsAsReadActionIntent(
-                        context, id, repoOwner, repoName),
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        builder.addAction(R.drawable.icon_notifications, "Mark as read", markReadIntent);
 
         nm.notify(id, builder.build());
     }
 
-    private void showSummaryNotification(NotificationManagerCompat nm,
-            int totalCount, boolean hasNewTodo) {
+    /** A project's summary: its logo and name, with one line per to-do under it. */
+    private void showProjectSummaryNotification(NotificationManagerCompat nm, int id,
+            List<GitLabTodo> todos, boolean hasNew, String accountLogin, String groupKey,
+            Map<Long, android.graphics.Bitmap> logos) {
         final Context context = getApplicationContext();
+        GitLabTodo newest = todos.get(0);
+        String projectName = projectName(context, newest);
 
-        String title = context.getString(R.string.unread_notifications_summary_title);
-        String text = context.getResources().getQuantityString(
-                R.plurals.unread_notifications_summary_text, totalCount, totalCount);
+        NotificationCompat.InboxStyle inbox = new NotificationCompat.InboxStyle()
+                .setBigContentTitle(projectName);
+        for (GitLabTodo todo : todos) inbox.addLine(collapsedLine(todo));
 
-        Notification publicVersion = makeBaseBuilder()
-                .setContentTitle(title)
-                .setContentText(text)
-                .setNumber(totalCount)
+        Intent intent = HomeActivity.makeIntent(context, R.id.notifications)
+                .putExtra(HomeActivity.EXTRA_NOTIFICATION_ACCOUNT, accountLogin)
+                .setData(android.net.Uri.parse("octolab-todos://" + accountLogin + "/" + id))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent contentIntent = PendingIntent.getActivity(context, id, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        android.app.Notification publicVersion = makeBaseBuilder()
+                .setContentTitle(context.getString(R.string.unread_notifications_summary_title))
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .build();
 
-        PendingIntent contentIntent = PendingIntent.getActivity(context, 0,
-                HomeActivity.makeIntent(context, R.id.notifications),
-                PendingIntent.FLAG_IMMUTABLE);
-        // Summary notification delete intent: pass id=0 so the handler calls cancelAll()
-        // (clearing all project notifications when the group summary is dismissed).
-        PendingIntent deleteIntent = PendingIntent.getService(context, 0,
-                NotificationHandlingService.makeMarkNotificationsSeenIntent(context, 0),
-                PendingIntent.FLAG_IMMUTABLE);
-
         NotificationCompat.Builder builder = makeBaseBuilder()
-                .setGroup(GROUP_ID_GITLAB)
+                .setGroup(groupKey)
                 .setGroupSummary(true)
                 .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
-                .setContentIntent(contentIntent)
-                .setDeleteIntent(deleteIntent)
-                .setContentTitle(title)
-                .setContentText(text)
+                .setWhen(parseIso8601Ms(newest.createdAt))
+                .setShowWhen(true)
                 .setPublicVersion(publicVersion)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)
-                .setNumber(totalCount);
+                .setContentTitle(projectName)
+                .setContentText(collapsedLine(newest))
+                .setStyle(inbox)
+                .setNumber(todos.size())
+                .setContentIntent(contentIntent)
+                .setAutoCancel(true)
+                .setDefaults(NotificationCompat.DEFAULT_ALL);
+        if (!hasNew) builder.setOnlyAlertOnce(true);
 
-        if (!hasNewTodo) builder.setOnlyAlertOnce(true);
+        builder.setLargeIcon(projectLogo(newest, accountLogin, logos));
 
-        nm.notify(0, builder.build());
+        nm.notify(id, builder.build());
+    }
+
+    /** The one shared project logo, as in the app (#176); fetched once per project per run. */
+    private android.graphics.Bitmap projectLogo(GitLabTodo todo, String accountLogin,
+            Map<Long, android.graphics.Bitmap> logos) {
+        if (todo.project == null) return null;
+        android.graphics.Bitmap logo = logos.get(todo.project.id);
+        if (logo == null && !logos.containsKey(todo.project.id)) {
+            logo = AvatarHandler.loadProjectLogoSynchronously(todo.project,
+                    largeIconSize(getApplicationContext()), apiBaseForLogin(accountLogin));
+            logos.put(todo.project.id, logo);
+        }
+        return logo;
+    }
+
+    private static int largeIconSize(Context context) {
+        return context.getResources()
+                .getDimensionPixelSize(android.R.dimen.notification_large_icon_width);
+    }
+
+    private static String projectName(Context context, GitLabTodo todo) {
+        return todo.project != null && todo.project.nameWithNamespace != null
+                ? todo.project.nameWithNamespace : context.getString(R.string.app_name);
+    }
+
+    /** "Issue: <title>", with GitLab's own type of the target; just the title without one. */
+    private static String collapsedLine(GitLabTodo todo) {
+        String type = todoTypeLabel(todo);
+        String title = todo.title();
+        return type != null ? type + ": " + title : title;
+    }
+
+    /**
+     * GitLab's type of the to-do's target in words: the work item type it gives ("TASK" →
+     * "Task"), else its target_type ("MergeRequest" → "Merge request"); null without either.
+     */
+    private static String todoTypeLabel(GitLabTodo todo) {
+        String raw = todo.target != null && todo.target.type != null
+                ? todo.target.type : todo.targetType;
+        if (raw == null || raw.isEmpty()) return null;
+        String words = raw.indexOf('_') >= 0 || raw.equals(raw.toUpperCase(java.util.Locale.ROOT))
+                ? raw.replace('_', ' ')
+                : raw.replaceAll("([a-z])([A-Z])", "$1 $2");
+        words = words.toLowerCase(java.util.Locale.ROOT);
+        return Character.toUpperCase(words.charAt(0)) + words.substring(1);
     }
 
     private NotificationCompat.Builder makeBaseBuilder() {
@@ -496,10 +615,10 @@ public class NotificationsWorker extends Worker {
         }
     }
 
-    /** Builds a one-line notification message: "Jay mentioned you in #34 Fix login bug". */
+    /** Builds a one-line notification message: "Jay mentioned you in #34". */
     private static String formatTodoMessage(Context ctx, GitLabTodo todo) {
-        String authorName = (todo.author != null && todo.author.name() != null)
-                ? todo.author.name() : "Someone";
+        String authorName = todo.author != null
+                ? ApiHelpers.getUserDisplayName(ctx, todo.author) : "Someone";
         String verb = formatActionVerb(todo.actionName);
         String ref = "";
         if (todo.isCommit() && todo.commitSha != null) {
@@ -510,15 +629,12 @@ public class NotificationsWorker extends Worker {
         } else if (todo.target != null) {
             String prefix = "MergeRequest".equals(todo.targetType) ? "!" : "#";
             ref = " in " + prefix + todo.target.iid;
-            if (todo.target.title != null && !todo.target.title.isEmpty()) {
-                ref += " " + todo.target.title;
-            }
         }
         return authorName + " " + verb + ref;
     }
 
     /** API base of the account a notification belongs to, e.g. "https://host/api/v4/". */
-    private static String apiBaseForLogin(String login) {
+    static String apiBaseForLogin(String login) {
         String instanceUrl = com.gl4a.Gl4Application.get().getInstanceUrlForLogin(login);
         if (instanceUrl == null) return null;
         return instanceUrl.endsWith("/") ? instanceUrl + "api/v4/" : instanceUrl + "/api/v4/";

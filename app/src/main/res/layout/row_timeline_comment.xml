@@ -9,6 +9,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:clipToPadding="false"
+    android:foreground="?attr/selectableItemBackground"
     android:paddingLeft="@dimen/timeline_side_padding"
     android:paddingRight="@dimen/timeline_side_padding"
     android:paddingTop="@dimen/timeline_row_gap"

@@ -25,7 +25,17 @@ public class GitLabTodo {
     public String title() {
         if (target != null && target.title != null) return target.title;
         if (commitTitle != null) return commitTitle;
-        return actionName;
+        // To-dos without a target, e.g. GitLab's own "duo_core_access_granted": GitLab's text
+        // for it, else the action in words, never the raw action name (#212)
+        if (body != null && !body.trim().isEmpty()) return body.trim();
+        return actionName != null ? humanize(actionName) : "";
+    }
+
+    /** "duo_core_access_granted" → "Duo core access granted". */
+    public static String humanize(String actionName) {
+        String words = actionName.replace('_', ' ').trim();
+        return words.isEmpty() ? words
+                : Character.toUpperCase(words.charAt(0)) + words.substring(1);
     }
     public GitLabIssue targetIssue() { return target; }
     public String url() { return targetUrl; }

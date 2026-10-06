@@ -91,8 +91,10 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
     @Override
     public void onStart() {
         super.onStart();
-        // Mark system notifications as seen whenever the user opens the notifications tab.
-        com.gl4a.worker.NotificationsWorker.markNotificationsAsSeen(requireContext(), true);
+        // The list has been seen: no alerts for its to-dos, but notifications already showing
+        // stay until their own to-do is done, tapped or swiped away. A notification tap passes
+        // through this screen, which cleared all of them (#178)
+        com.gl4a.worker.NotificationsWorker.markTodoListSeen(requireContext());
         if (!mInitialLoadDone) {
             mInitialLoadDone = true;
             setContentShown(false);
@@ -189,12 +191,16 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
             return;
         }
 
-        // Fallback: open in browser
+        // Fallback: the to-do's URL, in-app where LinkParser knows it. Some to-dos have none
+        // (e.g. GitLab's "Duo Core access granted"): opening the empty URL crashed (#212)
         String url = todo.url();
-        if (url != null) {
-            com.gl4a.utils.IntentUtils.openInCustomTabOrBrowser(
+        if (url != null && !url.trim().isEmpty()) {
+            com.gl4a.utils.IntentUtils.openLinkInternallyOrExternally(
                     getActivity(), android.net.Uri.parse(url));
             markTodoAsDone(todo);
+        } else {
+            android.widget.Toast.makeText(getActivity(), R.string.todo_nothing_to_open,
+                    android.widget.Toast.LENGTH_SHORT).show();
         }
     }
 

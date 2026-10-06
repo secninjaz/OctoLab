@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-06
+
+### Added
+- One notification per to-do, stacked by project like OctoDroid did. Each shows who caused it (their avatar with the project's logo as a badge), what they did, the title and the comment; tapping it opens the issue or merge request at that comment and marks the to-do done, and "Mark as done" is on every notification. Opening To-dos no longer clears them; each goes once its own to-do is done, tapped or swiped away (#178)
+
+### Changed
+- README: OctoLab is now in F-Droid; added the "Get it on F-Droid" badge and link as the first install option (#207)
+- The F-Droid summary reads "GitLab client for Android", so searching F-Droid for "gitlab client" finds OctoLab (#218)
+
+### Fixed
+- Crash on large issues with many images: "Canvas: trying to use a recycled bitmap" (#208)
+- Tapping one of GitLab's own to-dos, e.g. "Duo Core access granted", crashed the app; to-dos with nothing to open now say so (#212)
+- "Add reaction" on comments in a thread showed the reactions without their icons (#209)
+- The search bar's clear (X) icon was white on the light theme (#211)
+- The comment opened from a notification or to-do is highlighted again (#215)
+
 ## [1.3.9] - 2026-10-03
 
 ### Added

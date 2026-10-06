@@ -1,4 +1,4 @@
-OctoLab is a free and open-source Android client for GitLab. It works with gitlab.com as well as self-hosted GitLab instances (Community or Enterprise Edition).
+OctoLab is a free and open-source GitLab client for Android. It works with gitlab.com as well as self-hosted GitLab instances (Community or Enterprise Edition).
 
 FEATURES
 

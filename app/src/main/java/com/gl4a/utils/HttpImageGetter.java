@@ -352,12 +352,9 @@ public class HttpImageGetter {
         }
 
         private void discardLoadedImages() {
-            for (WeakReference<Bitmap> ref : mBitmaps) {
-                Bitmap bitmap = ref.get();
-                if (bitmap != null) {
-                    bitmap.recycle();
-                }
-            }
+            // Not recycled: a TextView may still be drawing the old text's images (e.g. a note
+            // rendered again with GitLab's stored HTML, #199), which crashed with "Canvas: trying
+            // to use a recycled bitmap" (#208). The garbage collector frees them once unused.
             mBitmaps.clear();
             for (GifInfo info : mGifs) {
                 info.destroy();

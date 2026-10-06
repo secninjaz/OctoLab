@@ -35,8 +35,8 @@ android {
     defaultConfig {
         minSdkVersion 23
         targetSdkVersion 33
-        versionCode 218
-        versionName "1.3.9"
+        versionCode 219
+        versionName "1.4.0"
         applicationId "com.secninjaz.octolab"
         resourceConfigurations += ['en']
 

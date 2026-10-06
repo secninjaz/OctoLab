@@ -438,6 +438,70 @@ public class AvatarHandler {
      * a Drawable to. Most projects have no uploaded avatar, so this is the common case,
      * not just a network-failure fallback.
      */
+    /**
+     * A user avatar as a round bitmap, as the app shows avatars, for places that take a plain
+     * bitmap rather than a drawable (notification icons).
+     */
+    public static Bitmap toCircle(Bitmap src) {
+        if (src == null) return null;
+        int size = Math.min(src.getWidth(), src.getHeight());
+        Bitmap result = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(result);
+        android.graphics.Paint paint = new android.graphics.Paint(
+                android.graphics.Paint.ANTI_ALIAS_FLAG | android.graphics.Paint.FILTER_BITMAP_FLAG);
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint);
+        paint.setXfermode(new android.graphics.PorterDuffXfermode(
+                android.graphics.PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(src, (size - src.getWidth()) / 2f, (size - src.getHeight()) / 2f, paint);
+        return result;
+    }
+
+    /**
+     * A notification icon showing both who and where: the round {@code avatar} with the project
+     * {@code logo} as a badge on its bottom-right corner, its corners rounded as project logos
+     * are in the app and transparency kept. A transparent gap that follows the logo's shape is
+     * cut into the avatar so the two don't run together on any background. Either may be null.
+     */
+    public static Bitmap withProjectBadge(Bitmap avatar, Bitmap logo, int sizePx) {
+        if (avatar == null) return logo;
+        Bitmap round = toCircle(avatar);
+        if (logo == null) return round;
+        Bitmap result = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(result);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        canvas.drawBitmap(round, null, new android.graphics.RectF(0, 0, sizePx, sizePx), paint);
+
+        // The logo as the app draws it: square-fitted, corners rounded by 20%
+        int badge = Math.round(sizePx * 0.46f);
+        Bitmap square = fitLogoToSquare(logo);
+        Bitmap badgeBitmap = Bitmap.createBitmap(badge, badge, Bitmap.Config.ARGB_8888);
+        Canvas badgeCanvas = new Canvas(badgeBitmap);
+        Paint maskPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        badgeCanvas.drawRoundRect(new android.graphics.RectF(0, 0, badge, badge),
+                badge * 0.20f, badge * 0.20f, maskPaint);
+        maskPaint.setXfermode(new android.graphics.PorterDuffXfermode(
+                android.graphics.PorterDuff.Mode.SRC_IN));
+        maskPaint.setFilterBitmap(true);
+        badgeCanvas.drawBitmap(square, null, new android.graphics.RectF(0, 0, badge, badge),
+                maskPaint);
+
+        // Clear a gap around the badge's visible shape, then draw the badge into it
+        float left = sizePx - badge, top = sizePx - badge;
+        float gap = Math.max(2f, sizePx * 0.035f);
+        Bitmap shape = badgeBitmap.extractAlpha();
+        Paint clear = new Paint(Paint.ANTI_ALIAS_FLAG);
+        clear.setXfermode(new android.graphics.PorterDuffXfermode(
+                android.graphics.PorterDuff.Mode.DST_OUT));
+        for (int angle = 0; angle < 360; angle += 30) {
+            double rad = Math.toRadians(angle);
+            canvas.drawBitmap(shape, left + (float) (gap * Math.cos(rad)),
+                    top + (float) (gap * Math.sin(rad)), clear);
+        }
+        canvas.drawBitmap(shape, left, top, clear);
+        canvas.drawBitmap(badgeBitmap, left, top, paint);
+        return result;
+    }
+
     private static Bitmap renderProjectPlaceholder(String projectName, long projectId, int sizePx) {
         DefaultAvatarDrawable drawable = new DefaultAvatarDrawable(projectName,
                 projectId > 0 ? projectId : null, true);

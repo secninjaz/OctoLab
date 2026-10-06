@@ -24,6 +24,9 @@ public class NotificationHandlingService extends IntentService {
 
     private static final String ACTION_MARK_SEEN = "com.gl4a.action.MARK_AS_SEEN";
     private static final String ACTION_MARK_READ = "com.gl4a.action.MARK_AS_READ";
+    private static final String ACTION_MARK_TODO_DONE = "com.gl4a.action.MARK_TODO_DONE";
+    private static final String EXTRA_ACCOUNT = "account";
+    private static final String EXTRA_TODO_ID = "todo_id";
     private static final String ACTION_HANDLE_NOTIFICATION_DISMISS =
             "com.gl4a.action.HANDLE_NOTIFICATION_DISMISS";
 
@@ -52,6 +55,16 @@ public class NotificationHandlingService extends IntentService {
                 .setData(android.net.Uri.parse("notification://cancel/" + notificationId))
                 .putExtra(EXTRA_REPO_OWNER, repoOwner)
                 .putExtra(EXTRA_REPO_NAME, repoName);
+    }
+
+    /** "Mark as done" on one to-do's notification (#178). */
+    public static Intent makeMarkTodoDoneIntent(Context context, int notificationId,
+            String accountLogin, long todoId) {
+        return new Intent(context, NotificationHandlingService.class)
+                .setAction(ACTION_MARK_TODO_DONE)
+                .setData(android.net.Uri.parse("notification://done/" + notificationId))
+                .putExtra(EXTRA_ACCOUNT, accountLogin)
+                .putExtra(EXTRA_TODO_ID, todoId);
     }
 
     public NotificationHandlingService() {
@@ -92,6 +105,29 @@ public class NotificationHandlingService extends IntentService {
                     NotificationsWorker.handleNotificationDismiss(this, notificationId);
                 }
                 break;
+            case ACTION_MARK_TODO_DONE: {
+                String login = intent.getStringExtra(EXTRA_ACCOUNT);
+                long todoId = intent.getLongExtra(EXTRA_TODO_ID, -1);
+                String token = login != null
+                        ? Gl4Application.get().getTokenForLogin(login) : null;
+                if (token != null && todoId > 0) {
+                    try {
+                        // With the to-do's own account, which may not be the active one
+                        com.gl4a.ServiceFactory.getForAccount(
+                                com.gl4a.gitlab.service.GitLabTodoService.class,
+                                NotificationsWorker.apiBaseForLogin(login), token)
+                                .markAsDone(todoId)
+                                .blockingGet();
+                    } catch (RuntimeException e) {
+                        Log.d(Gl4Application.LOG_TAG, "Marking to-do " + todoId + " done failed", e);
+                    }
+                }
+                if (notificationId != 0 && notificationId != -1) {
+                    NotificationsWorker.handleNotificationDismiss(this, notificationId);
+                    androidx.core.app.NotificationManagerCompat.from(this).cancel(notificationId);
+                }
+                break;
+            }
             case ACTION_MARK_READ:
                 if (repoOwner != null && repoName != null) {
                     // TODO: Implement GitLab to-do mark-as-read via GitLabTodoService
