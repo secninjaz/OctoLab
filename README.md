@@ -31,9 +31,9 @@ Built and maintained by [SecNinjaz](https://secninjaz.com).
 ## Screenshots
 
 <p float="left">
-  <img src="screenshots/3.png" width="180" alt="Project overview" />
-  <img src="screenshots/8.png" width="180" alt="Issues list" />
-  <img src="screenshots/7.png" width="180" alt="Diff viewer" />
+  <img src="screenshots/03.png" width="180" alt="Project overview" />
+  <img src="screenshots/08.png" width="180" alt="Issues list" />
+  <img src="screenshots/07.png" width="180" alt="Diff viewer" />
 </p>
 
 ---

@@ -10,6 +10,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.gl4a.R;
+import com.gl4a.utils.AvatarHandler;
 
 public class ContributorAdapter extends RootAdapter<GitLabContributor, ContributorAdapter.ViewHolder> {
     public ContributorAdapter(Context context) {
@@ -24,7 +25,9 @@ public class ContributorAdapter extends RootAdapter<GitLabContributor, Contribut
 
     @Override
     public void onBindViewHolder(ViewHolder holder, GitLabContributor contributor) {
-        holder.ivGravatar.setImageDrawable(null);
+        // The same author avatar as commits: the GitLab account behind the email (#239)
+        AvatarHandler.assignGitAuthorAvatar(holder.ivGravatar, contributor.name(),
+                contributor.email());
         holder.tvTitle.setText(contributor.name() != null ? contributor.name() : "");
         int contributions = contributor.commits();
         holder.tvExtra.setText(mContext.getResources().getQuantityString(R.plurals.contributor_extra_data,

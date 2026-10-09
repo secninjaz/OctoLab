@@ -50,6 +50,8 @@ public class GroupTree implements View.OnClickListener {
         final Map<String, List<Object>> childrenByPath = new HashMap<>();
         final Set<String> expanded = new HashSet<>();
         public int scrollY;
+        /** Groups shallower than this expand by themselves once shown; 0 = none (#240) */
+        int autoExpandDepth;
 
         public boolean hasContent() {
             return roots != null;
@@ -88,6 +90,13 @@ public class GroupTree implements View.OnClickListener {
         mActivity = activity;
         mContainer = container;
         mState = state;
+    }
+
+    /** A spinner in place of the tree until {@link #setRoots} replaces it (#242). */
+    public void showLoading() {
+        mContainer.removeAllViews();
+        mContainer.addView(mActivity.getLayoutInflater()
+                .inflate(R.layout.row_group_tree_loading, mContainer, false));
     }
 
     /** Rebuilds the rows from the retained state, e.g. after rotation. */
@@ -236,9 +245,18 @@ public class GroupTree implements View.OnClickListener {
 
     /** Replaces the tree with {@code roots} (groups and/or projects) at depth 0. */
     public void setRoots(List<?> roots, MembershipRoles roles) {
+        setRoots(roots, roles, 0);
+    }
+
+    /**
+     * As above, with every group above {@code autoExpandDepth} expanded straight away, e.g. to
+     * show all of a user's projects under their groups (#240).
+     */
+    public void setRoots(List<?> roots, MembershipRoles roles, int autoExpandDepth) {
         mState.clear();
         mState.roots = roots;
         mState.roles = roles;
+        mState.autoExpandDepth = autoExpandDepth;
         restore();
     }
 
@@ -266,6 +284,13 @@ public class GroupTree implements View.OnClickListener {
             node.row = row;
             mContainer.addView(row, index++);
             nodes.add(node);
+            if (node.group != null && depth < mState.autoExpandDepth
+                    && !mState.expanded.contains(pathOf(node.group))) {
+                // Expanded once it's in place; its children load in the background
+                row.post(() -> {
+                    if (!node.expanded) toggle(node);
+                });
+            }
             // Re-expand groups that were expanded before a rebuild, from cached children.
             if (node.group != null && mState.expanded.contains(pathOf(node.group))) {
                 List<Object> children = mState.childrenByPath.get(pathOf(node.group));
@@ -308,14 +333,20 @@ public class GroupTree implements View.OnClickListener {
             return;
         }
         node.loading = true;
+        // A spinner under the group while its children load (#242)
+        View spinner = mActivity.getLayoutInflater()
+                .inflate(R.layout.row_group_tree_loading, mContainer, false);
+        mContainer.addView(spinner, mContainer.indexOfChild(node.row) + 1);
         loadChildren(path, false, isSortByActivity(mActivity))
                 .compose(RxUtils::doInBackground)
                 .subscribe(children -> {
                     node.loading = false;
+                    mContainer.removeView(spinner);
                     mState.childrenByPath.put(path, children);
                     showChildren(node, children);
                 }, error -> {
                     node.loading = false;
+                    mContainer.removeView(spinner);
                     Toast.makeText(mActivity, R.string.group_tree_loading_failed,
                             Toast.LENGTH_SHORT).show();
                 });

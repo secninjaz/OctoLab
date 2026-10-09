@@ -118,6 +118,7 @@
             android:theme="@style/BottomSheetTheme"
             android:windowSoftInputMode="stateHidden" />
         <activity android:name=".activities.ForkListActivity" android:exported="false" />
+        <activity android:name=".activities.UserProjectListActivity" android:exported="false" />
         <activity android:name=".activities.FollowerFollowingListActivity" android:exported="false" />
         <activity android:name=".activities.GistActivity" android:exported="false" />
         <activity android:name=".activities.GistListActivity" android:exported="false" />

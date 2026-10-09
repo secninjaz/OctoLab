@@ -23,6 +23,21 @@ public interface GitLabUserService {
 
     // Search users — GET /users?username=xxx returns a list; take the first element for exact match.
     // Also accepts ?search=xxx for partial name/email matching.
+    // Users matching a search term, e.g. an email (public emails only, unless admin) (#244)
+    @GET("users")
+    Single<Response<List<GitLabUser>>> searchUsersByTerm(
+            @Query("search") String term,
+            @Query("per_page") int perPage
+    );
+
+    // A project's commits by one author (name or email), newest first (#244)
+    @GET("projects/{id}/repository/commits")
+    Single<Response<List<com.gl4a.gitlab.model.GitLabCommit>>> getCommitsByAuthor(
+            @Path(value = "id", encoded = true) String encodedProjectPath,
+            @Query("author") String author,
+            @Query("per_page") int perPage
+    );
+
     @GET("users")
     Single<Response<List<GitLabUser>>> searchUsers(
             @Query("username") String username,
@@ -50,6 +65,15 @@ public interface GitLabUserService {
     @GET("users/{id}/contributed_projects")
     Single<Response<List<GitLabProject>>> getContributedProjects(
             @Path("id") long userId,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
+    // Direct memberships of a user; GitLab allows this for administrators only (#232)
+    @GET("users/{id}/memberships")
+    Single<Response<List<com.gl4a.gitlab.model.GitLabMembership>>> getMemberships(
+            @Path("id") long userId,
+            @Query("type") String type,
             @Query("page") int page,
             @Query("per_page") int perPage
     );

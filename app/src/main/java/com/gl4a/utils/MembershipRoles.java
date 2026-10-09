@@ -40,9 +40,51 @@ public final class MembershipRoles {
         mRoles = roles;
     }
 
+    /**
+     * Another user's roles, from their memberships: full path → access level name
+     * ("MAINTAINER"). Items inside a group inherit its role, as for the viewer (#240).
+     */
+    public static MembershipRoles of(Map<String, String> rolesByPath) {
+        Map<String, String> roles = new HashMap<>();
+        for (Map.Entry<String, String> e : rolesByPath.entrySet()) {
+            if (e.getKey() != null && e.getValue() != null) {
+                roles.put(e.getKey().toLowerCase(), e.getValue());
+            }
+        }
+        return new MembershipRoles(roles);
+    }
+
+    private static MembershipRoles sCached;
+    private static String sCachedLogin;
+    private static long sCachedAt;
+    private static final long CACHE_MS = 5 * 60 * 1000;
+
+    /**
+     * {@link #load()}, reused for 5 minutes for the same account, so that every project list
+     * can show role badges without loading all memberships again (#233).
+     */
+    public static synchronized Single<MembershipRoles> loadCached() {
+        String login = Gl4Application.get().getAuthLogin();
+        if (sCached != null && login != null && login.equals(sCachedLogin)
+                && System.currentTimeMillis() - sCachedAt < CACHE_MS) {
+            return Single.just(sCached);
+        }
+        return load();
+    }
+
+    private static synchronized void remember(MembershipRoles roles) {
+        if (!roles.mRoles.isEmpty()) {
+            sCached = roles;
+            sCachedLogin = Gl4Application.get().getAuthLogin();
+            sCachedAt = System.currentTimeMillis();
+        }
+    }
+
     /** Emits empty roles (no badges) if GraphQL is unavailable or the query fails. */
     public static Single<MembershipRoles> load() {
         return Single.fromCallable(MembershipRoles::loadAll)
+                // A fresh load also refreshes what loadCached() hands out (#242)
+                .doOnSuccess(MembershipRoles::remember)
                 .onErrorReturn(error -> {
                     Log.d(Gl4Application.LOG_TAG, "Membership roles unavailable", error);
                     return new MembershipRoles(Collections.emptyMap());
@@ -113,6 +155,11 @@ public final class MembershipRoles {
             if (slash <= 0) return null;
             path = path.substring(0, slash);
         }
+    }
+
+    /** A GraphQL access level name ("MAINTAINER", …) in words; null for none (#233). */
+    public static String labelForName(Context context, String role) {
+        return role != null ? label(context, role) : null;
     }
 
     private static String label(Context context, String role) {

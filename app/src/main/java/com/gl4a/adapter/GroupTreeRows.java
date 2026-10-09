@@ -26,6 +26,14 @@ public final class GroupTreeRows {
     /** @param expandable show the chevron slot (tree); false for flat lists */
     public static void bind(View row, @Nullable GitLabGroup group, @Nullable GitLabProject project,
             int depth, boolean expandable, @Nullable MembershipRoles roles) {
+        String fullPath = group != null ? group.fullPath : project.pathWithNamespace;
+        bind(row, group, project, depth, expandable,
+                roles != null ? roles.labelFor(row.getContext(), fullPath) : null);
+    }
+
+    /** As above, with the role badge given, e.g. another user's role on their profile (#236). */
+    public static void bind(View row, @Nullable GitLabGroup group, @Nullable GitLabProject project,
+            int depth, boolean expandable, @Nullable String roleLabel) {
         Context context = row.getContext();
         int indentPx = Math.round(24 * context.getResources().getDisplayMetrics().density);
 
@@ -65,7 +73,6 @@ public final class GroupTreeRows {
         if (visibilityRes != 0) visibilityIcon.setImageResource(visibilityRes);
 
         TextView role = row.findViewById(R.id.tv_role);
-        String roleLabel = roles != null ? roles.labelFor(context, fullPath) : null;
         role.setVisibility(roleLabel != null ? View.VISIBLE : View.GONE);
         role.setText(roleLabel);
 

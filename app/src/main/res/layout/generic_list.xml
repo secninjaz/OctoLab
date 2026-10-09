@@ -18,6 +18,6 @@
         android:visibility="gone"
         app:rfs_barColor="@android:color/transparent"
         app:rfs_handleNormalColor="?colorScrollbarThumb"
-        app:rfs_handlePressedColor="?colorPrimary" />
+        app:rfs_handlePressedColor="@color/link_text" />
 
 </FrameLayout>

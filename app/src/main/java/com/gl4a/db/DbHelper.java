@@ -13,7 +13,7 @@ public class DbHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "gl4adb.db";
     // Pre-GitLab-port name, still the live file on upgrading installs.
     private static final String LEGACY_DATABASE_NAME = "gh4adb.db";
-    private static final int DATABASE_VERSION = 5;
+    private static final int DATABASE_VERSION = 6;
 
     static final String BOOKMARKS_TABLE = "bookmarks";
     static final String SUGGESTIONS_TABLE = "suggestions";
@@ -65,6 +65,9 @@ public class DbHelper extends SQLiteOpenHelper {
         if (oldVersion < 5) {
             addBookmarksAccountColumn(db);
         }
+        if (oldVersion >= 2 && oldVersion < 6) {
+            addSuggestionsAccountColumn(db);
+        }
     }
 
     private void createBookmarksTable(SQLiteDatabase db, String tableName) {
@@ -88,7 +91,22 @@ public class DbHelper extends SQLiteOpenHelper {
                 + "type integer not null, "
                 + "suggestion text, "
                 + "date long, "
-                + "unique (type, suggestion) on conflict replace);");
+                + "account text not null default '', "
+                + "unique (account, type, suggestion) on conflict replace);");
+    }
+
+    /**
+     * Suggestions per account, like bookmarks (#237). The unique key changes too, so the table
+     * is rebuilt; existing history goes to the account active during the upgrade.
+     */
+    private void addSuggestionsAccountColumn(SQLiteDatabase db) {
+        String account = com.gl4a.Gl4Application.get().getAuthLogin();
+        db.execSQL("ALTER TABLE " + SUGGESTIONS_TABLE + " RENAME TO suggestions_old;");
+        createSuggestionsTable(db);
+        db.execSQL("INSERT INTO " + SUGGESTIONS_TABLE + " (type, suggestion, date, account) "
+                + "SELECT type, suggestion, date, ? FROM suggestions_old;",
+                new Object[] { account != null ? account : "" });
+        db.execSQL("DROP TABLE suggestions_old;");
     }
 
     private void updateBookmarkUris(SQLiteDatabase db) {

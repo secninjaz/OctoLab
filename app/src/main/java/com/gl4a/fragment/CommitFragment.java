@@ -338,13 +338,8 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
     @Override
     public void onClick(View v) {
         if (v.getId() == R.id.iv_gravatar) {
-            GitLabUser user = mCommit.authorUser != null
-                    ? mCommit.authorUser
-                    : AvatarHandler.getCachedUserForEmail((String) v.getTag());
-            if (user != null) {
-                Intent intent = UserActivity.makeIntent(getActivity(), user);
-                if (intent != null) startActivity(intent);
-            }
+            // The one shared way to open a commit author's profile, as in commit lists (#244)
+            AvatarHandler.openGitAuthorProfile(getActivity(), mCommit);
         } else {
             GitLabDiff diff = (GitLabDiff) v.getTag();
             handleFileClick(diff);

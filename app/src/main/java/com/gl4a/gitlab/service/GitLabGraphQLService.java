@@ -31,6 +31,22 @@ public interface GitLabGraphQLService {
     Single<Response<GitLabMembershipsResponse>> getMemberships(@Body Map<String, Object> body);
 
     @POST("graphql")
+    Single<Response<com.gl4a.gitlab.model.GitLabProjectsByIdResponse>> getProjectsById(
+            @Body Map<String, Object> body);
+
+    @POST("graphql")
+    Single<Response<com.gl4a.gitlab.model.GitLabGroupsByIdResponse>> getGroupsById(
+            @Body Map<String, Object> body);
+
+    @POST("graphql")
+    Single<Response<com.gl4a.gitlab.model.GitLabCommitAuthorResponse>> getCommitAuthor(
+            @Body Map<String, Object> body);
+
+    // For queries whose fields are aliases (c0, c1, …), e.g. CommitAuthors (#244)
+    @POST("graphql")
+    Single<Response<Map<String, Object>>> rawQuery(@Body Map<String, Object> body);
+
+    @POST("graphql")
     Single<Response<GitLabGroupActivityResponse>> getGroupActivity(@Body Map<String, Object> body);
 
     @POST("graphql")

@@ -6,7 +6,11 @@ window.applyLineWrapping = function(enabled) {
         (document.head || document.body).appendChild(s);
     }
 
-    s.textContent = enabled ? 'pre { white-space: pre-wrap }' : '';
+    // Long unbroken text (e.g. a URL) has to break too: otherwise it widens the whole page past
+    // the screen and the other lines wrap at that width, cut off at the edge (#223)
+    s.textContent = enabled
+            ? 'pre { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word }'
+            : '';
 };
 
 window.addClickListeners = function() {

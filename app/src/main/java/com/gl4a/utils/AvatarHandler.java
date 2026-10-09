@@ -82,6 +82,116 @@ public class AvatarHandler {
             new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Returns the resolved GitLabUser for a commit author email, or null if not yet loaded. */
+    /**
+     * A git author (commit author, contributor): the avatar of the GitLab account with that
+     * email, else Gravatar, else initials. The one way to show a git author (#239).
+     */
+    public static void assignGitAuthorAvatar(ImageView view, String name, String email) {
+        GitLabUser author = new GitLabUser();
+        author.name = name;
+        author.username = email;
+        author.email = email;
+        assignAvatar(view, author);
+    }
+
+    /**
+     * Opens the profile of the GitLab account behind a git author: the given account if known,
+     * else the one already found for the email, else asks GitLab (#244). The one way to open a
+     * git author's profile, used by Commits and Contributors (#239).
+     *
+     * @param projectPath the project the author committed to, to ask GitLab which account it
+     *     links the commit to (works for private emails too); may be null
+     * @param sha one of the author's commits; if null, one is looked up by the author's email
+     */
+    public static void openGitAuthorProfile(Context context, @Nullable GitLabUser known,
+            String email, @Nullable String projectPath, long projectId, @Nullable String sha) {
+        GitLabUser user = known != null ? known : getCachedUserForEmail(email);
+        if (user != null) {
+            openProfile(context, user);
+            return;
+        }
+        io.reactivex.Single.fromCallable(() -> resolveGitAuthor(email, projectPath, projectId, sha))
+                .subscribeOn(io.reactivex.schedulers.Schedulers.io())
+                .observeOn(io.reactivex.android.schedulers.AndroidSchedulers.mainThread())
+                .subscribe(found -> {
+                    if (email != null) {
+                        sEmailUserCache.put(email.toLowerCase(java.util.Locale.ROOT).trim(),
+                                found);
+                    }
+                    openProfile(context, found);
+                }, error -> android.widget.Toast.makeText(context,
+                        com.gl4a.R.string.git_author_no_account,
+                        android.widget.Toast.LENGTH_SHORT).show());
+    }
+
+    /**
+     * A commit's author, from a commit list or the commit screen: the project path comes from
+     * the commit's own web URL (GitLab's), never from display names such as "F-Droid/Data",
+     * which GitLab can't look up (#244).
+     */
+    public static void openGitAuthorProfile(Context context,
+            com.gl4a.gitlab.model.GitLabCommit commit) {
+        String[] project = ApiHelpers.projectFromWebUrl(commit.webUrl);
+        openGitAuthorProfile(context, commit.authorUser, commit.authorEmail,
+                project != null ? project[0] + "/" + project[1] : null, 0, commit.sha());
+    }
+
+    private static void openProfile(Context context, GitLabUser user) {
+        android.content.Intent intent = com.gl4a.activities.UserActivity.makeIntent(context, user);
+        if (intent != null) context.startActivity(intent);
+    }
+
+    /** Blocking. Throws if GitLab links the author to no account the viewer can see. */
+    private static GitLabUser resolveGitAuthor(String email, @Nullable String projectPath,
+            long projectId, @Nullable String sha) throws Exception {
+        com.gl4a.gitlab.service.GitLabUserService users = com.gl4a.ServiceFactory.get(
+                com.gl4a.gitlab.service.GitLabUserService.class, false);
+        String username = null;
+        if (projectPath == null && projectId > 0) {
+            // The project's real path from GitLab, as GraphQL needs it
+            com.gl4a.gitlab.model.GitLabProject project = com.gl4a.ServiceFactory
+                    .get(com.gl4a.gitlab.service.GitLabProjectService.class, false)
+                    .getProject(projectId).blockingGet().body();
+            if (project != null) projectPath = project.pathWithNamespace;
+        }
+        // 1. GitLab's own link from the commit to an account, as on GitLab web
+        if (projectPath != null) {
+            String commit = sha;
+            if (commit == null && email != null) {
+                java.util.List<com.gl4a.gitlab.model.GitLabCommit> commits = users
+                        .getCommitsByAuthor(android.net.Uri.encode(projectPath), email, 1)
+                        .blockingGet().body();
+                if (commits != null && !commits.isEmpty()) commit = commits.get(0).id;
+            }
+            if (commit != null) {
+                java.util.Map<String, Object> variables = new java.util.HashMap<>();
+                variables.put("path", projectPath);
+                variables.put("ref", commit);
+                java.util.Map<String, Object> body = new java.util.HashMap<>();
+                body.put("query", "query($path: ID!, $ref: String!) { project(fullPath: $path)"
+                        + " { repository { commit(ref: $ref) { author { username } } } } }");
+                body.put("variables", variables);
+                com.gl4a.gitlab.model.GitLabCommitAuthorResponse response = com.gl4a.ServiceFactory
+                        .getGraphQL(com.gl4a.gitlab.service.GitLabGraphQLService.class)
+                        .getCommitAuthor(body).blockingGet().body();
+                if (response != null) username = response.username();
+            }
+        }
+        // 2. The email itself (public emails only, unless the viewer is an admin)
+        if (username == null && email != null) {
+            java.util.List<GitLabUser> found = users.searchUsersByTerm(email, 1)
+                    .blockingGet().body();
+            if (found != null && !found.isEmpty()) return found.get(0);
+        }
+        if (username == null) throw new IllegalStateException("No account for " + email);
+        // 3. The account itself, by username
+        java.util.List<GitLabUser> byName = users.searchUsers(username, 1, 1).blockingGet().body();
+        if (byName == null || byName.isEmpty()) {
+            throw new IllegalStateException("No account " + username);
+        }
+        return byName.get(0);
+    }
+
     public static GitLabUser getCachedUserForEmail(String email) {
         if (email == null || email.isEmpty()) return null;
         return sEmailUserCache.get(email.toLowerCase(java.util.Locale.ROOT).trim());
@@ -220,8 +330,24 @@ public class AvatarHandler {
      * Like {@link #assignAvatar} but uses a rounded-rectangle clip (20% corner radius) instead
      * of a full circle. Use for project/group logos whose content extends to the image corners.
      */
-    private static void assignAvatarLogo(ImageView view, String name, long id, String url) {
-        assignAvatarInternal(new ImageViewDelegate(view), name, id, url, null, true);
+    private static void assignAvatarLogo(ImageView view, String name, long key, String url) {
+        assignAvatarInternal(new ImageViewDelegate(view), name, key, url, null, true);
+    }
+
+    // Cache keys: users by their ID; group logos, project logos and email avatars each in a range
+    // of their own, so a user, a group and a project with the same number never share a cached
+    // bitmap or a request (a group's logo showed user #5's missing avatar, #234)
+    private static final long GROUP_LOGO_KEYS = 1L << 42;
+    private static final long PROJECT_LOGO_KEYS = 2L << 42;
+    private static final long EMAIL_KEYS = 3L << 42;
+    private static final long KEY_ID_MASK = (1L << 42) - 1;
+
+    private static long groupLogoKey(long groupId) {
+        return GROUP_LOGO_KEYS + groupId;
+    }
+
+    private static long projectLogoKey(long projectId) {
+        return PROJECT_LOGO_KEYS + projectId;
     }
 
     /**
@@ -236,8 +362,8 @@ public class AvatarHandler {
             return;
         }
         // Derive a stable, always-positive cache key so the userId <= 0 guard is bypassed.
-        long cacheId = ((long) email.toLowerCase(java.util.Locale.ROOT).trim().hashCode()
-                & 0x7FFF_FFFFL) + 1L;
+        long cacheId = EMAIL_KEYS + ((long) email.toLowerCase(java.util.Locale.ROOT).trim()
+                .hashCode() & 0x7FFF_FFFFL) + 1L;
 
         ImageViewDelegate delegate = new ImageViewDelegate(view);
         removeOldRequest(delegate);
@@ -353,8 +479,9 @@ public class AvatarHandler {
     }
 
     private static long inlineLogoId(com.gl4a.gitlab.model.GitLabProject project) {
+        // A project's own logo, else its group's: the same key as the group's own logo
         return project.avatarUrl != null && !project.avatarUrl.isEmpty()
-                ? project.id : project.namespace.id;
+                ? projectLogoKey(project.id) : groupLogoKey(project.namespace.id);
     }
 
     /**
@@ -377,7 +504,7 @@ public class AvatarHandler {
         if (group.avatarUrl != null && !group.avatarUrl.isEmpty() && group.id > 0) {
             String groupAvatarUrl = com.gl4a.Gl4Application.get().getApiBaseUrl()
                     + "groups/" + group.id + "/avatar";
-            assignAvatarLogo(view, group.name, group.id, groupAvatarUrl);
+            assignAvatarLogo(view, group.name, groupLogoKey(group.id), groupAvatarUrl);
         } else {
             view.setImageDrawable(new DefaultAvatarDrawable(group.name, null, true));
         }
@@ -582,7 +709,9 @@ public class AvatarHandler {
             return;
         }
 
-        view.setDrawable(new DefaultAvatarDrawable(userName, userId, isLogo));
+        // A logo's key is offset (see GROUP_LOGO_KEYS); the tile uses the plain ID as before
+        view.setDrawable(new DefaultAvatarDrawable(userName,
+                isLogo ? (userId & KEY_ID_MASK) : userId, isLogo));
         if (userId <= 0) {
             return;
         }

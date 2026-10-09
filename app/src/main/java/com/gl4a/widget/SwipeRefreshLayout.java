@@ -49,7 +49,21 @@ public class SwipeRefreshLayout extends androidx.swiperefreshlayout.widget.Swipe
         if (mChildScrollDelegate != null) {
             return mChildScrollDelegate.canChildScrollUp();
         }
-        return super.canChildScrollUp();
+        // No delegate: any scrolling view inside that isn't at its top means "scroll up", not
+        // "refresh", so screens whose scroll view isn't the direct child work too (#172, #241)
+        return super.canChildScrollUp() || anyCanScrollUp(this);
+    }
+
+    private static boolean anyCanScrollUp(View view) {
+        if (view.getVisibility() != View.VISIBLE) return false;
+        if (view.canScrollVertically(-1)) return true;
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                if (anyCanScrollUp(group.getChildAt(i))) return true;
+            }
+        }
+        return false;
     }
 
     @Override

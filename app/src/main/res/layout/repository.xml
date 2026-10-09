@@ -22,40 +22,64 @@
                 android:paddingTop="@dimen/content_padding"
                 android:paddingBottom="@dimen/content_padding">
 
-                <com.gl4a.widget.LinkHandlingTextView
-                    android:id="@+id/tv_repo_name"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:paddingLeft="@dimen/content_padding"
-                    android:paddingRight="@dimen/content_padding"
-                    android:textAppearance="@style/TextAppearance.HeaderTitle"
-                    app:needsLinkHandling="true"
-                    tools:text="Username/Repository" />
-
-                <com.gl4a.widget.LinkHandlingTextView
-                    android:id="@+id/tv_desc"
+                <!-- The project's logo before its path and URL, as in project lists (#235) -->
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:autoLink="web"
-                    android:paddingLeft="@dimen/content_padding"
-                    android:paddingRight="@dimen/content_padding"
-                    android:textAppearance="?android:attr/textAppearanceSmall"
-                    android:textIsSelectable="true"
-                    app:needsLinkHandling="true"
-                    tools:text="Repository description" />
+                    android:orientation="horizontal"
+                    android:paddingLeft="@dimen/content_padding">
 
-                <com.gl4a.widget.LinkHandlingTextView
-                    android:id="@+id/tv_url"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:autoLink="web"
-                    android:paddingLeft="@dimen/content_padding"
-                    android:paddingRight="@dimen/content_padding"
-                    android:textAppearance="?android:attr/textAppearanceSmall"
-                    android:textColorLink="?android:attr/textColorLink"
-                    app:needsLinkHandling="true"
-                    tools:text="https://example.com" />
+                    <com.gl4a.widget.FixedSizeImageView
+                        android:id="@+id/iv_repo_logo"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="@drawable/avatar_frame"
+                        tools:src="@drawable/default_avatar" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <com.gl4a.widget.LinkHandlingTextView
+                            android:id="@+id/tv_repo_name"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:paddingLeft="12dp"
+                            android:paddingRight="@dimen/content_padding"
+                            android:textAppearance="@style/TextAppearance.HeaderTitle"
+                            app:needsLinkHandling="true"
+                            tools:text="Username/Repository" />
+
+                        <com.gl4a.widget.LinkHandlingTextView
+                            android:id="@+id/tv_desc"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:autoLink="web"
+                            android:paddingLeft="12dp"
+                            android:paddingRight="@dimen/content_padding"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textIsSelectable="true"
+                            app:needsLinkHandling="true"
+                            tools:text="Repository description" />
+
+                        <com.gl4a.widget.LinkHandlingTextView
+                            android:id="@+id/tv_url"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:autoLink="web"
+                            android:paddingLeft="12dp"
+                            android:paddingRight="@dimen/content_padding"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            android:textColorLink="?android:attr/textColorLink"
+                            app:needsLinkHandling="true"
+                            tools:text="https://example.com" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
 
                 <Space
                     android:layout_width="match_parent"

@@ -81,7 +81,8 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
     };
     private static final String SUGGESTION_SELECTION =
             SuggestionsProvider.Columns.TYPE + " = ? AND " +
-                    SuggestionsProvider.Columns.SUGGESTION + " LIKE ?";
+                    SuggestionsProvider.Columns.SUGGESTION + " LIKE ? AND " +
+                    SuggestionsProvider.Columns.ACCOUNT + " = ?";
     private static final String SUGGESTION_ORDER = SuggestionsProvider.Columns.DATE + " DESC";
 
     private static final String STATE_KEY_QUERY = "query";
@@ -213,6 +214,7 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
             cv.put(SuggestionsProvider.Columns.TYPE, mSelectedSearchType);
             cv.put(SuggestionsProvider.Columns.SUGGESTION, query);
             cv.put(SuggestionsProvider.Columns.DATE, System.currentTimeMillis());
+            cv.put(SuggestionsProvider.Columns.ACCOUNT, currentAccount());
 
             new Thread() {
                 @Override
@@ -251,13 +253,15 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
         if (cursor.moveToPosition(position)) {
             if (position == cursor.getCount() - 1) {
                 final int type = mSelectedSearchType;
+                final String account = currentAccount();
                 final ContentResolver cr = getActivity().getContentResolver();
                 new Thread() {
                     @Override
                     public void run() {
                         cr.delete(SuggestionsProvider.Columns.CONTENT_URI,
-                                SuggestionsProvider.Columns.TYPE + " = ?",
-                                new String[] { String.valueOf(type) });
+                                SuggestionsProvider.Columns.TYPE + " = ? AND "
+                                        + SuggestionsProvider.Columns.ACCOUNT + " = ?",
+                                new String[] { String.valueOf(type), account });
                     }
                 }.start();
             } else {
@@ -290,7 +294,14 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
         }
         return getContext().getContentResolver().query(SuggestionsProvider.Columns.CONTENT_URI,
                 SUGGESTION_PROJECTION, SUGGESTION_SELECTION,
-                new String[] { String.valueOf(mSelectedSearchType), query + "%" }, SUGGESTION_ORDER);
+                new String[] { String.valueOf(mSelectedSearchType), query + "%", currentAccount() },
+                SUGGESTION_ORDER);
+    }
+
+    /** Search history is per account, the same key as bookmarks (#237). */
+    private static String currentAccount() {
+        String account = com.gl4a.Gl4Application.get().getAuthLogin();
+        return account != null ? account : "";
     }
 
     private void openFileViewer(GitLabSearchResult.GitLabBlob result, int matchIndex) {

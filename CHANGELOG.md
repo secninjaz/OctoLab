@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-09
+
+### Added
+- Profiles show Personal projects, Contributed projects and, for admins, Member of: the user's groups as an expandable tree with their roles, and a full list with every group expanded (#232, #236, #240)
+- Role badges (Owner, Maintainer…) on all project lists; on a profile they show that user's role (#233)
+- Explore's tabs list the projects active today, this week, this month or this year, most-starred first, with a new Year tab (#228)
+- The account chooser for links shows each account's avatar and name in bold (#229)
+- The project screen shows the project's logo (#235)
+
+### Changed
+- All project lists use the same rows as Projects (#233)
+- Usernames are fixed-width everywhere, and a display name always shows next to its username (#225, #231)
+- Commit authors are shown as the GitLab accounts GitLab links them to, with their avatar and a tap to their profile, in commit lists, commit screens and Contributors (#239, #244)
+- Collaborators include members through groups (#238)
+- Search suggestions are kept per account (#237)
+- New screenshots (#221)
+
+### Fixed
+- Long lines cut off in diffs (#223)
+- Markdown files showed ragged line breaks (#224)
+- Light theme: near-white text cursor, search icon, find-in-page bar, fast-scroll handle and toolbar controls (#226, #227, #230)
+- Group and project logos were sometimes missing or wrong (#234)
+- Pull-to-refresh fired while scrolling back up (#241)
+- No loading indicator when opening or expanding a group (#242)
+
 ## [1.4.0] - 2026-10-06
 
 ### Added

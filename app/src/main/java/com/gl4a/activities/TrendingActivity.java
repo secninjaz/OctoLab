@@ -10,7 +10,7 @@ import com.gl4a.fragment.TrendingFragment;
 
 public class TrendingActivity extends BaseFragmentPagerActivity {
     private static final int[] TITLES = new int[] {
-        R.string.trend_today, R.string.trend_week, R.string.trend_month
+        R.string.trend_today, R.string.trend_week, R.string.trend_month, R.string.trend_year
     };
 
     @Nullable
@@ -30,6 +30,7 @@ public class TrendingActivity extends BaseFragmentPagerActivity {
             case 0: return TrendingFragment.newInstance(TrendingFragment.TYPE_DAILY);
             case 1: return TrendingFragment.newInstance(TrendingFragment.TYPE_WEEKLY);
             case 2: return TrendingFragment.newInstance(TrendingFragment.TYPE_MONTHLY);
+            case 3: return TrendingFragment.newInstance(TrendingFragment.TYPE_YEARLY);
         }
         return null;
     }

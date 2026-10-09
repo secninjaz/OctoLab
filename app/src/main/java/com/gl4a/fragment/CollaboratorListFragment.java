@@ -35,7 +35,9 @@ public class CollaboratorListFragment extends PagedDataBaseFragment<GitLabUser> 
         final GitLabProjectService service =
                 ServiceFactory.get(GitLabProjectService.class, bypassCache);
         return SingleFactory.getProjectId(owner, repo)
-                .flatMap(projectId -> service.getMembers(projectId, page, 25))
+                // All members as GitLab shows them: direct, inherited from groups and invited;
+                // /members has direct ones only, so members via a group were missing (#238)
+                .flatMap(projectId -> service.getAllMembers(projectId, page, 25))
                 .map(response -> {
                     if (!response.isSuccessful() || response.body() == null) {
                         return Response.<GitLabPage<GitLabUser>>error(

@@ -118,7 +118,9 @@ public class StarredRepositoryListFragment extends PagedDataBaseFragment<GitLabP
 
     @Override
     protected RootAdapter<GitLabProject, ? extends RecyclerView.ViewHolder> onCreateAdapter() {
-        return new RepositoryAdapter(getActivity());
+        RepositoryAdapter adapter = new RepositoryAdapter(getActivity());
+        adapter.showViewerRoles(); // your role in each project, as in Groups (#233)
+        return adapter;
     }
 
     @Override

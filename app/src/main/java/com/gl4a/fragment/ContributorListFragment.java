@@ -36,6 +36,7 @@ public class ContributorListFragment extends PagedDataBaseFragment<GitLabContrib
         final GitLabProjectService service =
                 ServiceFactory.get(GitLabProjectService.class, bypassCache);
         return SingleFactory.getProjectId(repoOwner, repoName)
+                .doOnSuccess(projectId -> mProjectId = projectId)
                 .flatMap(projectId -> service.getContributors(projectId, page, 25))
                 .map(response -> {
                     if (!response.isSuccessful() || response.body() == null) {
@@ -60,6 +61,11 @@ public class ContributorListFragment extends PagedDataBaseFragment<GitLabContrib
 
     @Override
     public void onItemClick(GitLabContributor item) {
-        // GitLabContributor has no user account link — nothing to navigate to
+        // The GitLab account behind the contributor's email, as from a commit (#239)
+        // By project ID: owner/repo here may be display names, which GitLab can't look up (#244)
+        com.gl4a.utils.AvatarHandler.openGitAuthorProfile(getActivity(), null, item.email(),
+                null, mProjectId, null);
     }
+
+    private volatile long mProjectId;
 }

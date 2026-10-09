@@ -74,6 +74,7 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
     private FragmentFactory mFactory;
     private ImageView mAvatarView;
     private TextView mUserExtraView;
+    private TextView mUserNameView;
     private ImageView mDrawerSwitcher;
     private String mUserLogin;
     private GitLabUser mUserInfo;
@@ -302,9 +303,7 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
 
         mAvatarView = header.findViewById(R.id.avatar);
         mUserExtraView = header.findViewById(R.id.user_extra);
-
-        TextView userNameView = header.findViewById(R.id.user_name);
-        userNameView.setText(mUserLogin);
+        mUserNameView = header.findViewById(R.id.user_name);
 
         updateUserInfo();
 
@@ -564,8 +563,19 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         return R.id.notifications;
     }
 
+    /** Display name first, then "@username", like GitLab (#225). */
+    private void updateHeaderNames(String name) {
+        if (mUserNameView == null || mUserExtraView == null) return;
+        boolean hasName = !TextUtils.isEmpty(name) && !name.matches("\\*+");
+        mUserNameView.setText(hasName ? name : mUserLogin);
+        mUserExtraView.setText(ApiHelpers.formatUsername(mUserLogin));
+        mUserExtraView.setVisibility(hasName ? View.VISIBLE : View.GONE);
+    }
+
     private void updateUserInfo() {
         if (mUserInfo == null) {
+            // Until the profile loads, the name stored for the account
+            updateHeaderNames(Gl4Application.get().getNameForLogin(mUserLogin));
             // No user profile yet (network failed or still loading).
             // Use stored avatar URL and userId so the disk cache can show the
             // last-known avatar instead of falling back to initials.
@@ -583,14 +593,7 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         if (mAvatarView != null) {
             AvatarHandler.assignAvatar(mAvatarView, mUserInfo);
         }
-        if (mUserExtraView != null) {
-            if (TextUtils.isEmpty(mUserInfo.name())) {
-                mUserExtraView.setVisibility(View.GONE);
-            } else {
-                mUserExtraView.setText(mUserInfo.name());
-                mUserExtraView.setVisibility(View.VISIBLE);
-            }
-        }
+        updateHeaderNames(mUserInfo.name());
         mFactory.setUserInfo(mUserInfo);
     }
 
@@ -620,9 +623,8 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
                     continue;
                 }
 
-                String name = Gl4Application.get().getNameForLogin(login);
-                CharSequence label = !com.gl4a.utils.StringUtils.isBlank(name)
-                        ? name + " (@" + login + ")" : "@" + login;
+                CharSequence label = ApiHelpers.formatAccountLine(
+                        Gl4Application.get().getNameForLogin(login), login);
                 MenuItem item = mLeftDrawerMenu.add(R.id.other_accounts, id, Menu.NONE, label);
                 mOtherAccountLogins.put(id, login);
                 id++;

@@ -104,6 +104,21 @@
         <item name="boxStrokeErrorColor">@color/form_error</item>
         <!-- Focused stroke uses brand Purple 02p (#7759C2, 5.26:1) via link_text -->
         <item name="boxStrokeColor">@color/link_text</item>
+        <item name="materialThemeOverlay">@style/OctoLab.TextInputEditText.FilledBox</item>
+    </style>
+
+    <style name="OctoLab.TextInputLayout.OutlinedBox" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="materialThemeOverlay">@style/OctoLab.TextInputEditText.OutlinedBox</item>
+    </style>
+
+    <!-- Material colours a text field's cursor and selection handles with colorPrimary, which is
+         the toolbar's near-white grey here; use the link blue, as HeaderTheme does (#226) -->
+    <style name="OctoLab.TextInputEditText.FilledBox" parent="ThemeOverlay.MaterialComponents.TextInputEditText.FilledBox">
+        <item name="colorControlActivated">@color/link_text</item>
+    </style>
+
+    <style name="OctoLab.TextInputEditText.OutlinedBox" parent="ThemeOverlay.MaterialComponents.TextInputEditText.OutlinedBox">
+        <item name="colorControlActivated">@color/link_text</item>
     </style>
 
     <!-- Text buttons (OK/Cancel etc): use brand accent orange instead of colorPrimary (light grey=invisible).
@@ -116,6 +131,11 @@
     <!-- Popup/overflow menu overlay — light mode uses light (white bg, dark text).
          Night mode overrides this in values-night/themes.xml to Dark (dark bg, light text). -->
     <style name="AppTheme.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
+
+    <!-- Search fields: a hint magnifier that's visible on the light toolbar (#227) -->
+    <style name="OctoLab.SearchView" parent="Widget.AppCompat.SearchView">
+        <item name="searchHintIcon">@drawable/search_hint_icon</item>
+    </style>
 
     <!-- Toolbar overlay: dark text/icons on light grey primary (16.5:1 WCAG AA).
          Parent must be Light variant — ActionBar (without Light) inherits DarkActionBar white. -->

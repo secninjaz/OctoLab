@@ -50,6 +50,7 @@ import com.vdurmont.emoji.EmojiParser;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import io.reactivex.Single;
 import retrofit2.Response;
@@ -69,6 +70,8 @@ public class UserFragment extends LoadingFragmentBase implements
     private static final int ID_LOADER_REPO_LIST = 0;
     private static final int ID_LOADER_ORG_LIST = 1;
     private static final int ID_LOADER_ORG_MEMBER_COUNT = 2;
+    private static final int ID_LOADER_CONTRIBUTED = 3;
+    private static final int ID_LOADER_MEMBERSHIPS = 4;
 
     private GitLabUser mUser;
     private View mContentView;
@@ -94,6 +97,8 @@ public class UserFragment extends LoadingFragmentBase implements
     @Override
     public void onRefresh() {
         loadTopRepositories(true);
+        loadContributedProjects(true);
+        loadMemberships(true);
         loadGroupsIfUser(true);
     }
 
@@ -103,6 +108,8 @@ public class UserFragment extends LoadingFragmentBase implements
 
         fillData();
         loadTopRepositories(false);
+        loadContributedProjects(false);
+        loadMemberships(false);
         loadGroupsIfUser(false);
 
         setContentShown(true);
@@ -148,7 +155,8 @@ public class UserFragment extends LoadingFragmentBase implements
         // publicRepos() maps to public_projects_count which GitLab only returns for self.
         // Leave count as 0 initially — fillTopRepos() will update it once projects load.
         OverviewRow reposRow = mContentView.findViewById(R.id.repos_row);
-        reposRow.setText(getResources().getQuantityString(R.plurals.repository, 0, 0));
+        reposRow.setText(getResources().getQuantityString(
+                R.plurals.user_personal_project_count, 0, 0));
         reposRow.setClickIntent(RepositoryListActivity.makeIntent(getActivity(), mUser.login(), false));
 
         // GitLab does not expose a "type" field with bot/org distinction on the user model
@@ -160,8 +168,9 @@ public class UserFragment extends LoadingFragmentBase implements
         String displayName = ApiHelpers.getUserDisplayName(getActivity(), mUser);
         tvName.setText(displayName);
         TextView tvUsername = mContentView.findViewById(R.id.tv_username);
-        if (mUser.login() != null && !mUser.login().equals(displayName)) {
-            tvUsername.setText("@" + mUser.login());
+        // Shown even when it equals the display name, as GitLab does (#231)
+        if (mUser.login() != null) {
+            tvUsername.setText(ApiHelpers.formatUsername(mUser.login()));
             tvUsername.setVisibility(View.VISIBLE);
         } else {
             tvUsername.setVisibility(View.GONE);
@@ -195,6 +204,14 @@ public class UserFragment extends LoadingFragmentBase implements
 
         if (id == R.id.btn_repos) {
             intent = RepositoryListActivity.makeIntent(getActivity(), mUser.login(), false);
+        } else if (id == R.id.btn_contributed) {
+            intent = com.gl4a.activities.UserProjectListActivity.makeIntent(getActivity(),
+                    mUser.id, mUser.login(),
+                    com.gl4a.activities.UserProjectListActivity.TYPE_CONTRIBUTED);
+        } else if (id == R.id.btn_member_of) {
+            intent = com.gl4a.activities.UserProjectListActivity.makeIntent(getActivity(),
+                    mUser.id, mUser.login(),
+                    com.gl4a.activities.UserProjectListActivity.TYPE_MEMBER_OF);
         } else if (view.getTag() instanceof GitLabProject) {
             intent = RepositoryActivity.makeIntent(getActivity(), (GitLabProject) view.getTag());
         } else if (view.getTag() instanceof GitLabGroup) {
@@ -216,7 +233,7 @@ public class UserFragment extends LoadingFragmentBase implements
         // No follow toggle in GitLab
     }
 
-    private void fillTopRepos(Collection<GitLabProject> topRepos) {
+    private void fillTopRepos(Collection<GitLabProject> topRepos, Map<Long, String> roles) {
         View progress = mContentView.findViewById(R.id.pb_top_repos);
         LinearLayout ll = mContentView.findViewById(R.id.ll_top_repos);
         ll.removeAllViews();
@@ -225,28 +242,7 @@ public class UserFragment extends LoadingFragmentBase implements
 
         if (topRepos != null) {
             for (GitLabProject repo : topRepos) {
-                View rowView = inflater.inflate(R.layout.top_repo, null);
-                rowView.setOnClickListener(this);
-                rowView.setTag(repo);
-
-                TextView tvTitle = rowView.findViewById(R.id.tv_title);
-                tvTitle.setText(ApiHelpers.formatRepoName(getActivity(), repo));
-
-                TextView tvDesc = rowView.findViewById(R.id.tv_desc);
-                if (!StringUtils.isBlank(repo.description())) {
-                    tvDesc.setVisibility(View.VISIBLE);
-                    tvDesc.setText(EmojiParser.parseToUnicode(repo.description()));
-                } else {
-                    tvDesc.setVisibility(View.GONE);
-                }
-
-                TextView tvForks = rowView.findViewById(R.id.tv_forks);
-                tvForks.setText(String.valueOf(repo.forksCount()));
-
-                TextView tvStars = rowView.findViewById(R.id.tv_stars);
-                tvStars.setText(String.valueOf(repo.stargazersCount()));
-
-                ll.addView(rowView);
+                ll.addView(makeProjectRow(inflater, ll, repo, roles));
             }
         }
 
@@ -256,7 +252,7 @@ public class UserFragment extends LoadingFragmentBase implements
             btnMore.setVisibility(View.VISIBLE);
         } else {
             TextView hintView = (TextView) inflater.inflate(R.layout.hint_view, ll, false);
-            hintView.setText(R.string.user_no_repos);
+            hintView.setText(R.string.user_no_personal_projects);
             ll.addView(hintView);
         }
 
@@ -268,7 +264,8 @@ public class UserFragment extends LoadingFragmentBase implements
         if (topRepos != null) {
             OverviewRow reposRow = mContentView.findViewById(R.id.repos_row);
             int count = mRepoTotal >= 0 ? mRepoTotal : topRepos.size();
-            reposRow.setText(getResources().getQuantityString(R.plurals.repository, count, count));
+            reposRow.setText(getResources().getQuantityString(
+                    R.plurals.user_personal_project_count, count, count));
         }
     }
 
@@ -330,19 +327,16 @@ public class UserFragment extends LoadingFragmentBase implements
         GitLabProjectService service = ServiceFactory.get(GitLabProjectService.class, force, 5);
         Single<Response<List<GitLabProject>>> observable;
 
-        if (mIsSelf) {
-            observable = service.listProjects(true, 1, 5, "last_activity_at", "desc", null, false);
-        } else {
-            // Fix: GitLab GET /users/:id/projects requires a numeric user ID, not a username string.
-            // Use the GitLabUserService overload that accepts long userId.
-            com.gl4a.gitlab.service.GitLabUserService userService = ServiceFactory.get(
-                    com.gl4a.gitlab.service.GitLabUserService.class, force);
-            observable = userService.getUserProjects(mUser.id, 1, 5);
-        }
+        // Personal projects (the user's own namespace), also on your own profile, as on
+        // GitLab; projects you're a member of are under "Member of" (#232).
+        // GitLab GET /users/:id/projects needs the numeric user ID, not the username.
+        com.gl4a.gitlab.service.GitLabUserService userService = ServiceFactory.get(
+                com.gl4a.gitlab.service.GitLabUserService.class, force);
+        observable = userService.getUserProjects(mUser.id, 1, 5);
 
         observable
                 // The total travels with the list, so a cached result after rotation keeps it
-                .map(response -> android.util.Pair.create(ApiHelpers.throwOnFailure(response),
+                .map(response -> Preview.of(mUser.login(), ApiHelpers.throwOnFailure(response),
                         totalCount(response)))
                 .compose(makeLoaderSingle(ID_LOADER_REPO_LIST, force))
                 .doOnSubscribe(disposable -> {
@@ -350,13 +344,148 @@ public class UserFragment extends LoadingFragmentBase implements
                     mContentView.findViewById(R.id.ll_top_repos).setVisibility(View.GONE);
                 })
                 .subscribe(result -> {
-                    mRepoTotal = result.second;
-                    fillTopRepos(result.first);
+                    mRepoTotal = result.total;
+                    fillTopRepos(result.projects, result.roles);
                 }, e -> {
                     // Non-fatal: hide the repos section if the API is restricted on this instance
                     mContentView.findViewById(R.id.pb_top_repos).setVisibility(View.GONE);
                     mContentView.findViewById(R.id.ll_top_repos).setVisibility(View.GONE);
                 });
+    }
+
+    /** The Projects section's row, with the viewed user's role in the project (#233). */
+    private View makeProjectRow(LayoutInflater inflater, ViewGroup parent, GitLabProject repo,
+            Map<Long, String> roles) {
+        View row = com.gl4a.adapter.RepositoryAdapter.inflateRow(inflater, parent);
+        com.gl4a.adapter.RepositoryAdapter.bindRow(requireContext(), row, repo,
+                com.gl4a.utils.MembershipRoles.labelForName(requireContext(), roles.get(repo.id)));
+        row.setOnClickListener(this);
+        row.setTag(repo);
+        return row;
+    }
+
+    /** A preview's projects, GitLab's total and the viewed user's role in each (#233). */
+    private static class Preview {
+        final List<GitLabProject> projects;
+        final int total;
+        final Map<Long, String> roles;
+
+        Preview(List<GitLabProject> projects, int total, Map<Long, String> roles) {
+            this.projects = projects;
+            this.total = total;
+            this.roles = roles;
+        }
+
+        /** Blocking: loads the user's roles in these projects with one query. */
+        static Preview of(String login, List<GitLabProject> projects, int total) {
+            List<Long> ids = new java.util.ArrayList<>();
+            for (GitLabProject p : projects) ids.add(p.id);
+            return new Preview(projects, total,
+                    com.gl4a.utils.UserProjectRoles.load(login, ids).roles);
+        }
+    }
+
+    /**
+     * Fills one of the #232 sections: GitLab's total in the header, up to 5 rows, and
+     * "View more" when there are any.
+     */
+    private void fillSection(int cardId, int labelId, int listId, int progressId, int moreId,
+            @androidx.annotation.StringRes int titleRes, int total, List<View> rows,
+            @androidx.annotation.StringRes int emptyRes) {
+        TextView label = mContentView.findViewById(labelId);
+        LinearLayout ll = mContentView.findViewById(listId);
+        View progress = mContentView.findViewById(progressId);
+        View more = mContentView.findViewById(moreId);
+        mContentView.findViewById(cardId).setVisibility(View.VISIBLE);
+
+        int count = total >= 0 ? total : rows.size();
+        label.setText(getString(R.string.user_section_with_count, getString(titleRes), count));
+        ll.removeAllViews();
+        for (View row : rows) ll.addView(row);
+        if (rows.isEmpty()) {
+            TextView hintView = (TextView) getLayoutInflater().inflate(R.layout.hint_view, ll, false);
+            hintView.setText(emptyRes);
+            ll.addView(hintView);
+        }
+        more.setOnClickListener(this);
+        more.setVisibility(rows.isEmpty() ? View.GONE : View.VISIBLE);
+        ll.setVisibility(View.VISIBLE);
+        progress.setVisibility(View.GONE);
+    }
+
+    private void loadContributedProjects(boolean force) {
+        ServiceFactory.get(com.gl4a.gitlab.service.GitLabUserService.class, force, 5)
+                .getContributedProjects(mUser.id, 1, 5)
+                .map(response -> Preview.of(mUser.login(), ApiHelpers.throwOnFailure(response),
+                        totalCount(response)))
+                .compose(makeLoaderSingle(ID_LOADER_CONTRIBUTED, force))
+                .subscribe(result -> fillProjectSection(R.id.contributed_card,
+                        R.id.tv_contributed_label, R.id.ll_contributed, R.id.pb_contributed,
+                        R.id.btn_contributed, R.string.user_contributed_projects, result,
+                        R.string.user_no_contributed_projects),
+                        e -> mContentView.findViewById(R.id.contributed_card)
+                                .setVisibility(View.GONE));
+    }
+
+    private void fillProjectSection(int cardId, int labelId, int listId, int progressId,
+            int moreId, @androidx.annotation.StringRes int titleRes, Preview preview,
+            @androidx.annotation.StringRes int emptyRes) {
+        LinearLayout ll = mContentView.findViewById(listId);
+        List<View> rows = new java.util.ArrayList<>();
+        for (GitLabProject project : preview.projects) {
+            rows.add(makeProjectRow(getLayoutInflater(), ll, project, preview.roles));
+        }
+        fillSection(cardId, labelId, listId, progressId, moreId, titleRes, preview.total, rows,
+                emptyRes);
+    }
+
+    /**
+     * "Member of": GitLab only answers this for admins; when it refuses, it stays hidden.
+     * Memberships carry only project IDs; their projects come from one query (#233).
+     */
+    /**
+     * "Member of": the user's groups as the Groups screen's tree, expandable, then their other
+     * direct projects, all with their roles (#236, #240). GitLab only answers this for admins;
+     * when it refuses, the section stays hidden.
+     */
+    private void loadMemberships(boolean force) {
+        io.reactivex.Single.fromCallable(() ->
+                        com.gl4a.utils.UserMemberships.load(mUser.id, mUser.login(), force))
+                .compose(makeLoaderSingle(ID_LOADER_MEMBERSHIPS, force))
+                .subscribe(this::fillMemberOf, e -> mContentView.findViewById(R.id.member_of_card)
+                        .setVisibility(View.GONE));
+    }
+
+    private static final int MEMBER_OF_PREVIEW_PROJECTS = 5;
+
+    private void fillMemberOf(com.gl4a.utils.UserMemberships memberOf) {
+        mContentView.findViewById(R.id.member_of_card).setVisibility(View.VISIBLE);
+        mContentView.findViewById(R.id.pb_member_of).setVisibility(View.GONE);
+        ((TextView) mContentView.findViewById(R.id.tv_member_of_label)).setText(getString(
+                R.string.user_member_of_counts, getString(R.string.user_member_of),
+                getResources().getQuantityString(R.plurals.user_group_count,
+                        memberOf.groups.size(), memberOf.groups.size()),
+                getResources().getQuantityString(R.plurals.user_project_count,
+                        memberOf.projectCount, memberOf.projectCount)));
+
+        List<Object> roots = new java.util.ArrayList<>(memberOf.groups);
+        roots.addAll(memberOf.otherProjects.subList(0,
+                Math.min(MEMBER_OF_PREVIEW_PROJECTS, memberOf.otherProjects.size())));
+        new com.gl4a.widget.GroupTree(requireActivity(),
+                mContentView.findViewById(R.id.ll_member_of_tree), new com.gl4a.widget.GroupTree.State())
+                .setRoots(roots, memberOf.roles);
+
+        LinearLayout ll = mContentView.findViewById(R.id.ll_member_of);
+        ll.removeAllViews();
+        if (roots.isEmpty()) {
+            TextView hintView = (TextView) getLayoutInflater().inflate(R.layout.hint_view, ll, false);
+            hintView.setText(R.string.user_no_memberships);
+            ll.addView(hintView);
+        }
+        ll.setVisibility(roots.isEmpty() ? View.VISIBLE : View.GONE);
+        View more = mContentView.findViewById(R.id.btn_member_of);
+        more.setOnClickListener(this);
+        more.setVisibility(roots.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
     private void loadGroupsIfUser(boolean force) {

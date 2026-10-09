@@ -114,7 +114,7 @@ public class GroupListFragment extends Fragment implements BaseActivity.Refresha
         if (mLoad != null) mLoad.dispose();
         final boolean byActivity = GroupTree.isSortByActivity(requireContext());
         mLoad = Single.fromCallable(() -> loadAllGroups(force, byActivity))
-                .zipWith(MembershipRoles.load(), Data::new)
+                .zipWith(force ? MembershipRoles.load() : MembershipRoles.loadCached(), Data::new)
                 .compose(RxUtils::doInBackground)
                 .subscribe(this::show, error -> {
                     View v = getView();

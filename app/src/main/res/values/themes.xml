@@ -65,6 +65,7 @@
         <item name="colorOnSurface">@color/theme_text_primary</item>
         <item name="colorError">@color/form_error</item>
         <item name="textInputStyle">@style/OctoLab.TextInputLayout</item>
+        <item name="searchViewStyle">@style/OctoLab.SearchView</item>
     </style>
 
     <style name="TransparentTheme" parent="AppTheme">
@@ -86,6 +87,9 @@
         <item name="colorSecondary">@color/link_text</item>
         <!-- Cursor/activated control colour — must be visible on light bg -->
         <item name="colorControlActivated">@color/link_text</item>
+        <!-- Menus are inflated with this theme, whose parent is the dark one: without this,
+             dropdown arrows and search underlines in the toolbar come out white (#230) -->
+        <item name="colorControlNormal">@color/theme_text_primary</item>
         <!-- AppCompat uses colorAccent for text selection handles (waterdrop) -->
         <item name="colorAccent">@color/link_text</item>
         <!-- Null cursor drawable = cursor inherits text colour (#1F1E24 dark) -->

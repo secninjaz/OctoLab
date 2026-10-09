@@ -48,8 +48,9 @@ secret_detection:
   variables:
     GIT_DEPTH: 0
     GIT_STRATEGY: clone
-    # release.sh was remediated (credential removed, history rewritten).
-    # Exclude until gitaly server-side GC purges the stale unreferenced objects.
+    # release.sh is deleted, but a revoked token from it is still in the old
+    # v1.0.x-beta tags; without this, secret detection reports it and the
+    # security gate blocks releases. Remove once those tags are gone.
     SECRET_DETECTION_EXCLUDED_PATHS: "release.sh"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'

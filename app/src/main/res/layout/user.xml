@@ -191,7 +191,7 @@
                     style="@style/HeaderLabel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/user_pub_repos" />
+                    android:text="@string/user_personal_projects" />
 
                 <ProgressBar
                     android:id="@+id/pb_top_repos"
@@ -215,6 +215,103 @@
                     android:text="@string/view_more"
                     android:visibility="gone"
                     tools:visibility="visible" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Contributed projects section (#232) -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/contributed_card"
+            style="?attr/cardViewTheme"
+            android:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/overview_header_spacing"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_contributed_label"
+                    style="@style/HeaderLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/user_contributed_projects" />
+
+                <ProgressBar
+                    android:id="@+id/pb_contributed"
+                    style="@style/LoadingProgress" />
+
+                <LinearLayout
+                    android:id="@+id/ll_contributed"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/btn_contributed"
+                    style="@style/MoreButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:text="@string/view_more"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Member of (admins only) section (#232) -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/member_of_card"
+            style="?attr/cardViewTheme"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/overview_header_spacing"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_member_of_label"
+                    style="@style/HeaderLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/user_member_of" />
+
+                <ProgressBar
+                    android:id="@+id/pb_member_of"
+                    style="@style/LoadingProgress" />
+
+                <!-- The user's groups (expandable, like the Groups screen) and projects (#240) -->
+                <LinearLayout
+                    android:id="@+id/ll_member_of_tree"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <LinearLayout
+                    android:id="@+id/ll_member_of"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/btn_member_of"
+                    style="@style/MoreButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:text="@string/view_more"
+                    android:visibility="gone" />
 
             </LinearLayout>
 

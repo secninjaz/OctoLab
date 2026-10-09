@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Find-in-page arrows: the theme's text colour, not white on the light action bar (#230) -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_enabled="false" android:color="#61ffffff" />
-    <item android:color="#fff" />
+    <item android:state_enabled="false" android:alpha="0.38" android:color="@color/theme_text_primary" />
+    <item android:color="@color/theme_text_primary" />
 </selector>

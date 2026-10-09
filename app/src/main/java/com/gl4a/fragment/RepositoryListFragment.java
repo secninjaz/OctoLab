@@ -38,6 +38,8 @@ import retrofit2.Response;
 public class RepositoryListFragment extends PagedDataBaseFragment<GitLabProject> {
     private String mLogin;
     private String mRepoType;
+    private final java.util.Map<Long, String> mUserRoles =
+            new java.util.concurrent.ConcurrentHashMap<>();
     private boolean mIsOrg;
     private String mSortOrder;
     private String mSortDirection;
@@ -71,7 +73,15 @@ public class RepositoryListFragment extends PagedDataBaseFragment<GitLabProject>
 
     @Override
     protected RootAdapter<GitLabProject, ? extends RecyclerView.ViewHolder> onCreateAdapter() {
-        return new RepositoryAdapter(getActivity());
+        RepositoryAdapter adapter = new RepositoryAdapter(getActivity());
+        // Your own and group project lists: your role, as in Groups. Another user's projects:
+        // that user's role, loaded with each page (#233)
+        if (isViewerList()) {
+            adapter.showViewerRoles();
+        } else {
+            adapter.setRoleSource(RepositoryAdapter.userRoles(mUserRoles));
+        }
+        return adapter;
     }
 
     @Override
@@ -128,9 +138,20 @@ public class RepositoryListFragment extends PagedDataBaseFragment<GitLabProject>
 
         return raw.map(response -> {
             if (response.isSuccessful()) {
+                if (!isSelf && !mIsOrg && response.body() != null) {
+                    // That user's role in each project of this page, in one query (#233)
+                    List<Long> ids = new java.util.ArrayList<>();
+                    for (GitLabProject project : response.body()) ids.add(project.id);
+                    mUserRoles.putAll(com.gl4a.utils.UserProjectRoles.load(mLogin, ids).roles);
+                }
                 return Response.success(ApiHelpers.toPage(response));
             }
             return Response.<GitLabPage<GitLabProject>>error(response.errorBody(), response.raw());
         });
+    }
+
+    /** Your own projects or a group's: role badges show your role. */
+    private boolean isViewerList() {
+        return mIsOrg || ApiHelpers.loginEquals(mLogin, Gl4Application.get().getAuthLogin());
     }
 }

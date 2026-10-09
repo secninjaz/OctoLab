@@ -7,8 +7,11 @@ info:
   version: "4"
 
 servers:
-  - url: https://dev.taskmiles.com/api/v4
-    description: Self-hosted GitLab instance
+  - url: https://{host}/api/v4
+    description: The GitLab instance (gitlab.com or self-hosted)
+    variables:
+      host:
+        default: gitlab.com
 
 security:
   - privateToken: []

@@ -26,6 +26,8 @@ public class SuggestionsProvider extends ContentProvider {
         String TYPE = "type";
         String SUGGESTION = "suggestion";
         String DATE = "date";
+        /** The account a search was made with; each account sees only its own (#237) */
+        String ACCOUNT = "account";
 
         int TYPE_REPO = 0;
         int TYPE_USER = 1;

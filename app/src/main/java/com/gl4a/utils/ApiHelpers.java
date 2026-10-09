@@ -109,6 +109,48 @@ public class ApiHelpers {
         return getUserLogin(context, user);
     }
 
+    /**
+     * "@username" as the app shows usernames everywhere: in fixed-width text. The one place
+     * that style is defined; anything that displays a username should use this (#231). Not for
+     * text the user types, e.g. inserted @mentions ({@link StringUtils#formatMention}).
+     */
+    public static SpannableStringBuilder formatUsername(String login) {
+        SpannableStringBuilder at = new SpannableStringBuilder("@").append(login);
+        at.setSpan(new android.text.style.TypefaceSpan("monospace"), 0, at.length(), 0);
+        return at;
+    }
+
+    /**
+     * True if {@code name} can be shown next to the username: set and not masked. Shown even
+     * when it equals the username, as GitLab does (#231).
+     */
+    private static boolean hasUsableName(String name, String login) {
+        return !TextUtils.isEmpty(name) && !name.matches("\\*+");
+    }
+
+    /**
+     * An account as GitLab shows it: the display name, with "@username" on a smaller second
+     * line; just "@username" without a usable name (#225).
+     */
+    public static CharSequence formatAccountLabel(String name, String login) {
+        if (!hasUsableName(name, login)) return formatUsername(login);
+        SpannableStringBuilder label = new SpannableStringBuilder(name).append("\n");
+        int start = label.length();
+        label.append(formatUsername(login));
+        label.setSpan(new android.text.style.RelativeSizeSpan(0.85f), start, label.length(), 0);
+        return label;
+    }
+
+    /** "Name  @username" on one line, e.g. in the drawer's account list (#231). */
+    public static CharSequence formatAccountLine(String name, String login) {
+        if (!hasUsableName(name, login)) return formatUsername(login);
+        SpannableStringBuilder line = new SpannableStringBuilder(name).append("  ");
+        int start = line.length();
+        line.append(formatUsername(login));
+        line.setSpan(new android.text.style.RelativeSizeSpan(0.85f), start, line.length(), 0);
+        return line;
+    }
+
     public static SpannableStringBuilder getUserNameWithType(Context context, GitLabUser user) {
         return getUserNameWithType(context, user, false);
     }
@@ -130,18 +172,16 @@ public class ApiHelpers {
      * no display name.
      */
     public static SpannableStringBuilder getUserNameWithLogin(Context context, GitLabUser user) {
-        if (user == null || TextUtils.isEmpty(user.name) || user.name.equals(user.username)
-                || user.name.matches("\\*+")) {
+        if (user == null || !hasUsableName(user.name, user.username)) {
             return new SpannableStringBuilder(getUserLogin(context, user));
         }
         SpannableStringBuilder builder = new SpannableStringBuilder(user.name);
         if (!TextUtils.isEmpty(user.username)) {
             builder.append("  ");
             int start = builder.length();
-            builder.append("@").append(user.username);
+            builder.append(formatUsername(user.username));
             int end = builder.length();
             builder.setSpan(new android.text.style.RelativeSizeSpan(0.85f), start, end, 0);
-            builder.setSpan(new android.text.style.TypefaceSpan("monospace"), start, end, 0);
             builder.setSpan(new android.text.style.ForegroundColorSpan(
                     UiUtils.resolveColor(context, android.R.attr.textColorSecondary)),
                     start, end, 0);

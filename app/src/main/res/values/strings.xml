@@ -213,7 +213,7 @@
     <string name="no_blogs_found">No blogs found.</string>
     <string name="no_comments_found">Nobody has commented so far.</string>
     <string name="no_files_found">No files found.</string>
-    <string name="no_trends_found">No trending repositories found.</string>
+    <string name="no_trends_found">No projects were active in this period.</string>
     <string name="no_open_milestones_found">This repository doesn\'t have any open milestones.</string>
     <string name="no_closed_milestones_found">This repository doesn\'t have any closed milestones.</string>
     <string name="no_commits_found">No commits found.</string>
@@ -305,6 +305,28 @@
     <string name="user_follow_action">Follow</string>
     <string name="user_unfollow_action">Unfollow</string>
     <string name="user_no_repos">No repositories found</string>
+    <string name="git_author_no_account">No GitLab account found for this author</string>
+    <!-- Profile sections, named as on GitLab's profile page (#232) -->
+    <string name="user_personal_projects">Personal projects</string>
+    <string name="user_contributed_projects">Contributed projects</string>
+    <string name="user_member_of">Member of</string>
+    <string name="user_section_with_count">%1$s (%2$d)</string>
+    <string name="user_member_of_counts">%1$s (%2$s, %3$s)</string>
+    <plurals name="user_group_count">
+        <item quantity="one">%d group</item>
+        <item quantity="other">%d groups</item>
+    </plurals>
+    <plurals name="user_project_count">
+        <item quantity="one">%d project</item>
+        <item quantity="other">%d projects</item>
+    </plurals>
+    <string name="user_no_personal_projects">No personal projects</string>
+    <string name="user_no_contributed_projects">No contributed projects</string>
+    <string name="user_no_memberships">Not a direct member of any project</string>
+    <plurals name="user_personal_project_count">
+        <item quantity="one">%d personal project</item>
+        <item quantity="other">%d personal projects</item>
+    </plurals>
 
     <!-- Repository -->
     <string name="repo_forks">Forks</string>
@@ -562,6 +584,7 @@
     <string name="trend_today">Today</string>
     <string name="trend_week">Week</string>
     <string name="trend_month">Month</string>
+    <string name="trend_year">Year</string>
     <string name="trend_stars_today">%1$d today, %2$d total</string>
     <string name="trend_stars_week">%1$d this week, %2$d total</string>
     <string name="trend_stars_month">%1$d this month, %2$d total</string>

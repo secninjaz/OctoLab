@@ -82,13 +82,8 @@ public class CommitAdapter extends RootAdapter<GitLabCommit, CommitAdapter.ViewH
     public void onClick(View v) {
         if (v.getId() == R.id.iv_gravatar) {
             GitLabCommit commit = (GitLabCommit) v.getTag();
-            GitLabUser user = commit.authorUser != null
-                    ? commit.authorUser
-                    : AvatarHandler.getCachedUserForEmail(commit.authorEmail);
-            if (user != null) {
-                Intent intent = UserActivity.makeIntent(mContext, user);
-                if (intent != null) mContext.startActivity(intent);
-            }
+            // The one way to open a git author's profile, also used by Contributors (#239)
+            AvatarHandler.openGitAuthorProfile(mContext, commit);
         } else {
             super.onClick(v);
         }

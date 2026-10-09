@@ -245,6 +245,9 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         repoName.append(name);
         repoName.setSpan(repoSpan, 0, owner.length(), 0);
         tvRepoName.setText(repoName);
+        // The one shared project logo, as in every project list (#235)
+        com.gl4a.utils.AvatarHandler.assignProjectLogo(
+                mContentView.findViewById(R.id.iv_repo_logo), mRepository);
 
         fillTextView(R.id.tv_desc, 0, mRepository.description());
         fillTextView(R.id.tv_url, 0, mRepository.htmlUrl());

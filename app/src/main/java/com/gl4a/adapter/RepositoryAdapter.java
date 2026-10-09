@@ -37,8 +37,51 @@ import java.util.Locale;
 
 public class RepositoryAdapter extends RootAdapter<GitLabProject, RepositoryAdapter.ViewHolder>
         implements Filterable {
+    /** Whose role a row's badge shows, if any (#233). */
+    public interface RoleSource {
+        /** The role in words ("Maintainer"), or null for no badge. */
+        String roleLabel(Context context, GitLabProject project);
+    }
+
+    private RoleSource mRoleSource;
+
     public RepositoryAdapter(Context context) {
         super(context);
+    }
+
+    /** Turns on role badges; lists without a source show none. */
+    public void setRoleSource(RoleSource source) {
+        mRoleSource = source;
+        notifyDataSetChanged();
+    }
+
+    /** The viewer's own role, from the same memberships as the Groups tree. */
+    public static RoleSource viewerRoles(com.gl4a.utils.MembershipRoles roles) {
+        return (context, project) -> roles.labelFor(context, project.pathWithNamespace);
+    }
+
+    /** Shows the viewer's roles once they're loaded (cached across lists for a while). */
+    public void showViewerRoles() {
+        com.gl4a.utils.MembershipRoles.loadCached()
+                .compose(com.gl4a.utils.RxUtils::doInBackground)
+                .subscribe(roles -> setRoleSource(viewerRoles(roles)), error -> { });
+    }
+
+    /** Another user's role, by project ID, as loaded by UserProjectRoles (role names). */
+    public static RoleSource userRoles(java.util.Map<Long, String> rolesById) {
+        return (context, project) -> com.gl4a.utils.MembershipRoles.labelForName(context,
+                rolesById.get(project.id));
+    }
+
+    /** A project row outside a list (profile previews), the same as the list rows. */
+    public static View inflateRow(LayoutInflater inflater, ViewGroup parent) {
+        View v = inflater.inflate(R.layout.row_repo, parent, false);
+        v.setTag(R.id.tv_title, new ViewHolder(v));
+        return v;
+    }
+
+    public static void bindRow(Context context, View row, GitLabProject project, String role) {
+        bind(context, (ViewHolder) row.getTag(R.id.tv_title), project, role);
     }
 
     @Override
@@ -49,9 +92,17 @@ public class RepositoryAdapter extends RootAdapter<GitLabProject, RepositoryAdap
 
     @Override
     public void onBindViewHolder(ViewHolder holder, GitLabProject repository) {
+        bind(mContext, holder, repository,
+                mRoleSource != null ? mRoleSource.roleLabel(mContext, repository) : null);
+    }
+
+    private static void bind(Context context, ViewHolder holder, GitLabProject repository,
+            String role) {
         // Shared with every other project logo in the app — see AvatarHandler.assignProjectLogo.
         AvatarHandler.assignProjectLogo(holder.ivAvatar, repository);
-        holder.tvTitle.setText(ApiHelpers.formatRepoName(mContext, repository));
+        holder.tvTitle.setText(ApiHelpers.formatRepoName(context, repository));
+        holder.tvRole.setVisibility(role != null ? View.VISIBLE : View.GONE);
+        holder.tvRole.setText(role);
 
         if (!StringUtils.isBlank(repository.description())) {
             holder.tvDesc.setVisibility(View.VISIBLE);
@@ -111,6 +162,7 @@ public class RepositoryAdapter extends RootAdapter<GitLabProject, RepositoryAdap
             tvSize = view.findViewById(R.id.tv_size);
             tvPrivate = view.findViewById(R.id.tv_private);
             tvFork = view.findViewById(R.id.tv_fork);
+            tvRole = view.findViewById(R.id.tv_role);
 
             view.findViewById(R.id.attributes).setOnClickListener(this);
             view.findViewById(R.id.scrollView).setOnTouchListener(this);
@@ -125,6 +177,7 @@ public class RepositoryAdapter extends RootAdapter<GitLabProject, RepositoryAdap
         private final TextView tvSize;
         private final TextView tvPrivate;
         private final TextView tvFork;
+        private final TextView tvRole;
 
         @Override
         public void onClick(View v) {

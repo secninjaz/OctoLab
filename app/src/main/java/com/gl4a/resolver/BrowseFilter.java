@@ -80,15 +80,40 @@ public class BrowseFilter extends AppCompatActivity {
         // Multiple accounts on this instance — always ask which one to use, even if
         // one of them is already active, since the user may want a specific other one.
         String[] logins = matches.toArray(new String[0]);
-        CharSequence[] labels = new CharSequence[logins.length];
-        for (int i = 0; i < logins.length; i++) {
-            String name = Gl4Application.get().getNameForLogin(logins[i]);
-            labels[i] = !com.gl4a.utils.StringUtils.isBlank(name)
-                    ? name + " (@" + logins[i] + ")" : "@" + logins[i];
-        }
+        // Each account with its avatar, name in bold and @username, as in the drawer (#229)
+        android.widget.ArrayAdapter<String> accounts = new android.widget.ArrayAdapter<String>(
+                this, R.layout.row_account_choice, R.id.label, logins) {
+            @Override
+            public android.view.View getView(int position, android.view.View convertView,
+                    android.view.ViewGroup parent) {
+                android.view.View row = super.getView(position, convertView, parent);
+                String login = logins[position];
+                Gl4Application app = Gl4Application.get();
+                CharSequence label = com.gl4a.utils.ApiHelpers.formatAccountLabel(
+                        app.getNameForLogin(login), login);
+                android.text.SpannableStringBuilder bold =
+                        new android.text.SpannableStringBuilder(label);
+                int nameEnd = label.toString().indexOf('\n');
+                if (nameEnd > 0) {
+                    bold.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                            0, nameEnd, 0);
+                }
+                ((android.widget.TextView) row.findViewById(R.id.label)).setText(bold);
+                android.widget.ImageView avatar = row.findViewById(R.id.avatar);
+                long userId = app.getUserIdForLogin(login);
+                String url = app.getAvatarUrlForLogin(login);
+                if (userId > 0 && url != null) {
+                    com.gl4a.utils.AvatarHandler.assignAvatar(avatar, login, userId, url);
+                } else {
+                    avatar.setImageDrawable(
+                            new com.gl4a.utils.AvatarHandler.DefaultAvatarDrawable(login, null));
+                }
+                return row;
+            }
+        };
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle(R.string.choose_account_for_link)
-                .setItems(labels, (dialog, which) -> {
+                .setAdapter(accounts, (dialog, which) -> {
                     Gl4Application.get().setActiveLogin(logins[which]);
                     proceed.run();
                 })

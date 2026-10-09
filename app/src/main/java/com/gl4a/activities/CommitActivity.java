@@ -283,6 +283,12 @@ public class CommitActivity extends BaseFragmentPagerActivity implements
         resolveProjectId()
                 .flatMap(projectId -> service.getCommit(projectId, mObjectSha)
                         .map(ApiHelpers::throwOnFailure))
+                // The account GitLab links the commit to, as in commit lists (#244)
+                .map(commit -> {
+                    com.gl4a.utils.CommitAuthors.attach(
+                            new java.util.ArrayList<>(java.util.Collections.singletonList(commit)));
+                    return commit;
+                })
                 .<GitLabCommit>compose(makeLoaderSingle(ID_LOADER_COMMIT, force))
                 .subscribe(result -> {
                     mCommit = result;

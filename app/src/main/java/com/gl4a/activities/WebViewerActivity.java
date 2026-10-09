@@ -281,6 +281,9 @@ public abstract class WebViewerActivity extends BaseActivity implements
         content.append("');\n");
         content.append("var converter = new showdown.Converter();\n");
         content.append("converter.setFlavor('github');\n");
+        // GitHub's flavor turns every newline into a line break, as in GitHub comments; GitLab
+        // joins the lines of a paragraph in files, so hard-wrapped text flows (#224)
+        content.append("converter.setOption('simpleLineBreaks', false);\n");
         content.append("var html = converter.makeHtml(text);\n");
         if (repoOwner != null && repoName != null) {
             String actualRef = ref == null ? "main" : ref;
@@ -484,6 +487,9 @@ public abstract class WebViewerActivity extends BaseActivity implements
         content.append("');\n");
         content.append("var converter = new showdown.Converter();\n");
         content.append("converter.setFlavor('github');\n");
+        // GitHub's flavor turns every newline into a line break, as in GitHub comments; GitLab
+        // joins the lines of a paragraph in files, so hard-wrapped text flows (#224)
+        content.append("converter.setOption('simpleLineBreaks', false);\n");
         content.append("var html = converter.makeHtml(text);\n");
         if (repoOwner != null && repoName != null) {
             String actualRef = ref == null ? "master" : ref;

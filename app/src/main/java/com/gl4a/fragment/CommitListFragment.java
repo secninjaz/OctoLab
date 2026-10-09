@@ -225,6 +225,8 @@ public class CommitListFragment extends PagedDataBaseFragment<GitLabCommit> impl
                         return Response.success(new ApiHelpers.DummyPage<>());
                     }
                     if (response.isSuccessful()) {
+                        // The accounts GitLab links these commits to, as for issue authors
+                        com.gl4a.utils.CommitAuthors.attach(response.body());
                         GitLabPage<GitLabCommit> glPage = ApiHelpers.toPage(response);
                         return Response.success(glPage);
                     }

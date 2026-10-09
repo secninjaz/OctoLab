@@ -207,8 +207,12 @@ public class GroupActivity extends BaseActivity implements
             mRootView.post(() -> mRootView.scrollTo(0, scrollY));
             return;
         }
+        // The header and a spinner straight away, not a blank area while it loads (#242)
+        findViewById(R.id.tv_subgroups_header).setVisibility(View.VISIBLE);
+        mTree.showLoading();
         GroupTree.loadChildren(groupPath(), force, GroupTree.isSortByActivity(this))
-                .zipWith(MembershipRoles.load(), TreeData::new)
+                .zipWith(force ? MembershipRoles.load() : MembershipRoles.loadCached(),
+                        TreeData::new)
                 .compose(makeLoaderSingle(ID_LOADER_SUBGROUPS, force))
                 .subscribe(data -> {
                     findViewById(R.id.tv_subgroups_header)
@@ -217,6 +221,7 @@ public class GroupActivity extends BaseActivity implements
                 }, error -> {
                     // Non-fatal: the overview is still useful without the tree.
                     findViewById(R.id.tv_subgroups_header).setVisibility(View.GONE);
+                    ((android.view.ViewGroup) findViewById(R.id.ll_subgroups)).removeAllViews();
                 });
     }
 }

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Find-in-page match count: the theme's text colour, red when nothing matches (#230) -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_selected="true" android:color="#ef5350" /> <!-- red 400 -->
-    <item android:color="#fff" />
+    <item android:color="@color/theme_text_primary" />
 </selector>

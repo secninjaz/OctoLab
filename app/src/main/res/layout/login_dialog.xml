@@ -13,7 +13,7 @@
         android:layout_height="wrap_content"
         android:layout_marginBottom="16dp"
         android:hint="@string/instance_url_hint"
-        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        style="@style/OctoLab.TextInputLayout.OutlinedBox"
         app:boxStrokeColor="@color/link_text"
         app:hintTextColor="@color/theme_hint">
 
@@ -79,7 +79,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:hint="@string/credentials_token"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            style="@style/OctoLab.TextInputLayout.OutlinedBox"
             app:boxStrokeColor="@color/link_text"
             app:hintTextColor="@color/theme_hint">
 

@@ -224,6 +224,7 @@ public class UiUtils {
             androidx.appcompat.R.id.search_button,
             androidx.appcompat.R.id.search_go_btn,
             androidx.appcompat.R.id.search_voice_btn,
+            androidx.appcompat.R.id.search_mag_icon,
         };
         for (int id : ids) {
             android.view.View view = searchView.findViewById(id);

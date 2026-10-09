@@ -134,7 +134,8 @@ public class CommitCompareFragment extends ListDataBaseFragment<GitLabCommit> im
                         }));
 
         return compareSingle
-                .<List<GitLabCommit>>map(compare -> compare.commits != null ? compare.commits : new ArrayList<>())
+                .<List<GitLabCommit>>map(compare -> compare.commits != null
+                        ? com.gl4a.utils.CommitAuthors.attach(compare.commits) : new ArrayList<>())
                 // Bummer, at least one branch was deleted.
                 // Can't do anything here, so return an empty list.
                 .compose(RxUtils.<List<GitLabCommit>>mapFailureToValue(HttpURLConnection.HTTP_NOT_FOUND, new ArrayList<>()));
