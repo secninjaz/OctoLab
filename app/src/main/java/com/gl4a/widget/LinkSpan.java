@@ -28,6 +28,6 @@ public class LinkSpan extends ClickableSpan {
     @Override
     public void updateDrawState(@NonNull TextPaint ds) {
         ds.setColor(ds.linkColor);
-        ds.setUnderlineText(false);
+        ds.setUnderlineText(com.gl4a.utils.MarkdownStyle.UNDERLINE_LINKS);
     }
 }

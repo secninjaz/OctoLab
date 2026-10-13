@@ -100,6 +100,8 @@ public class CommentViewHolder
         mContext = view.getContext();
         mCard = view.findViewById(R.id.card);
         mReplyAvatar = view.findViewById(R.id.iv_reply_avatar);
+        // A reply's avatar opens its author's profile, as a comment's does (#252)
+        mReplyAvatar.setOnClickListener(this);
         mThreadToggle = view.findViewById(R.id.ll_thread_toggle);
         mThreadChevron = view.findViewById(R.id.iv_thread_chevron);
         mThreadAvatars = view.findViewById(R.id.ll_thread_avatars);
@@ -424,6 +426,7 @@ public class CommentViewHolder
         mReplyAvatar.setVisibility(reply ? View.VISIBLE : View.GONE);
         if (reply) {
             AvatarHandler.assignAvatar(mReplyAvatar, comment.user());
+            mReplyAvatar.setTag(comment.user());
         }
     }
 
@@ -453,7 +456,8 @@ public class CommentViewHolder
                 }
                 mPopupMenu.show();
                 break;
-            case R.id.iv_gravatar: {
+            case R.id.iv_gravatar:
+            case R.id.iv_reply_avatar: {
                 GitLabUser user = (GitLabUser) v.getTag();
                 Intent intent = UserActivity.makeIntent(mContext, user);
                 if (intent != null) {

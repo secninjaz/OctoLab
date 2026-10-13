@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/media_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/black">
 
+    <!-- Scaled to fit the screen at the video's own shape, in either orientation: given the
+         whole area, VideoView sizes itself to the largest picture that fits, up or down. With
+         the width filling the screen, landscape squashed the picture; with wrap_content, a
+         video smaller than the screen stayed small, also in full screen (#259) -->
     <VideoView
         android:id="@+id/video_view"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:layout_gravity="center" />
 
     <ProgressBar

@@ -27,6 +27,7 @@ public class SearchActivity extends FragmentContainerActivity {
     public static final int SEARCH_TYPE_REPO = SearchFragment.SEARCH_TYPE_REPO;
     public static final int SEARCH_TYPE_USER = SearchFragment.SEARCH_TYPE_USER;
     public static final int SEARCH_TYPE_CODE = SearchFragment.SEARCH_TYPE_CODE;
+    public static final int SEARCH_TYPE_ALL = SearchFragment.SEARCH_TYPE_ALL;
 
     public static Intent makeIntent(Context context, String initialSearch,
             int searchType, boolean startSearchImmediately) {
@@ -49,7 +50,8 @@ public class SearchActivity extends FragmentContainerActivity {
     @Override
     protected Fragment onCreateFragment() {
         Intent intent = getIntent();
-        int searchType = intent.getIntExtra("search_type", SEARCH_TYPE_REPO);
+        // Everything by default, like GitLab web (#262)
+        int searchType = intent.getIntExtra("search_type", SEARCH_TYPE_ALL);
         String initialQuery = intent.getStringExtra("initial_search");
         boolean startSearchImmediately = intent.getBooleanExtra("search_immediately", true);
 

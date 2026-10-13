@@ -1,4 +1,6 @@
 package com.gl4a.adapter;
+import com.gl4a.gitlab.model.GitLabGroup;
+import com.gl4a.gitlab.model.GitLabIssue;
 import com.gl4a.gitlab.model.GitLabProject;
 import com.gl4a.gitlab.model.GitLabSearchResult;
 import com.gl4a.gitlab.model.GitLabUser;
@@ -13,6 +15,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import androidx.annotation.StringRes;
+
 import com.gl4a.R;
 import com.gl4a.fragment.SearchFragment;
 import com.gl4a.utils.ApiHelpers;
@@ -24,9 +28,32 @@ public class SearchAdapter extends RootAdapter<Object, RecyclerView.ViewHolder> 
         void onSearchFragmentClick(GitLabSearchResult.GitLabBlob result, int matchIndex);
     }
 
+    /**
+     * A section of the All search, e.g. "Projects", before its first few results; tapping it
+     * shows all results of its kind (#262).
+     */
+    public static final class Section {
+        public final int searchType;
+        @StringRes final int title;
+
+        public Section(int searchType, @StringRes int title) {
+            this.searchType = searchType;
+            this.title = title;
+        }
+    }
+
+    // Each kind of row in its own range, so one list can mix them (the All search, #262)
+    private static final int KIND_USER = 10000;
+    private static final int KIND_REPO = 20000;
+    private static final int KIND_CODE = 30000;
+    private static final int KIND_GROUP = 40000;
+    private static final int KIND_ISSUE = 50000;
+    private static final int KIND_SECTION = 60000;
+
     private UserAdapter mUserAdapter;
     private RepositoryAdapter mRepoAdapter;
     private CodeSearchAdapter mCodeAdapter;
+    private IssueAdapter mIssueAdapter;
     private int mMode;
 
     public SearchAdapter(Context context, Callback callback) {
@@ -34,6 +61,7 @@ public class SearchAdapter extends RootAdapter<Object, RecyclerView.ViewHolder> 
         mUserAdapter = new UserAdapter(context);
         mRepoAdapter = new RepositoryAdapter(context);
         mCodeAdapter = new CodeSearchAdapter(context, callback);
+        mIssueAdapter = new IssueAdapter(context);
         mMode = SearchFragment.SEARCH_TYPE_REPO;
     }
 
@@ -44,33 +72,75 @@ public class SearchAdapter extends RootAdapter<Object, RecyclerView.ViewHolder> 
 
     @Override
     public int getItemViewType(Object item) {
-        if (item instanceof GitLabUser) {
-            return mUserAdapter.getItemViewType((GitLabUser) item) + 10000;
+        if (item instanceof Section) {
+            return KIND_SECTION;
+        } else if (item instanceof GitLabUser) {
+            return mUserAdapter.getItemViewType((GitLabUser) item) + KIND_USER;
         } else if (item instanceof GitLabProject) {
-            return mRepoAdapter.getItemViewType((GitLabProject) item) + 20000;
+            return mRepoAdapter.getItemViewType((GitLabProject) item) + KIND_REPO;
+        } else if (item instanceof GitLabGroup) {
+            return KIND_GROUP;
+        } else if (item instanceof GitLabIssue) {
+            return mIssueAdapter.getItemViewType((GitLabIssue) item) + KIND_ISSUE;
         } else {
-            return mCodeAdapter.getItemViewType((GitLabSearchResult.GitLabBlob) item) + 30000;
+            return mCodeAdapter.getItemViewType((GitLabSearchResult.GitLabBlob) item) + KIND_CODE;
         }
     }
 
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(LayoutInflater inflater,
             ViewGroup parent, int viewType) {
-        RootAdapter<?, ? extends RecyclerView.ViewHolder> adapter =
-                mMode == SearchFragment.SEARCH_TYPE_REPO ? mRepoAdapter :
-                mMode == SearchFragment.SEARCH_TYPE_USER ? mUserAdapter :
-                mCodeAdapter;
-        return adapter.onCreateViewHolder(inflater, parent, viewType % 10000);
+        int kind = viewType / 10000 * 10000;
+        int subType = viewType % 10000;
+        switch (kind) {
+            case KIND_SECTION:
+                return new SectionViewHolder(
+                        inflater.inflate(R.layout.row_search_section, parent, false));
+            case KIND_GROUP:
+                // The one group row of the app's group lists (#172)
+                return new GroupViewHolder(
+                        inflater.inflate(R.layout.row_group_tree_item, parent, false));
+            case KIND_USER:
+                return mUserAdapter.onCreateViewHolder(inflater, parent, subType);
+            case KIND_REPO:
+                return mRepoAdapter.onCreateViewHolder(inflater, parent, subType);
+            case KIND_ISSUE:
+                return mIssueAdapter.onCreateViewHolder(inflater, parent, subType);
+            default:
+                return mCodeAdapter.onCreateViewHolder(inflater, parent, subType);
+        }
     }
 
     @Override
     public void onBindViewHolder(RecyclerView.ViewHolder holder, Object item) {
-        if (item instanceof GitLabUser) {
+        if (item instanceof Section) {
+            ((SectionViewHolder) holder).title.setText(((Section) item).title);
+        } else if (item instanceof GitLabUser) {
             mUserAdapter.onBindViewHolder((UserAdapter.ViewHolder) holder, (GitLabUser) item);
         } else if (item instanceof GitLabProject) {
             mRepoAdapter.onBindViewHolder((RepositoryAdapter.ViewHolder) holder, (GitLabProject) item);
+        } else if (item instanceof GitLabGroup) {
+            GroupTreeRows.bind(holder.itemView, (GitLabGroup) item, null, 0, false,
+                    (String) null);
+        } else if (item instanceof GitLabIssue) {
+            mIssueAdapter.onBindViewHolder((IssueAdapter.ViewHolder) holder, (GitLabIssue) item);
         } else {
             mCodeAdapter.onBindViewHolder((CodeSearchAdapter.ViewHolder) holder, (GitLabSearchResult.GitLabBlob) item);
+        }
+    }
+
+    private static class SectionViewHolder extends RecyclerView.ViewHolder {
+        final TextView title;
+
+        SectionViewHolder(View view) {
+            super(view);
+            title = view.findViewById(R.id.tv_title);
+        }
+    }
+
+    private static class GroupViewHolder extends RecyclerView.ViewHolder {
+        GroupViewHolder(View view) {
+            super(view);
         }
     }
 

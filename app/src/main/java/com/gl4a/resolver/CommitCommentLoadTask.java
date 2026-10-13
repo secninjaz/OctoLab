@@ -69,8 +69,9 @@ public class CommitCommentLoadTask extends UrlLoadTask {
                 .cache();
 
         Single<List<GitLabDiff>> diffSingle = SingleFactory.getProjectId(repoOwner, repoName)
-                .flatMap(projectId -> commitService.getCommitDiff(projectId, commitSha, 1, 100)
-                        .map(ApiHelpers::throwOnFailure))
+                // Every page: a commit can change more than 100 files (#272)
+                .flatMap(projectId -> ApiHelpers.<GitLabDiff>allPages(
+                        page -> commitService.getCommitDiff(projectId, commitSha, page, 100)))
                 .subscribeOn(Schedulers.io())
                 .cache();
 

@@ -54,6 +54,7 @@ public class CommitCommentsFragment extends ListDataBaseFragment<GitLabComment> 
         args.putString("owner", repoOwner);
         args.putString("repo", repoName);
         args.putString("sha", commitSha);
+        args.putString("commit_url", commit.webUrl);
         args.putParcelable("commit_author", commit.author());
         args.putParcelable("committer", (android.os.Parcelable) null);
         args.putParcelable("initial_comment", initialComment);
@@ -234,6 +235,14 @@ public class CommitCommentsFragment extends ListDataBaseFragment<GitLabComment> 
         super.onRecyclerViewInflated(view, inflater);
         // Same GitLab-style timeline as issues/MRs: cards on a timeline line, no dividers (#179).
         view.addItemDecoration(new com.gl4a.widget.TimelineLineDecoration(view.getContext(), false));
+        com.gl4a.widget.StableScrollbarLayoutManager.setUpCommentList(view);
+    }
+
+    @Override
+    protected androidx.recyclerview.widget.LinearLayoutManager createLayoutManager(
+            android.content.Context context) {
+        // The shared list setup of every screen of comments (#258)
+        return com.gl4a.widget.StableScrollbarLayoutManager.forComments(context, null);
     }
 
     @Override
@@ -299,6 +308,11 @@ public class CommitCommentsFragment extends ListDataBaseFragment<GitLabComment> 
     @Override
     public void quoteText(CharSequence text) {
         mBottomSheet.addQuote(text);
+    }
+
+    @Override
+    public String getShareUrl(GitLabComment comment) {
+        return IntentUtils.commentWebUrl(getArguments().getString("commit_url"), comment.id());
     }
 
     @Override

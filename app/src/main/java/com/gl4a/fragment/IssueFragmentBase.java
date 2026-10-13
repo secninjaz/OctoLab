@@ -218,6 +218,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         super.onRecyclerViewInflated(view, inflater);
         // GitLab web's timeline line instead of row dividers (#179).
         view.addItemDecoration(new com.gl4a.widget.TimelineLineDecoration(view.getContext(), true));
+        com.gl4a.widget.StableScrollbarLayoutManager.setUpCommentList(view);
 
         mListHeaderView = inflater.inflate(R.layout.issue_comment_list_header, view, false);
         mAdapter.setHeaderView(mListHeaderView);
@@ -325,11 +326,8 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
             android.content.Context context) {
         // Keeps the scrollbar's size steady while scrolling a timeline of very different
         // row heights (#152)
-        com.gl4a.widget.StableScrollbarLayoutManager layoutManager =
-                new com.gl4a.widget.StableScrollbarLayoutManager(context);
-        layoutManager.setCollapsedRows(
+        return com.gl4a.widget.StableScrollbarLayoutManager.forComments(context,
                 position -> mAdapter != null && mAdapter.isRowCollapsed(position));
-        return layoutManager;
     }
 
     @Override
@@ -882,6 +880,11 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
     public void onConfirmed(String tag, Parcelable data) {
         GitLabComment comment = (GitLabComment) data;
         handleDeleteComment(comment);
+    }
+
+    @Override
+    public String getShareUrl(GitLabComment comment) {
+        return IntentUtils.commentWebUrl(mIssue != null ? mIssue.webUrl : null, comment.id());
     }
 
     @Override

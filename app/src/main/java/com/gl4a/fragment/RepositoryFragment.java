@@ -88,6 +88,10 @@ public class RepositoryFragment extends LoadingFragmentBase implements
     private static final int ID_LOADER_README = 0;
     private static final int ID_LOADER_MR_COUNT = 1;
     private static final int ID_LOADER_STARRING = 2;
+    private static final int ID_LOADER_LANGUAGES = 3;
+    private static final int ID_LOADER_LICENSE = 4;
+    private static final int ID_LOADER_TOP_FILES = 5;
+    private static final int ID_LOADER_LAST_COMMIT = 6;
 
     private static final String STATE_KEY_IS_README_EXPANDED = "is_readme_expanded";
     private static final String STATE_KEY_IS_README_LOADED = "is_readme_loaded";
@@ -159,6 +163,9 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         }
         loadMergeRequestCount(true);
         loadStarringState(true);
+        loadLanguages(true);
+        loadLicense(true);
+        loadBranchDetails(true);
     }
 
     @Override
@@ -179,6 +186,9 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         }
         loadMergeRequestCount(false);
         loadStarringState(false);
+        loadLanguages(false);
+        loadLicense(false);
+        loadBranchDetails(false);
 
         updateReadmeVisibility();
     }
@@ -214,6 +224,10 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         }
         if (mLoadingView != null && mIsReadmeExpanded) {
             mLoadingView.setVisibility(View.VISIBLE);
+        }
+        // The last commit and file shortcuts follow the selected branch (#271)
+        if (mContentView != null) {
+            loadBranchDetails(true);
         }
     }
 
@@ -315,6 +329,16 @@ public class RepositoryFragment extends LoadingFragmentBase implements
 
         if (!Gl4Application.get().isAuthorized()) {
             updateStargazerUi();
+        }
+
+        // Created on, as GitLab web shows it (#271)
+        TextView createdOn = mContentView.findViewById(R.id.tv_created_on);
+        java.util.Date created = StringUtils.parseIsoDate(mRepository.createdAt);
+        if (created != null) {
+            createdOn.setText(getString(R.string.repo_created_on,
+                    java.text.DateFormat.getDateInstance(java.text.DateFormat.LONG)
+                            .format(created)));
+            createdOn.setVisibility(View.VISIBLE);
         }
 
         mReadmeTitleView.setOnClickListener(view -> toggleReadmeExpanded());
@@ -506,6 +530,248 @@ public class RepositoryFragment extends LoadingFragmentBase implements
                     pullsRow.setText(getResources().getQuantityString(
                             R.plurals.pull_request, count, count));
                 }, this::handleLoadFailure);
+    }
+
+    // The licence name GitLab detected, for its shortcut (#271)
+    private String mLicenseName;
+    private java.util.List<com.gl4a.gitlab.model.GitLabTreeItem> mTopFiles;
+
+    /** The languages bar and legend, from GitLab's languages with its colours (#271). */
+    private void loadLanguages(boolean force) {
+        if (mRepository.pathWithNamespace == null) return;
+        java.util.Map<String, Object> variables = new java.util.HashMap<>();
+        variables.put("path", mRepository.pathWithNamespace);
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("query", "query($path: ID!) { project(fullPath: $path) {"
+                + " languages { name share color } } }");
+        body.put("variables", variables);
+        ServiceFactory.getGraphQL(com.gl4a.gitlab.service.GitLabGraphQLService.class)
+                .rawQuery(body)
+                .map(ApiHelpers::throwOnFailure)
+                .map(RepositoryFragment::languagesOf)
+                .compose(makeLoaderSingle(ID_LOADER_LANGUAGES, force))
+                .subscribe(this::showLanguages, error -> showLanguages(
+                        java.util.Collections.emptyList()));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static java.util.List<java.util.Map<String, Object>> languagesOf(
+            java.util.Map<String, Object> response) {
+        Object data = response.get("data");
+        Object project = data instanceof java.util.Map
+                ? ((java.util.Map<String, Object>) data).get("project") : null;
+        Object languages = project instanceof java.util.Map
+                ? ((java.util.Map<String, Object>) project).get("languages") : null;
+        java.util.List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        if (languages instanceof java.util.List) {
+            for (Object language : (java.util.List<?>) languages) {
+                if (language instanceof java.util.Map) {
+                    result.add((java.util.Map<String, Object>) language);
+                }
+            }
+        }
+        return result;
+    }
+
+    private void showLanguages(java.util.List<java.util.Map<String, Object>> languages) {
+        if (mContentView == null) return;
+        View section = mContentView.findViewById(R.id.ll_languages);
+        android.widget.LinearLayout bar = mContentView.findViewById(R.id.ll_language_bar);
+        bar.removeAllViews();
+        SpannableStringBuilder legend = new SpannableStringBuilder();
+        for (java.util.Map<String, Object> language : languages) {
+            Object name = language.get("name");
+            Object share = language.get("share");
+            if (!(name instanceof String) || !(share instanceof Number)) continue;
+            int color;
+            try {
+                color = android.graphics.Color.parseColor(String.valueOf(language.get("color")));
+            } catch (IllegalArgumentException e) {
+                color = android.graphics.Color.GRAY;
+            }
+            float percent = ((Number) share).floatValue();
+            View part = new View(getContext());
+            part.setBackgroundColor(color);
+            bar.addView(part, new android.widget.LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.MATCH_PARENT, percent));
+            if (legend.length() > 0) legend.append("   ");
+            int dot = legend.length();
+            legend.append("\u25CF");
+            legend.setSpan(new ForegroundColorSpan(color), dot, dot + 1,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            legend.append(" ").append((String) name).append(" ")
+                    .append(String.format(Locale.getDefault(), "%.1f%%", percent));
+        }
+        bar.setClipToOutline(true);
+        ((TextView) mContentView.findViewById(R.id.tv_language_legend)).setText(legend);
+        section.setVisibility(bar.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    /** The licence GitLab detected, named on its shortcut (#271). */
+    @SuppressWarnings("unchecked")
+    private void loadLicense(boolean force) {
+        ServiceFactory.get(GitLabProjectService.class, force)
+                .getProjectWithLicense(mRepository.id())
+                .map(ApiHelpers::throwOnFailure)
+                .map(project -> {
+                    Object license = project.get("license");
+                    Object name = license instanceof java.util.Map
+                            ? ((java.util.Map<String, Object>) license).get("name") : null;
+                    return name instanceof String ? (String) name : "";
+                })
+                .compose(makeLoaderSingle(ID_LOADER_LICENSE, force))
+                .subscribe(name -> {
+                    mLicenseName = name.isEmpty() ? null : name;
+                    showFileShortcuts();
+                }, error -> { });
+    }
+
+    /** The selected branch's top-level files (for the shortcuts) and last commit (#271). */
+    private void loadBranchDetails(boolean force) {
+        final String ref = mRef != null ? mRef : mRepository.defaultBranch();
+        ServiceFactory.get(GitLabRepositoryService.class, force)
+                .getTree(mRepository.id(), null, ref, false, 1, 100)
+                .map(ApiHelpers::throwOnFailure)
+                .compose(makeLoaderSingle(ID_LOADER_TOP_FILES, true))
+                .subscribe(files -> {
+                    mTopFiles = files;
+                    showFileShortcuts();
+                }, error -> { });
+        ServiceFactory.get(com.gl4a.gitlab.service.GitLabCommitService.class, force)
+                .listCommits(mRepository.id(), ref, null, 1, 1, null, null)
+                .map(ApiHelpers::throwOnFailure)
+                .map(commits -> {
+                    if (commits.isEmpty()) {
+                        throw new java.io.IOException("No commits on " + ref);
+                    }
+                    // The account GitLab links the commit to, as in commit lists (#244)
+                    com.gl4a.utils.CommitAuthors.attach(new java.util.ArrayList<>(commits));
+                    return commits.get(0);
+                })
+                .compose(makeLoaderSingle(ID_LOADER_LAST_COMMIT, true))
+                .subscribe(this::showLastCommit, error -> {
+                    if (mContentView != null) {
+                        mContentView.findViewById(R.id.ll_last_commit).setVisibility(View.GONE);
+                    }
+                });
+    }
+
+    private void showLastCommit(com.gl4a.gitlab.model.GitLabCommit commit) {
+        if (mContentView == null) return;
+        View row = mContentView.findViewById(R.id.ll_last_commit);
+        android.widget.ImageView avatar = mContentView.findViewById(R.id.iv_last_commit_avatar);
+        // The commit lists' author avatar and tap to the profile (#239, #244)
+        com.gl4a.utils.AvatarHandler.assignGitAuthorAvatar(avatar, commit.authorName,
+                commit.authorEmail);
+        avatar.setOnClickListener(v ->
+                com.gl4a.utils.AvatarHandler.openGitAuthorProfile(getActivity(), commit));
+        ((TextView) mContentView.findViewById(R.id.tv_last_commit_title)).setText(commit.title);
+        String shortId = commit.shortId != null ? commit.shortId
+                : commit.sha().substring(0, Math.min(8, commit.sha().length()));
+        CharSequence when = StringUtils.formatRelativeTime(getContext(),
+                commit.committedDate != null ? commit.committedDate : commit.createdAt, true);
+        TextView meta = mContentView.findViewById(R.id.tv_last_commit_meta);
+        meta.setText(getString(R.string.repo_last_commit_meta, shortId, when != null ? when : ""));
+        // The commit icon before the short ID, as GitLab web's "-O- 37ec95d1"
+        android.graphics.drawable.Drawable icon = androidx.core.content.ContextCompat.getDrawable(
+                requireContext(), R.drawable.commit).mutate();
+        int size = Math.round(meta.getTextSize() * 1.2f);
+        icon.setBounds(0, 0, size, size);
+        icon.setTint(UiUtils.resolveColor(requireContext(), android.R.attr.textColorSecondary));
+        meta.setCompoundDrawablesRelative(icon, null, null, null);
+        meta.setCompoundDrawablePadding(Math.round(meta.getTextSize() * 0.3f));
+        final String owner = ownerFromPath(mRepository);
+        final String name = mRepository.path != null ? mRepository.path : mRepository.name();
+        row.setOnClickListener(v -> startActivity(com.gl4a.activities.CommitActivity.makeIntent(
+                getActivity(), owner, name, commit.sha())));
+        row.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * README, licence, CHANGELOG and CONTRIBUTING shortcuts for those on the selected branch,
+     * as on GitLab web (#271). README scrolls to the README below; the others open the file.
+     */
+    private void showFileShortcuts() {
+        if (mContentView == null || mTopFiles == null) return;
+        com.google.android.material.chip.ChipGroup group =
+                mContentView.findViewById(R.id.cg_file_shortcuts);
+        group.removeAllViews();
+        final String ref = mRef != null ? mRef : mRepository.defaultBranch();
+        final String owner = ownerFromPath(mRepository);
+        final String name = mRepository.path != null ? mRepository.path : mRepository.name();
+        String readme = null, license = null, changelog = null, contributing = null;
+        for (com.gl4a.gitlab.model.GitLabTreeItem file : mTopFiles) {
+            if (!file.isFile() || file.name == null) continue;
+            String lower = file.name.toLowerCase(Locale.ROOT);
+            if (readme == null && lower.startsWith("readme")) readme = file.path;
+            else if (license == null && (lower.startsWith("license")
+                    || lower.startsWith("licence") || lower.startsWith("copying"))) {
+                license = file.path;
+            } else if (changelog == null && lower.startsWith("changelog")) changelog = file.path;
+            else if (contributing == null && lower.startsWith("contributing")) {
+                contributing = file.path;
+            }
+        }
+        if (readme != null) {
+            // Named as the file is ("README"), like the other shortcuts
+            String label = readme.contains(".")
+                    ? readme.substring(0, readme.lastIndexOf('.')) : readme;
+            addShortcut(group, label, R.drawable.description, v -> {
+                if (!mIsReadmeExpanded) toggleReadmeExpanded();
+                View card = (View) mReadmeTitleView.getParent();
+                if (mContentView instanceof androidx.core.widget.NestedScrollView) {
+                    ((androidx.core.widget.NestedScrollView) mContentView)
+                            .smoothScrollTo(0, ((View) card.getParent()).getTop());
+                }
+            });
+        }
+        if (license != null) {
+            final String path = license;
+            addShortcut(group, mLicenseName != null ? mLicenseName
+                    : getString(R.string.repo_shortcut_license), R.drawable.license,
+                    v -> startActivity(com.gl4a.activities.FileViewerActivity.makeIntent(
+                            getActivity(), owner, name, ref, path)));
+        }
+        for (String path : new String[] { changelog, contributing }) {
+            if (path == null) continue;
+            String label = path.contains(".") ? path.substring(0, path.lastIndexOf('.')) : path;
+            addShortcut(group, label, R.drawable.file,
+                    v -> startActivity(com.gl4a.activities.FileViewerActivity.makeIntent(
+                            getActivity(), owner, name, ref, path)));
+        }
+        group.setVisibility(group.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    /**
+     * A shortcut pill: a plain label with an icon, not a Material chip, whose own touch
+     * handling kept a swipe started on it from switching tabs (#271).
+     */
+    private void addShortcut(com.google.android.material.chip.ChipGroup group, String label,
+            int icon, View.OnClickListener onClick) {
+        Context context = group.getContext();
+        float density = context.getResources().getDisplayMetrics().density;
+        TextView pill = new TextView(context);
+        pill.setText(label);
+        pill.setTextAppearance(android.R.style.TextAppearance_Small);
+        pill.setTextColor(UiUtils.resolveColor(context, android.R.attr.textColorPrimary));
+        pill.setBackgroundResource(R.drawable.shortcut_pill);
+        pill.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        int horizontal = Math.round(12 * density), vertical = Math.round(6 * density);
+        pill.setPadding(horizontal, vertical, horizontal, vertical);
+        android.graphics.drawable.Drawable drawable =
+                androidx.core.content.ContextCompat.getDrawable(context, icon).mutate();
+        int size = Math.round(18 * density);
+        drawable.setBounds(0, 0, size, size);
+        drawable.setTint(UiUtils.resolveColor(context, android.R.attr.textColorSecondary));
+        pill.setCompoundDrawablesRelative(drawable, null, null, null);
+        pill.setCompoundDrawablePadding(Math.round(6 * density));
+        android.util.TypedValue ripple = new android.util.TypedValue();
+        context.getTheme().resolveAttribute(android.R.attr.selectableItemBackground, ripple,
+                true);
+        pill.setForeground(androidx.core.content.ContextCompat.getDrawable(context,
+                ripple.resourceId));
+        pill.setOnClickListener(onClick);
+        group.addView(pill);
     }
 
     private void toggleStarringState() {

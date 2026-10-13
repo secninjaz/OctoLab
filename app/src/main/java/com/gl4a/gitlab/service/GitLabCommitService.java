@@ -30,6 +30,22 @@ public interface GitLabCommitService {
             @Query("until") String until
     );
 
+    /** Branches and tags containing the commit ({"type": "branch"|"tag", "name"}) (#273). */
+    @GET("projects/{id}/repository/commits/{sha}/refs?type=all")
+    Single<Response<List<java.util.Map<String, Object>>>> getCommitRefs(
+            @Path("id") long projectId,
+            @Path("sha") String sha,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
+    /** Merge requests the commit is part of, read as issues for their title and link (#273). */
+    @GET("projects/{id}/repository/commits/{sha}/merge_requests")
+    Single<Response<List<com.gl4a.gitlab.model.GitLabIssue>>> getCommitMergeRequests(
+            @Path("id") long projectId,
+            @Path("sha") String sha
+    );
+
     @GET("projects/{id}/repository/commits/{sha}")
     Single<Response<GitLabCommit>> getCommit(
             @Path("id") long projectId,

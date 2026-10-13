@@ -204,6 +204,9 @@ public abstract class DiffViewerActivity<C extends GitLabComment> extends WebVie
         }
         content.append("</title>");
         HtmlUtils.writeCssInclude(content, "diff", cssTheme);
+        // Added and removed lines in the theme's diff colours, as every diff in the app (#274)
+        content.append("<style>").append(com.gl4a.utils.MarkdownStyle.of(this).diffViewCss())
+                .append("</style>");
         HtmlUtils.writeScriptInclude(content, "codeutils");
         content.append("</head><body");
 

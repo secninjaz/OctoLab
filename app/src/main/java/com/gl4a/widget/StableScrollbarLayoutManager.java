@@ -30,8 +30,61 @@ public class StableScrollbarLayoutManager extends LinearLayoutManager {
         super(context);
     }
 
+    /** Rows scrolled off that a list of comments keeps as they are (#256). */
+    private static final int KEPT_ROWS = 10;
+
+    /**
+     * THE list setup for every screen of GitLab comments: issue and MR discussions, commit
+     * comments and reviews (#258). Comments shown in the web view keep their bottom in place
+     * at the top edge, recent rows come back without loading again, and the scrollbar keeps
+     * its size. Call from createLayoutManager and onRecyclerViewInflated respectively.
+     */
+    public static StableScrollbarLayoutManager forComments(Context context,
+            @Nullable CollapsedRows collapsedRows) {
+        StableScrollbarLayoutManager layoutManager = new StableScrollbarLayoutManager(context);
+        layoutManager.setCollapsedRows(collapsedRows);
+        return layoutManager;
+    }
+
+    /** See {@link #forComments}. */
+    public static void setUpCommentList(RecyclerView list) {
+        list.setItemViewCacheSize(KEPT_ROWS);
+    }
+
     public void setCollapsedRows(@Nullable CollapsedRows collapsedRows) {
         mCollapsedRows = collapsedRows;
+    }
+
+    /** Whether the row was just tapped, as HttpImageGetter marks it (#256). */
+    private static boolean wasTapped(View row) {
+        Object until = row.getTag(com.gl4a.R.id.row_tapped_until);
+        return until instanceof Long && android.os.SystemClock.uptimeMillis() < (Long) until;
+    }
+
+    @Override
+    public void onLayoutChildren(RecyclerView.Recycler recycler, RecyclerView.State state) {
+        View before = getChildCount() > 0 ? getChildAt(0) : null;
+        int beforePos = before != null ? getPosition(before) : -1;
+        int beforeTop = before != null ? before.getTop() : 0;
+        int beforeH = before != null ? before.getHeight() : 0;
+        super.onLayoutChildren(recycler, state);
+        View after = getChildCount() > 0 ? getChildAt(0) : null;
+        int afterPos = after != null ? getPosition(after) : -1;
+        // The row at the top edge, partly above it, changed height without being tapped (its
+        // content loaded or came back, e.g. a comment's web view): the list keeps that row's
+        // top in place, so scrolling up jumped from the bottom being looked at to the
+        // comment's top. Scroll by the change in this same layout, so its bottom stays put. A
+        // section expanded by tap opens downwards as before (#256).
+        if (after != null && !state.isPreLayout() && afterPos == beforePos
+                && after.getTop() == beforeTop && beforeTop < getPaddingTop()
+                && after.getHeight() != beforeH && !wasTapped(after)) {
+            int delta = after.getHeight() - beforeH;
+            // Shrinking moves it down: never past the top edge
+            delta = Math.max(delta, beforeTop - getPaddingTop());
+            if (delta != 0) {
+                scrollVerticallyBy(delta, recycler, state);
+            }
+        }
     }
 
     @Override

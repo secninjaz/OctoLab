@@ -33,9 +33,18 @@ public class BookmarksProvider extends ContentProvider {
         String EXTRA = "extra_data";
         String ORDER_ID = "order_id";
         String ACCOUNT = "account";
+        // The user's, group's or project's ID and avatar address, for its picture (#265)
+        String OBJECT_ID = "object_id";
+        String AVATAR_URL = "avatar_url";
 
         int TYPE_USER = 0;
         int TYPE_REPO = 1;
+        // More kinds (#263); see BookmarkActions
+        int TYPE_GROUP = 2;
+        int TYPE_ISSUE = 3;
+        int TYPE_MERGE_REQUEST = 4;
+        int TYPE_COMMIT = 5;
+        int TYPE_SNIPPET = 6;
     }
 
     private static final int MATCH_ALL = 0;
@@ -54,6 +63,12 @@ public class BookmarksProvider extends ContentProvider {
     // url must be resolvable by BrowseFilter!
     public static void saveBookmark(Context context, String name, int type, String url,
             String extraData, boolean showToast) {
+        saveBookmark(context, name, type, url, extraData, 0, null, showToast);
+    }
+
+    /** @param objectId the user's, group's or project's ID for its picture; 0 if none */
+    public static void saveBookmark(Context context, String name, int type, String url,
+            String extraData, long objectId, String avatarUrl, boolean showToast) {
         ContentResolver cr = context.getContentResolver();
         String account = com.gl4a.Gl4Application.get().getAuthLogin();
 
@@ -64,6 +79,8 @@ public class BookmarksProvider extends ContentProvider {
         cv.put(BookmarksProvider.Columns.EXTRA, extraData);
         cv.put(BookmarksProvider.Columns.ORDER_ID, getNextOrderId(cr));
         cv.put(BookmarksProvider.Columns.ACCOUNT, account != null ? account : "");
+        cv.put(BookmarksProvider.Columns.OBJECT_ID, objectId);
+        cv.put(BookmarksProvider.Columns.AVATAR_URL, avatarUrl);
 
         if (cr.insert(BookmarksProvider.Columns.CONTENT_URI, cv) != null && showToast) {
             Toast.makeText(context, R.string.bookmark_saved, Toast.LENGTH_LONG).show();

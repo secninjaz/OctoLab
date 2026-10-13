@@ -117,8 +117,9 @@ public class RefPathDisambiguationTask extends UrlLoadTask {
 
         // then look for matching branches
         return SingleFactory.getProjectId(mRepoOwner, mRepoName)
-                .flatMap(projectId -> projectService.getBranches(projectId, 1, 100)
-                        .map(ApiHelpers::throwOnFailure)
+                // Every page: a project can have more than 100 branches or tags (#269)
+                .flatMap(projectId -> ApiHelpers.<GitLabBranch>allPages(
+                                page -> projectService.getBranches(projectId, page, 100))
                         .map(branches -> {
                             for (GitLabBranch b : branches) {
                                 if (matchesUrlPath(b)) return Optional.of(b);
@@ -127,8 +128,8 @@ public class RefPathDisambiguationTask extends UrlLoadTask {
                         })
                         // and tags after that
                         .flatMap(result -> RxUtils.toSingleOrFallback(result, () ->
-                                projectService.getTags(projectId, 1, 100)
-                                        .map(ApiHelpers::throwOnFailure)
+                                ApiHelpers.<GitLabTag>allPages(
+                                                page -> projectService.getTags(projectId, page, 100))
                                         .map(tags -> {
                                             for (GitLabTag tag : tags) {
                                                 if (mRefAndPath.equals(tag.name) || mRefAndPath.startsWith(tag.name + "/")) {

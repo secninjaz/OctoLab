@@ -208,8 +208,22 @@ public class CommitActivity extends BaseFragmentPagerActivity implements
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.commit_menu, menu);
+        com.gl4a.utils.BookmarkActions.prepareMenu(this, menu, bookmarkTarget());
 
         return super.onCreateOptionsMenu(menu);
+    }
+
+    /** Bookmarked by GitLab's address for it, with its project and short ID below (#263). */
+    @androidx.annotation.Nullable
+    private com.gl4a.utils.BookmarkActions.Target bookmarkTarget() {
+        if (mCommit == null || mObjectSha == null) return null;
+        String url = mCommit.webUrl != null ? mCommit.webUrl
+                : com.gl4a.Gl4Application.get().getInstanceUrl() + "/" + mRepoOwner + "/"
+                        + mRepoName + "/-/commit/" + mObjectSha;
+        String shortId = mObjectSha.length() > 8 ? mObjectSha.substring(0, 8) : mObjectSha;
+        String title = mCommit.title != null ? mCommit.title : shortId;
+        return new com.gl4a.utils.BookmarkActions.Target(com.gl4a.db.BookmarksProvider.Columns.TYPE_COMMIT, url, title,
+                mRepoOwner + "/" + mRepoName + "@" + shortId);
     }
 
     @Override
@@ -223,6 +237,9 @@ public class CommitActivity extends BaseFragmentPagerActivity implements
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        if (com.gl4a.utils.BookmarkActions.onMenuItemSelected(this, item, bookmarkTarget())) {
+            return true;
+        }
         Uri diffUri = IntentUtils.createBaseUriForRepo(mRepoOwner, mRepoName)
                 .appendPath("commit")
                 .appendPath(mObjectSha)
@@ -293,6 +310,7 @@ public class CommitActivity extends BaseFragmentPagerActivity implements
                 .subscribe(result -> {
                     mCommit = result;
                     showContentIfReady();
+                    supportInvalidateOptionsMenu();
                 }, this::handleLoadFailure);
     }
 
@@ -314,8 +332,9 @@ public class CommitActivity extends BaseFragmentPagerActivity implements
     private void loadDiffs(boolean force) {
         GitLabCommitService service = ServiceFactory.get(GitLabCommitService.class, force);
         resolveProjectId()
-                .flatMap(projectId -> service.getCommitDiff(projectId, mObjectSha, 1, 100)
-                        .map(ApiHelpers::throwOnFailure))
+                // Every page: a commit can change more than 100 files (#272)
+                .flatMap(projectId -> ApiHelpers.<GitLabDiff>allPages(
+                        page -> service.getCommitDiff(projectId, mObjectSha, page, 100)))
                 .<List<GitLabDiff>>compose(makeLoaderSingle(ID_LOADER_DIFFS, force))
                 .subscribe(result -> {
                     mDiffs = result;

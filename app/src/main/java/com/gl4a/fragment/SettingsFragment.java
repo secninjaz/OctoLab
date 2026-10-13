@@ -49,6 +49,8 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
     public static final String KEY_CUSTOM_TABS = "use_custom_tabs";
     public static final String KEY_NOTIFICATIONS = "notifications";
     public static final String KEY_NOTIFICATION_INTERVAL = "notification_interval";
+    /** Notify new comments on issues and MRs the user participates in (#267). */
+    public static final String KEY_NOTIFY_PARTICIPATING = "notify_participating";
     private static final String KEY_ABOUT = "about";
     private static final String KEY_OPEN_SOURCE_COMPONENTS = "open_source_components";
     private static final String KEY_DEBUG_LOGGING = DebugLogger.PREF_KEY_ENABLED;

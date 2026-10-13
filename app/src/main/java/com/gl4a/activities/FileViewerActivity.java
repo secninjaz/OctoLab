@@ -97,6 +97,10 @@ public class FileViewerActivity extends WebViewerActivity
         String filename = FileUtils.getFileName(mPath);
         if (FileUtils.isBinaryFormat(filename) && !FileUtils.isImage(filename)) {
             openUnsuitableFileAndFinish();
+        } else if (FileUtils.getMimeTypeFor(filename) == null) {
+            // Unknown type (.AppImage, no extension…): GitLab knows whether it's text; only
+            // text is shown here, anything else opens like other files (#245)
+            checkTypeWithGitLab();
         } else {
             loadFile(false);
         }
@@ -222,8 +226,13 @@ public class FileViewerActivity extends WebViewerActivity
                 IntentUtils.launchBrowser(this, url);
                 return true;
             case R.id.download:
-                DownloadUtils.enqueueDownloadWithPermissionCheck(this, buildRawFileUrl(),
-                        FileUtils.getMimeTypeFor(mPath), FileUtils.getFileName(mPath), null);
+                // With the account token, by project ID, as in the file list (#245)
+                com.gl4a.utils.SingleFactory.getProjectId(mRepoOwner, mRepoName)
+                        .compose(com.gl4a.utils.RxUtils::doInBackground)
+                        .subscribe(projectId -> DownloadUtils.enqueueAuthenticatedDownload(this,
+                                DownloadUtils.repositoryFileUrl(projectId, mPath, mRef),
+                                FileUtils.getFileName(mPath), FileUtils.getMimeTypeFor(mPath),
+                                null), error -> handleLoadFailure(error));
                 return true;
             case R.id.share:
                 IntentUtils.share(this, getString(R.string.share_file_subject,
@@ -300,17 +309,52 @@ public class FileViewerActivity extends WebViewerActivity
         return IntentUtils.createRawFileUrl(mRepoOwner, mRepoName, mRef, mPath);
     }
 
+    /**
+     * Files this screen can't show (videos, PDFs, documents…) open like attachments: played
+     * in-app, or downloaded with the account token and handed to an installed app, never via
+     * the browser, whose raw link needs a browser login (#245). The project is addressed by ID,
+     * since owner/repo here can be display names.
+     */
+    private void checkTypeWithGitLab() {
+        com.gl4a.utils.SingleFactory.getProjectId(mRepoOwner, mRepoName)
+                .map(projectId -> {
+                    String tok = com.gl4a.Gl4Application.get().getAuthToken();
+                    okhttp3.Request head = new okhttp3.Request.Builder()
+                            .url(com.gl4a.utils.DownloadUtils.repositoryFileUrl(
+                                    projectId, mPath, mRef))
+                            .head()
+                            .header("PRIVATE-TOKEN", tok != null ? tok : "")
+                            .build();
+                    try (okhttp3.Response resp = com.gl4a.ServiceFactory.getImageHttpClient()
+                            .newCall(head).execute()) {
+                        String type = resp.header("Content-Type", "");
+                        return type.startsWith("text/") || type.contains("xml")
+                                || type.contains("json");
+                    }
+                })
+                .compose(com.gl4a.utils.RxUtils::doInBackground)
+                .subscribe(isText -> {
+                    if (isText) {
+                        loadFile(false);
+                    } else {
+                        openUnsuitableFileAndFinish();
+                    }
+                }, error -> loadFile(false));
+    }
+
     private void openUnsuitableFileAndFinish() {
-        Uri uri = Uri.parse(buildRawFileUrl());
-        String mime = FileUtils.getMimeTypeFor(FileUtils.getFileName(mPath));
-        Intent intent = IntentUtils.createViewerOrBrowserIntent(this, uri, mime);
-        if (intent == null) {
-            handleLoadFailure(new ActivityNotFoundException());
-            findViewById(R.id.retry_button).setVisibility(View.GONE);
-        } else {
-            startActivity(intent);
-            finish();
-        }
+        String fileName = FileUtils.getFileName(mPath);
+        com.gl4a.utils.SingleFactory.getProjectId(mRepoOwner, mRepoName)
+                .compose(com.gl4a.utils.RxUtils::doInBackground)
+                .subscribe(projectId -> {
+                    Uri uri = Uri.parse(com.gl4a.utils.DownloadUtils.repositoryFileUrl(
+                            projectId, mPath, mRef));
+                    startActivity(AttachmentViewerActivity.makeIntent(this, uri, fileName));
+                    finish();
+                }, error -> {
+                    handleLoadFailure(error);
+                    findViewById(R.id.retry_button).setVisibility(View.GONE);
+                });
     }
 
     private static String highlightImage(String imageUrl, String cssTheme, String title) {

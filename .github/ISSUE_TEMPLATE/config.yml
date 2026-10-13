@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/secninjaz/OctoLab/blob/main/SECURITY.md
+    about: Please report security problems privately as described in the security policy, not as a public issue.

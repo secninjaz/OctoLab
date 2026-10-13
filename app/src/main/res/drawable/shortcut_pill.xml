@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A project file shortcut on the About tab (#271): a light pill, as on GitLab web -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/colorControlHighlight" />
+    <corners android:radius="16dp" />
+</shape>

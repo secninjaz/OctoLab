@@ -21,13 +21,7 @@ pre > div {
     color: #eee;
 }
 
-.add {
-    background-color: #DFD;
-}
-
-.remove {
-    background-color: #FDD;
-}
+/* .add and .remove: the theme's diff colours, added by the app from MarkdownStyle (#274) */
 
 .comment {
     white-space: normal;

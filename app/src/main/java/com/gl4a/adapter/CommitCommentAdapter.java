@@ -68,6 +68,8 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
         void deleteComment(GitLabComment comment);
         void quoteText(CharSequence text);
         void addText(CharSequence text);
+        /** The comment's web link, for sharing; null when there's none (#253). */
+        default String getShareUrl(GitLabComment comment) { return null; }
     }
 
     private final HttpImageGetter mImageGetter;
@@ -92,11 +94,15 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
                     mActionCallback.deleteComment(item);
                     return true;
 
-                case R.id.share:
-                    String subject = mContext.getString(R.string.share_commit_comment_subject,
-                            item.id(), mRepoOwner + "/" + mRepoName);
-                    IntentUtils.share(mContext, subject, Uri.parse(item.htmlUrl()));
+                case R.id.share: {
+                    String url = mActionCallback.getShareUrl(item);
+                    if (url != null) {
+                        String subject = mContext.getString(R.string.share_commit_comment_subject,
+                                item.id(), mRepoOwner + "/" + mRepoName);
+                        IntentUtils.share(mContext, subject, Uri.parse(url));
+                    }
                     return true;
+                }
             }
             return false;
         }

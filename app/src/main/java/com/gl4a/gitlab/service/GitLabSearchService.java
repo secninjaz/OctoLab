@@ -30,6 +30,7 @@ public interface GitLabSearchService {
             @Query("per_page") int perPage
     );
 
+    /** Issues, or merge requests with scope "merge_requests": they read as issues (#262). */
     @GET("search")
     Single<Response<List<GitLabIssue>>> searchIssues(
             @Query("scope") String scope,

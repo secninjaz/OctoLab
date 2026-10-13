@@ -54,6 +54,11 @@ public class EventAdapter extends RootAdapter<GitLabEvent, EventAdapter.EventVie
         View v = inflater.inflate(R.layout.row_event, parent, false);
         EventViewHolder holder = new EventViewHolder(v);
         holder.ivGravatar.setOnClickListener(this);
+        // Links in the title (#140); the rest of the title still taps through to the item
+        holder.tvTitle.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+        holder.tvTitle.setClickable(false);
+        holder.tvTitle.setLongClickable(false);
+        holder.tvTitle.setFocusable(false);
         return holder;
     }
 
@@ -67,6 +72,8 @@ public class EventAdapter extends RootAdapter<GitLabEvent, EventAdapter.EventVie
         holder.tvActor.setText(ApiHelpers.getUserNameWithType(mContext, actor));
 
         SpannableStringBuilder title = StringUtils.applyBoldTags(formatTitle(event));
+        // The project, branch or tag and references link as on GitLab web (#140)
+        com.gl4a.utils.EventLinks.linkify(title, event, mProjectPaths.get(event.projectId));
         holder.tvTitle.setText(title);
 
         holder.tvCreatedAt.setText(StringUtils.formatRelativeTime(

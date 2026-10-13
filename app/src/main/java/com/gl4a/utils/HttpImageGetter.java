@@ -593,7 +593,7 @@ public class HttpImageGetter {
                     && !mMarkdownApiInProgress.contains(id)) {
                 requestServerHtml(info, markdown, id, true).subscribe();
             }
-            if (info.mServerHtml != null && info.mServerHtml.contains("<table")
+            if (info.mServerHtml != null && needsWebView(info.mServerHtml)
                     && view.getParent() != null) {
                 // Re-populate the table WebView from cached server HTML.
                 android.webkit.WebView wvTable =
@@ -763,9 +763,11 @@ public class HttpImageGetter {
                             .replaceAll("\\s*data-src=\"[^\"]*\"", "")
                             .replaceAll("\\s*data-canonical-src=\"[^\"]*\"", "")
                             .replaceAll("\\s*data-sourcepos=\"[^\"]*\"", "")
-                            .replaceAll("\\s*class=\"[^\"]*\"", "")
                             .replaceAll("\\s*dir=\"[^\"]*\"", "")
-                            .replaceAll("\\s*decoding=\"[^\"]*\"", "");
+                            .replaceAll("\\s*decoding=\"[^\"]*\"", "")
+                            // GitLab's stored rendering writes newlines as &#x000A;, which the
+                            // HTML parser dropped, joining the words at a line break (#254)
+                            .replaceAll("(?i)&#x0*a;|&#0*10;", "\n");
                     // Make relative src absolute.
                     html = html.replaceAll("src=\"(/[^\"]+)\"",
                             "src=\"" + instanceUrl + "$1\"");
@@ -821,10 +823,10 @@ public class HttpImageGetter {
                         return false;
                     }
                     info.mServerRendered = true;
-                    // If HTML contains a table, render in a companion WebView (wv_table) for
-                    // proper grid display. Otherwise use Html.fromHtml() via the existing
+                    // Content Android text can't show as GitLab web does goes to the companion
+                    // WebView (wv_table); everything else uses Html.fromHtml() via the existing
                     // encode/apply path.
-                    if (html.contains("<table")) {
+                    if (needsWebView(html)) {
                         // Cache server HTML so the table can be re-shown when the ViewHolder
                         // is recycled and rebound.
                         info.mServerHtml = html;
@@ -844,6 +846,7 @@ public class HttpImageGetter {
                             }
                         }
                         if (shown) {
+                            storedHtmlWins(info, stored, id, embedImages);
                             return true;
                         }
                     }
@@ -857,11 +860,7 @@ public class HttpImageGetter {
                         // Not on screen yet: its images load when it's bound (#202)
                         info.applyEncoded(rendered.second);
                     }
-                    if (!stored && info.mStoredHtml != null) {
-                        // GitLab's stored rendering arrived meanwhile: it wins (#199)
-                        info.mServerRendered = false;
-                        requestServerHtml(info, null, id, embedImages).subscribe();
-                    }
+                    storedHtmlWins(info, stored, id, embedImages);
                     return true;
                 })
                 .onErrorReturn(error -> {
@@ -874,6 +873,31 @@ public class HttpImageGetter {
                 .doOnDispose(() -> mMarkdownApiInProgress.remove(id));
     }
 
+    /**
+     * THE decision how GitLab content is shown (#254): in the web view when it has what
+     * Android text can't show as GitLab web does — a table, a code block (scrolls sideways) or
+     * a collapsible section (opens on tap) — else as Android text. Both use the shared style
+     * (MarkdownStyle).
+     */
+    static boolean needsWebView(String html) {
+        return html.contains("<table") || html.contains("<pre") || html.contains("<details");
+    }
+
+    /**
+     * GitLab's stored rendering arrived while the markdown API's was in progress: show it
+     * instead (#199). Also for a note with a table, which returned before this, so its web
+     * view kept the markdown API's rendering, e.g. without "(closed)" on references (#251).
+     */
+    private void storedHtmlWins(ObjectInfo info, boolean stored, Object id, boolean embedImages) {
+        if (!stored && info.mStoredHtml != null) {
+            info.mServerRendered = false;
+            requestServerHtml(info, null, id, embedImages).subscribe();
+        }
+    }
+
+    /** The height each web view content was last shown at, by content (#256). */
+    private final java.util.Map<Integer, Integer> mWebViewHeights = new java.util.HashMap<>();
+
     private void showTableInWebView(android.view.View tvDesc,
             android.webkit.WebView wvTable, String html) {
         tvDesc.setVisibility(android.view.View.GONE);
@@ -885,6 +909,13 @@ public class HttpImageGetter {
         wvTable.setVerticalScrollBarEnabled(false);
         wvTable.setHorizontalScrollBarEnabled(false);
         wvTable.setWebViewClient(new android.webkit.WebViewClient() {
+            @Override
+            public void onPageFinished(android.webkit.WebView v, String url) {
+                // Loaded: let it take its own height again (a section may have been
+                // collapsed since), once that height has been laid out (#256)
+                v.postDelayed(() -> reserveHeight(v, 0), 300);
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(android.webkit.WebView v,
                     android.webkit.WebResourceRequest req) {
@@ -907,32 +938,125 @@ public class HttpImageGetter {
                 return true;
             }
         });
-        // Transparent, with header and borders as tints of the text colour, so the table sits
-        // on whatever is behind it (a timeline card, the issue header) in either theme, like
-        // the rest of the note (#192). colorBackground differs from the cards' colour.
-        int[] attrs = {android.R.attr.textColorPrimary, android.R.attr.textColorLink};
-        android.content.res.TypedArray ta = mContext.obtainStyledAttributes(attrs);
-        int fgInt = ta.getColor(0, 0xFF212121);
-        int linkInt = ta.getColor(1, 0xFFE24329);
-        ta.recycle();
-        String fg = String.format("#%06X", 0xFFFFFF & fgInt);
-        String fgRgb = android.graphics.Color.red(fgInt) + ","
-                + android.graphics.Color.green(fgInt) + "," + android.graphics.Color.blue(fgInt);
-        String link = String.format("#%06X", 0xFFFFFF & linkInt);
-        String wrapped = "<html><head><style>"
-                + "body{font-size:14px;font-family:sans-serif;background:transparent"
-                + ";color:" + fg + ";margin:0;padding:0;overflow:hidden}"
-                + "table{border-collapse:collapse;width:100%;margin-bottom:12px}"
-                + "th,td{border:1px solid rgba(" + fgRgb + ",0.25);padding:6px 10px;"
-                + "text-align:left}"
-                + "th{background:rgba(" + fgRgb + ",0.06);color:" + fg + ";font-weight:bold}"
-                + "td{color:" + fg + "}"
-                + "code{background:rgba(" + fgRgb + ",0.08);border-radius:3px;padding:0 3px}"
-                + "a,a:visited{color:" + link + "}"
-                + "::-webkit-scrollbar{display:none}"
-                + "</style></head><body>" + html + "</body></html>";
+        // Transparent, so the content sits on whatever is behind it (a timeline card, the
+        // issue header) in either theme, like the rest of the note (#192). The look is the
+        // shared one Android text uses too (#251).
+        // Only a table or code block wider than the screen scrolls sideways, inside its own
+        // box, as in READMEs; everything else stays within the width, so the page never pans
+        // (#248)
+        String wrapped = MarkdownStyle.webViewPage(mContext, html, "");
+        // The stylesheet sizes text as Android text is, system font size included
+        wvTable.getSettings().setTextZoom(100);
+        // Tapping (e.g. to expand a section) must not focus the view: the list then scrolls
+        // the whole view into sight, which jumped back to its top (#251)
+        wvTable.setFocusableInTouchMode(false);
+        keepSidewaysDragsInWebView(wvTable);
         wvTable.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        // Shown again when scrolled back to, or re-bound: keep what's there, with any section
+        // expanded and table scrolled, instead of loading it again (#251)
+        if (wrapped.equals(wvTable.getTag(com.gl4a.R.id.wv_table))) {
+            return;
+        }
+        // While it loads, keep the height this content had when last shown, so the list
+        // doesn't move when it's scrolled back to; released once loaded (#256)
+        Integer knownHeight = mWebViewHeights.get(wrapped.hashCode());
+        reserveHeight(wvTable, knownHeight != null ? knownHeight : 0);
+        rememberWebViewHeight(wvTable);
+        wvTable.setTag(com.gl4a.R.id.wv_table, wrapped);
         wvTable.loadDataWithBaseURL(null, wrapped, "text/html", "utf-8", null);
+    }
+
+    /**
+     * Reserves {@code height} for the web view's content while it loads. A WebView ignores a
+     * minimum height while it has no content, so a comment's row came into the list at the
+     * placeholder's height (304px for a 4236px comment) and grew ~60 ms later: fast scrolling
+     * skipped past it and the scrollbar changed size. Set on the comment's content container
+     * (its text and web view, row_timeline_comment's ll_content) where there is one, which
+     * does honour it (#256).
+     */
+    private static void reserveHeight(android.view.View webView, int height) {
+        android.view.ViewParent parent = webView.getParent();
+        if (parent instanceof android.widget.LinearLayout
+                && ((android.view.ViewGroup) parent).getChildCount() == 2) {
+            android.view.ViewGroup.LayoutParams lp = webView.getLayoutParams();
+            int margins = lp instanceof android.view.ViewGroup.MarginLayoutParams
+                    ? ((android.view.ViewGroup.MarginLayoutParams) lp).topMargin
+                            + ((android.view.ViewGroup.MarginLayoutParams) lp).bottomMargin
+                    : 0;
+            ((android.view.View) parent).setMinimumHeight(height > 0 ? height + margins : 0);
+        } else {
+            webView.setMinimumHeight(height);
+        }
+    }
+
+    /** Records the height each content is shown at, for {@link #showTableInWebView} (#256). */
+    private void rememberWebViewHeight(android.webkit.WebView webView) {
+        if (webView.getTag(com.gl4a.R.id.webview_height_listener) != null) {
+            return;
+        }
+        webView.setTag(com.gl4a.R.id.webview_height_listener, Boolean.TRUE);
+        webView.addOnLayoutChangeListener((v, left, top, right, bottom,
+                oldLeft, oldTop, oldRight, oldBottom) -> {
+            Object content = v.getTag(com.gl4a.R.id.wv_table);
+            int height = bottom - top;
+            if (content != null && height > 0 && v.getVisibility() == android.view.View.VISIBLE) {
+                mWebViewHeights.put(content.hashCode(), height);
+            }
+        });
+    }
+
+    /**
+     * The row was just tapped (e.g. a section expanded): StableScrollbarLayoutManager then lets
+     * it grow downwards as usual instead of keeping its bottom in place (#256).
+     */
+    private static void markRowTapped(android.view.View webView) {
+        android.view.View row = webView;
+        while (row.getParent() instanceof android.view.View
+                && !(row.getParent() instanceof androidx.recyclerview.widget.RecyclerView)) {
+            row = (android.view.View) row.getParent();
+        }
+        row.setTag(com.gl4a.R.id.row_tapped_until, android.os.SystemClock.uptimeMillis() + 2000);
+    }
+
+    /**
+     * A sideways drag in a table or code block scrolls it, instead of being taken over by the
+     * list around the web view part way through, which made it stop and start (#251). Vertical
+     * drags still scroll the list.
+     */
+    private static void keepSidewaysDragsInWebView(android.webkit.WebView webView) {
+        final int touchSlop = android.view.ViewConfiguration.get(webView.getContext())
+                .getScaledTouchSlop();
+        final float[] down = new float[2];
+        final boolean[] decided = new boolean[1];
+        webView.setOnTouchListener((v, event) -> {
+            switch (event.getActionMasked()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    down[0] = event.getX();
+                    down[1] = event.getY();
+                    decided[0] = false;
+                    break;
+                case android.view.MotionEvent.ACTION_UP:
+                    if (!decided[0]) {
+                        markRowTapped(v);
+                    }
+                    break;
+                case android.view.MotionEvent.ACTION_MOVE:
+                    if (!decided[0]) {
+                        float dx = Math.abs(event.getX() - down[0]);
+                        float dy = Math.abs(event.getY() - down[1]);
+                        if (dx > touchSlop || dy > touchSlop) {
+                            decided[0] = true;
+                            if (dx > dy && v.getParent() != null) {
+                                v.getParent().requestDisallowInterceptTouchEvent(true);
+                            }
+                        }
+                    }
+                    break;
+                default:
+                    break;
+            }
+            return false; // the web view still handles every touch itself
+        });
     }
 
     private String rewriteRawUrl(String url, String instanceUrl) {

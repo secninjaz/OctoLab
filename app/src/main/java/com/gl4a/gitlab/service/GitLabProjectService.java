@@ -50,9 +50,24 @@ public interface GitLabProjectService {
             @Query("per_page") int perPage
     );
 
+    /**
+     * The user's own projects matching a search, also by their group's path, as GitLab web
+     * matches them: "webmine" finds the projects in the WebMine group (#262).
+     */
+    @GET("projects?membership=true&search_namespaces=true&order_by=last_activity_at&sort=desc")
+    Single<Response<List<GitLabProject>>> searchOwnProjects(
+            @Query("search") String query,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
     // Get project by numeric ID
     @GET("projects/{id}")
     Single<Response<GitLabProject>> getProject(@Path("id") long projectId);
+
+    /** The project with the licence GitLab detected ("license": key, name, …) (#271). */
+    @GET("projects/{id}?license=true")
+    Single<Response<Map<String, Object>>> getProjectWithLicense(@Path("id") long projectId);
 
     // Get project by namespace/name — id must be URL-encoded as "namespace%2Frepo"
     // Callers must pass URLEncoder.encode(namespace + "/" + repo, "UTF-8")

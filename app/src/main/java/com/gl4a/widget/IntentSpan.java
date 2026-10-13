@@ -32,7 +32,7 @@ public class IntentSpan extends ClickableSpan {
 
     @Override
     public void updateDrawState(@NonNull TextPaint ds) {
-        ds.setUnderlineText(false);
+        ds.setUnderlineText(com.gl4a.utils.MarkdownStyle.UNDERLINE_LINKS);
         ds.setColor(UiUtils.resolveColor(mContext, android.R.attr.textColorLink));
     }
 }

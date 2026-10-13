@@ -1,21 +1,42 @@
-## Summary
+<!--
+Thanks for contributing! Before you start:
+- Please read CONTRIBUTING.md.
+- One change per pull/merge request, linked to the issue it fixes.
+- Title: a Conventional Commit, e.g. "fix(issues): keep the scroll position after a reply".
+Text between these arrows is only a hint and isn't shown in the request.
+-->
 
-<!-- What does this PR change and why? -->
+### Checks
+- [ ] Commit messages follow Conventional Commits (`fix: …`, `feat: …`), reverts included
+- [ ] Tested on a physical device or emulator
+- [ ] Tested in light and dark theme, if anything visible changed
+- [ ] Follows the existing code style; shared helpers used and extended, not re-implemented per screen
+- [ ] No hardcoded credentials, tokens or API keys; nothing private in logs
+- [ ] CHANGELOG updated under "Unreleased", for user-visible changes
+- [ ] I reviewed the attachments and removed any tokens or private information
 
-## Type of change
+### What this changes and why
 
+
+Closes #
+
+### Type of change
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Documentation
 - [ ] Other:
 
-## Checklist
+### How it was tested
+<!-- Device or emulator, Android version, gitlab.com and/or self-hosted GitLab. -->
+- Device or emulator:
+- Android version:
+- GitLab: gitlab.com / self-hosted
 
-- [ ] Tested on a physical device or emulator
-- [ ] No hardcoded credentials, tokens, or API keys
-- [ ] Follows the existing code style
-- [ ] Self-hosted GitLab instance tested (if applicable)
+### Screenshots
+<!-- Optional: before and after, for visible changes. -->
 
----
 
-> **Note:** Primary development happens on [GitLab](https://dev.taskmiles.com/testg/octolab). GitHub is a public mirror. PRs here are reviewed and cherry-picked to GitLab manually. For discussions or contributions you'd prefer to keep on GitLab, feel free to open an issue or MR there directly.
+### AI use
+<!-- Tick one. If AI tools were used, say which and for what (e.g. code, tests, text). -->
+- [ ] No AI tools were used
+- [ ] AI tools were used:

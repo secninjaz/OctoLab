@@ -1,7 +1,6 @@
 package com.gl4a.fragment;
 
 import android.database.Cursor;
-import android.net.Uri;
 import android.os.Bundle;
 
 import androidx.loader.app.LoaderManager;
@@ -16,7 +15,6 @@ import com.gl4a.BaseActivity;
 import com.gl4a.R;
 import com.gl4a.adapter.BookmarkAdapter;
 import com.gl4a.db.BookmarksProvider;
-import com.gl4a.resolver.BrowseFilter;
 
 public class BookmarkListFragment extends LoadingListFragmentBase implements
         LoaderManager.LoaderCallbacks<Cursor>, BookmarkAdapter.OnItemInteractListener {
@@ -97,7 +95,7 @@ public class BookmarkListFragment extends LoadingListFragmentBase implements
 
     @Override
     public void onItemClick(long id, String url) {
-        startActivity(BrowseFilter.makeRedirectionIntent(getActivity(), Uri.parse(url), null));
+        com.gl4a.utils.BookmarkActions.open(requireActivity(), url);
     }
 
     @Override

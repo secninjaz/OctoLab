@@ -296,6 +296,17 @@ public class NotificationsWorker extends Worker {
                 continue;
             }
 
+            // New comments on issues and MRs the user participates in (#267)
+            if (prefs.getBoolean(SettingsFragment.KEY_NOTIFY_PARTICIPATING, true)) {
+                try {
+                    int comments = notifyParticipatingComments(nm, prefs, login, apiBase, token);
+                    totalUnseen += comments;
+                    anyNew |= comments > 0;
+                } catch (Exception e) {
+                    Log.d(TAG, "Checking participating comments failed for " + login, e);
+                }
+            }
+
             synchronized (sPrefsLock) {
                 long lastCheck = prefs.getLong(keyLastCheck(login), 0);
                 long lastSeen  = prefs.getLong(keyLastSeen(login), 0);
@@ -393,6 +404,96 @@ public class NotificationsWorker extends Worker {
         return Result.success();
     }
 
+    private static String keyParticipatingCheck(String login) {
+        return "participating_last_check_" + login;
+    }
+
+    /**
+     * Notifies new comments by others on the issues and MRs the account participates in, as
+     * the shared definition has it (#267): only items updated since the last check, and only
+     * comments made since then. The first check only sets that starting point. A comment that
+     * mentions the user already comes as a to-do, so it's left to that.
+     *
+     * @return how many were notified
+     */
+    private int notifyParticipatingComments(NotificationManagerCompat nm,
+            SharedPreferences prefs, String login, String apiBase, String token) {
+        long now = System.currentTimeMillis();
+        long since = prefs.getLong(keyParticipatingCheck(login), 0);
+        if (since <= 0) {
+            prefs.edit().putLong(keyParticipatingCheck(login), now).apply();
+            return 0;
+        }
+        Context context = getApplicationContext();
+        com.gl4a.utils.Participation participation =
+                com.gl4a.utils.Participation.forAccount(context, login, apiBase, token);
+        String sinceIso = com.gl4a.utils.Participation.isoTime(since);
+        List<com.gl4a.gitlab.model.GitLabIssue> changed =
+                new ArrayList<>(participation.items(false, sinceIso, false));
+        changed.addAll(participation.items(true, sinceIso, false));
+
+        com.gl4a.gitlab.service.GitLabIssueService issues = ServiceFactory.getForAccount(
+                com.gl4a.gitlab.service.GitLabIssueService.class, apiBase, token);
+        com.gl4a.gitlab.service.GitLabMergeRequestService mrs = ServiceFactory.getForAccount(
+                com.gl4a.gitlab.service.GitLabMergeRequestService.class, apiBase, token);
+        com.gl4a.gitlab.service.GitLabProjectService projects = ServiceFactory.getForAccount(
+                com.gl4a.gitlab.service.GitLabProjectService.class, apiBase, token);
+        Map<Long, com.gl4a.gitlab.model.GitLabProject> projectsById = new HashMap<>();
+        Map<Long, android.graphics.Bitmap> logos = new HashMap<>();
+        Map<String, android.graphics.Bitmap> icons = new HashMap<>();
+        int posted = 0;
+        for (com.gl4a.gitlab.model.GitLabIssue item : changed) {
+            if (posted >= MAX_TODO_NOTIFICATIONS_PER_ACCOUNT) break;
+            boolean mergeRequest = item.webUrl != null
+                    && item.webUrl.contains("/-/merge_requests/");
+            List<com.gl4a.gitlab.model.GitLabComment> notes;
+            try {
+                notes = (mergeRequest
+                        ? mrs.getComments(item.projectId, item.iid, "desc", 1, 20)
+                        : issues.getComments(item.projectId, item.iid, "desc", 1, 20))
+                        .map(ApiHelpers::throwOnFailure)
+                        .blockingGet();
+            } catch (Exception e) {
+                continue;
+            }
+            for (com.gl4a.gitlab.model.GitLabComment note : notes) {
+                if (posted >= MAX_TODO_NOTIFICATIONS_PER_ACCOUNT) break;
+                if (note.system || note.author == null
+                        || ApiHelpers.loginEquals(note.author, login)
+                        || com.gl4a.utils.Participation.isoMillis(note.createdAt) <= since) {
+                    continue;
+                }
+                String body = note.body();
+                if (body != null && body.contains("@" + login)) continue;
+                com.gl4a.gitlab.model.GitLabProject project = projectsById.get(item.projectId);
+                if (project == null && !projectsById.containsKey(item.projectId)) {
+                    try {
+                        project = projects.getProject(item.projectId)
+                                .map(ApiHelpers::throwOnFailure).blockingGet();
+                    } catch (Exception ignored) {
+                    }
+                    projectsById.put(item.projectId, project);
+                }
+                // Shown as the to-dos are, so it looks and opens the same: at the comment
+                GitLabTodo comment = new GitLabTodo();
+                comment.id = -note.id;
+                comment.project = project;
+                comment.author = note.author;
+                comment.actionName = "commented";
+                comment.targetType = mergeRequest ? "MergeRequest" : "Issue";
+                comment.target = item;
+                comment.targetUrl = item.webUrl + "#note_" + note.id;
+                comment.body = body;
+                comment.createdAt = note.createdAt;
+                showTodoNotification(nm, comment, todoNotificationId(login, comment.id), true,
+                        login, "participating:" + login, logos, icons);
+                posted++;
+            }
+        }
+        prefs.edit().putLong(keyParticipatingCheck(login), now).apply();
+        return posted;
+    }
+
     /** Prepends a log entry to KEY_WORKER_LOG, keeping at most MAX_LOG_ENTRIES. */
     public static void appendWorkerLog(Context ctx, long startMs, String summary,
             int unseen, boolean anyNew) {
@@ -479,9 +580,12 @@ public class NotificationsWorker extends Worker {
                         .bigText(expanded.toString()))
                 .setContentIntent(contentIntent)
                 .setDeleteIntent(deleteIntent)
-                .setAutoCancel(true)
-                .addAction(R.drawable.icon_notifications,
-                        context.getString(R.string.mark_todo_done), doneIntent);
+                .setAutoCancel(true);
+        // A comment on a participated item (#267) has no to-do to mark done
+        if (todo.id > 0) {
+            builder.addAction(R.drawable.icon_notifications,
+                    context.getString(R.string.mark_todo_done), doneIntent);
+        }
         if (!isNew) builder.setOnlyAlertOnce(true);
 
         // Who and where in Android's one icon slot: the round avatar of whoever caused the
@@ -611,6 +715,7 @@ public class NotificationsWorker extends Worker {
             case "unmergeable":         return "MR cannot be merged";
             case "marked":              return "marked as todo";
             case "merge_train_removed": return "removed from merge train";
+            case "commented":           return "commented";
             default: return actionName.replace('_', ' ');
         }
     }

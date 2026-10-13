@@ -43,8 +43,20 @@ public class AvatarHandler {
 
     private static final int MAX_CACHED_IMAGE_SIZE = 60; /* dp - maximum gravatar view size used */
 
+    // Logo style: how every project and group logo looks, in lists, headers, group trees and
+    // notifications. Change it here only; every path reads these (#246).
+
+    // Corner radius of a logo, its letter tile and its frame, as a fraction of their size —
+    // a fraction, not a fixed dp, so the curve is the same at every size (a fixed 8dp frame
+    // looked rounder on small rows than on a header, #246).
+    private static final float LOGO_CORNER_FRACTION = 0.20f;
+
+    // The frame behind every logo (see newLogoFrame), so white or transparent logos stay
+    // visible on any background.
+    private static final @ColorInt int LOGO_FRAME_COLOR = 0x26000000;
+
     // Hairline gap (dp) kept between a project/group logo tile and its surrounding
-    // rounded-square frame (avatar_frame.xml) — shared by both the real-logo path
+    // rounded-square frame — shared by both the real-logo path
     // (fitLogoToSquare) and the initials-tile placeholder (DefaultAvatarDrawable) so
     // a loaded logo and its own placeholder look consistent, and neither renders
     // perfectly flush against the frame (which reads as the two shapes merging).
@@ -55,8 +67,17 @@ public class AvatarHandler {
     // can be far larger than the ~40dp it's ultimately displayed at, e.g. a 730px-wide fetched
     // logo), and that bitmap gets scaled down afterward by RoundedBitmapDrawable/ImageView. A
     // fixed pixel/dp inset baked into the oversized source washes out to sub-pixel once scaled
-    // down — same reason the corner radius below is also a percentage (0.20f), not a fixed dp.
+    // down — same reason the corner radius is also a fraction, not a fixed dp.
     private static final float LOGO_INSET_FRACTION = 0.025f;
+
+    // A notification's project badge on the author's avatar: its size, and the gap cut around
+    // it, as fractions of the icon.
+    private static final float BADGE_SIZE_FRACTION = 0.46f;
+    private static final float BADGE_GAP_FRACTION = 0.035f;
+
+    private static float logoCornerRadius(float size) {
+        return size * LOGO_CORNER_FRACTION;
+    }
 
     private static LruCache<Long, Bitmap> sCache;
     private static int sNextRequestId = 1;
@@ -238,7 +259,7 @@ public class AvatarHandler {
             // identically to network-loaded bitmaps (fixes first-load circle crop).
             Bitmap toDisplay = request.isLogo ? fitLogoToSquare(diskBitmap) : diskBitmap;
             float radius = request.isLogo
-                    ? Math.max(toDisplay.getWidth(), toDisplay.getHeight()) * 0.20f
+                    ? logoCornerRadius(Math.max(toDisplay.getWidth(), toDisplay.getHeight()))
                     : Math.max(toDisplay.getWidth() / 2, toDisplay.getHeight() / 2);
             Resources res = request.views.get(0).getContext().getResources();
             RoundedBitmapDrawable d = RoundedBitmapDrawableFactory.create(res, toDisplay);
@@ -261,7 +282,7 @@ public class AvatarHandler {
                             if (request.isLogo) {
                                 Bitmap logo = fitLogoToSquare(bitmap);
                                 applyAvatarToView(view, logo, true,
-                                        Math.max(logo.getWidth(), logo.getHeight()) * 0.20f);
+                                        logoCornerRadius(Math.max(logo.getWidth(), logo.getHeight())));
                             } else {
                                 applyAvatarToView(view, bitmap);
                             }
@@ -408,7 +429,7 @@ public class AvatarHandler {
      * API avatar endpoint, as group /uploads/ URLs 401 without a session cookie); if the
      * project data is slim (e.g. from the Todos API) or the project sits in a nested group,
      * GET /projects/:id and walk up the ancestor groups (cached per project); else the
-     * initials tile of the project's own name. Use with {@code @drawable/avatar_frame}.
+     * initials tile of the project's own name. Show it in a {@link com.gl4a.widget.LogoImageView}.
      */
     public static void assignProjectLogo(ImageView view, com.gl4a.gitlab.model.GitLabProject project) {
         String name = projectLogoName(project);
@@ -424,7 +445,8 @@ public class AvatarHandler {
     }
 
     /**
-     * {@link #assignProjectLogo} as a Bitmap, for notifications. Same decision, same result.
+     * {@link #assignProjectLogo} as a Bitmap, for notifications. Same decision, same result,
+     * drawn as the app draws it on its frame (see {@link #renderLogoTile}).
      * Performs blocking network I/O — call from a background thread only.
      */
     public static Bitmap loadProjectLogoSynchronously(
@@ -444,13 +466,13 @@ public class AvatarHandler {
                 }
                 if (url != null) {
                     Bitmap bitmap = fetchBitmap(url, instanceOf(apiBase));
-                    if (bitmap != null) return fitLogoToSquare(bitmap);
+                    if (bitmap != null) return renderLogoTile(bitmap, name, id, placeholderSizePx);
                 }
             } catch (IOException e) {
                 Log.d(TAG, "loadProjectLogoSynchronously failed for id=" + id, e);
             }
         }
-        return renderProjectPlaceholder(name, id, placeholderSizePx);
+        return renderLogoTile(null, name, id, placeholderSizePx);
     }
 
     /** "https://host/api/v4/" → "https://host" */
@@ -498,7 +520,7 @@ public class AvatarHandler {
     /**
      * The single group logo derivation (#172): the group's avatar via the API avatar endpoint
      * (group /uploads/ URLs return 401 without a session cookie), else the initials tile.
-     * Use together with {@code @drawable/avatar_frame} as the view background.
+     * Show it in a {@link com.gl4a.widget.LogoImageView}.
      */
     public static void assignGroupLogo(ImageView view, com.gl4a.gitlab.model.GitLabGroup group) {
         if (group.avatarUrl != null && !group.avatarUrl.isEmpty() && group.id > 0) {
@@ -527,7 +549,7 @@ public class AvatarHandler {
             // Project avatar — rounded-square clip (20% radius), matching RepositoryAdapter.
             Bitmap logo = fitLogoToSquare(cached);
             applyAvatarToView(delegate, logo, false,
-                    Math.max(logo.getWidth(), logo.getHeight()) * 0.20f);
+                    logoCornerRadius(Math.max(logo.getWidth(), logo.getHeight())));
             return;
         }
 
@@ -559,13 +581,6 @@ public class AvatarHandler {
     }
 
     /**
-     * Renders the same rounded-square colored initials tile used in-app as a project's
-     * placeholder logo, as a plain Bitmap — for contexts like notifications that need a
-     * raw Bitmap (NotificationCompat.Builder#setLargeIcon) rather than a View to apply
-     * a Drawable to. Most projects have no uploaded avatar, so this is the common case,
-     * not just a network-failure fallback.
-     */
-    /**
      * A user avatar as a round bitmap, as the app shows avatars, for places that take a plain
      * bitmap rather than a drawable (notification icons).
      */
@@ -585,9 +600,9 @@ public class AvatarHandler {
 
     /**
      * A notification icon showing both who and where: the round {@code avatar} with the project
-     * {@code logo} as a badge on its bottom-right corner, its corners rounded as project logos
-     * are in the app and transparency kept. A transparent gap that follows the logo's shape is
-     * cut into the avatar so the two don't run together on any background. Either may be null.
+     * {@code logo} (from {@link #loadProjectLogoSynchronously}, already on its frame) as a badge
+     * on its bottom-right corner. A transparent gap around the badge is cut into the avatar so
+     * the two don't run together on any background. Either may be null.
      */
     public static Bitmap withProjectBadge(Bitmap avatar, Bitmap logo, int sizePx) {
         if (avatar == null) return logo;
@@ -598,23 +613,14 @@ public class AvatarHandler {
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         canvas.drawBitmap(round, null, new android.graphics.RectF(0, 0, sizePx, sizePx), paint);
 
-        // The logo as the app draws it: square-fitted, corners rounded by 20%
-        int badge = Math.round(sizePx * 0.46f);
-        Bitmap square = fitLogoToSquare(logo);
+        int badge = Math.round(sizePx * BADGE_SIZE_FRACTION);
         Bitmap badgeBitmap = Bitmap.createBitmap(badge, badge, Bitmap.Config.ARGB_8888);
-        Canvas badgeCanvas = new Canvas(badgeBitmap);
-        Paint maskPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        badgeCanvas.drawRoundRect(new android.graphics.RectF(0, 0, badge, badge),
-                badge * 0.20f, badge * 0.20f, maskPaint);
-        maskPaint.setXfermode(new android.graphics.PorterDuffXfermode(
-                android.graphics.PorterDuff.Mode.SRC_IN));
-        maskPaint.setFilterBitmap(true);
-        badgeCanvas.drawBitmap(square, null, new android.graphics.RectF(0, 0, badge, badge),
-                maskPaint);
+        new Canvas(badgeBitmap).drawBitmap(logo, null,
+                new android.graphics.RectF(0, 0, badge, badge), paint);
 
-        // Clear a gap around the badge's visible shape, then draw the badge into it
+        // Clear a gap around the badge's shape, then draw the badge into it
         float left = sizePx - badge, top = sizePx - badge;
-        float gap = Math.max(2f, sizePx * 0.035f);
+        float gap = Math.max(2f, sizePx * BADGE_GAP_FRACTION);
         Bitmap shape = badgeBitmap.extractAlpha();
         Paint clear = new Paint(Paint.ANTI_ALIAS_FLAG);
         clear.setXfermode(new android.graphics.PorterDuffXfermode(
@@ -629,13 +635,92 @@ public class AvatarHandler {
         return result;
     }
 
-    private static Bitmap renderProjectPlaceholder(String projectName, long projectId, int sizePx) {
-        DefaultAvatarDrawable drawable = new DefaultAvatarDrawable(projectName,
-                projectId > 0 ? projectId : null, true);
-        Bitmap bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
-        drawable.setBounds(0, 0, sizePx, sizePx);
-        drawable.draw(new Canvas(bitmap));
-        return bitmap;
+    /**
+     * A project logo as the app shows it — the logo, or its letter tile when {@code logo} is
+     * null, on the logo frame — as a plain bitmap for notifications. The notification shade
+     * follows the system's light/dark mode, not the app's theme, so the frame's background and
+     * the letter tile's colours are the app's own for the system's mode (#246).
+     */
+    private static Bitmap renderLogoTile(@Nullable Bitmap logo, String name, long projectId,
+            int sizePx) {
+        Resources res = systemThemedResources();
+        Bitmap result = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(result);
+        android.graphics.RectF rect = new android.graphics.RectF(0, 0, sizePx, sizePx);
+        float radius = logoCornerRadius(sizePx);
+
+        // The frame over the surface it sits on in the app
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        paint.setColor(res.getColor(com.gl4a.R.color.theme_surface));
+        canvas.drawRoundRect(rect, radius, radius, paint);
+        paint.setColor(LOGO_FRAME_COLOR);
+        canvas.drawRoundRect(rect, radius, radius, paint);
+
+        if (logo != null) {
+            // Kept within the frame's rounded shape, as RoundedBitmapDrawable does in the app
+            paint.setColor(0xff000000);
+            paint.setXfermode(new android.graphics.PorterDuffXfermode(
+                    android.graphics.PorterDuff.Mode.SRC_ATOP));
+            canvas.drawBitmap(fitLogoToSquare(logo), null, rect, paint);
+        } else {
+            DefaultAvatarDrawable tile = new DefaultAvatarDrawable(name,
+                    projectId > 0 ? projectId : null, true, res);
+            tile.setBounds(0, 0, sizePx, sizePx);
+            tile.draw(canvas);
+        }
+        return result;
+    }
+
+    /** The app's resources in the system's light/dark mode rather than the app's theme. */
+    private static Resources systemThemedResources() {
+        Context app = com.gl4a.Gl4Application.get();
+        android.content.res.Configuration config =
+                new android.content.res.Configuration(app.getResources().getConfiguration());
+        int nightMask = android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+        config.uiMode = (config.uiMode & ~nightMask)
+                | (Resources.getSystem().getConfiguration().uiMode & nightMask);
+        return app.createConfigurationContext(config).getResources();
+    }
+
+    /**
+     * The frame behind every project and group logo: a translucent rounded square with the
+     * logo's own corner curve at any size. {@link com.gl4a.widget.LogoImageView} uses it.
+     */
+    public static Drawable newLogoFrame() {
+        return new LogoFrameDrawable();
+    }
+
+    private static class LogoFrameDrawable extends Drawable {
+        private final Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.RectF mRect = new android.graphics.RectF();
+
+        LogoFrameDrawable() {
+            mPaint.setColor(LOGO_FRAME_COLOR);
+        }
+
+        @Override
+        public void draw(@NonNull Canvas canvas) {
+            mRect.set(getBounds());
+            float radius = logoCornerRadius(Math.min(mRect.width(), mRect.height()));
+            canvas.drawRoundRect(mRect, radius, radius, mPaint);
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+            mPaint.setAlpha(android.graphics.Color.alpha(LOGO_FRAME_COLOR) * alpha / 255);
+            invalidateSelf();
+        }
+
+        @Override
+        public void setColorFilter(@Nullable ColorFilter colorFilter) {
+            mPaint.setColorFilter(colorFilter);
+            invalidateSelf();
+        }
+
+        @Override
+        public int getOpacity() {
+            return android.graphics.PixelFormat.TRANSLUCENT;
+        }
     }
 
     public static void assignAvatar(Context context, MenuItem item,
@@ -702,7 +787,7 @@ public class AvatarHandler {
             if (isLogo) {
                 Bitmap logo = fitLogoToSquare(bitmap);
                 applyAvatarToView(view, logo, false,
-                        Math.max(logo.getWidth(), logo.getHeight()) * 0.20f);
+                        logoCornerRadius(Math.max(logo.getWidth(), logo.getHeight())));
             } else {
                 applyAvatarToView(view, bitmap, false);
             }
@@ -1328,17 +1413,27 @@ public class AvatarHandler {
          *                shape project/group logos use once loaded, instead of a full circle.
          */
         public DefaultAvatarDrawable(String userName, Object identifier, boolean isLogo) {
+            this(userName, identifier, isLogo, null);
+        }
+
+        /**
+         * @param themed resources whose light/dark mode picks the colours (notifications use
+         *               the system's mode); null for the app's own theme.
+         */
+        DefaultAvatarDrawable(String userName, Object identifier, boolean isLogo,
+                @Nullable Resources themed) {
             mIsLogo = isLogo;
-            mState = new UserNameState(userName, identifier, isLogo);
+            mState = new UserNameState(userName, identifier, isLogo, themed);
 
             mPaint = new Paint();
             mPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             mPaint.setTextAlign(Paint.Align.CENTER);
             mPaint.setAntiAlias(true);
 
-            Resources resources = com.gl4a.Gl4Application.get().getResources();
+            Resources resources = themed != null
+                    ? themed : com.gl4a.Gl4Application.get().getResources();
             // Hairline inset so the tile doesn't render perfectly flush against the row's
-            // rounded-square frame background (avatar_frame.xml) — without it the two
+            // rounded-square frame background (newLogoFrame) — without it the two
             // rounded-rects visually merge into one hard edge with no framing at all.
             mLogoInset = resources.getDisplayMetrics().density * LOGO_INSET_DP;
             boolean darkTheme = resources.getBoolean(com.gl4a.R.bool.is_dark_theme);
@@ -1381,7 +1476,7 @@ public class AvatarHandler {
             if (mIsLogo) {
                 sRectF.set(bounds.left + mLogoInset, bounds.top + mLogoInset,
                         bounds.right - mLogoInset, bounds.bottom - mLogoInset);
-                float radius = minDimension * 0.20f;
+                float radius = logoCornerRadius(minDimension);
                 canvas.drawRoundRect(sRectF, radius, radius, mPaint);
             } else {
                 canvas.drawCircle(bounds.centerX(), bounds.centerY(), minDimension / 2, mPaint);
@@ -1415,17 +1510,20 @@ public class AvatarHandler {
             private final String mUserName;
             private final Object mIdentifier;
             private final boolean mIsLogo;
+            private final Resources mThemed;
 
-            public UserNameState(String userName, Object identifier, boolean isLogo) {
+            public UserNameState(String userName, Object identifier, boolean isLogo,
+                    @Nullable Resources themed) {
                 mUserName = userName;
                 mIdentifier = identifier;
                 mIsLogo = isLogo;
+                mThemed = themed;
             }
 
             @NonNull
             @Override
             public Drawable newDrawable() {
-                return new DefaultAvatarDrawable(mUserName, mIdentifier, mIsLogo);
+                return new DefaultAvatarDrawable(mUserName, mIdentifier, mIsLogo, mThemed);
             }
 
             @Override

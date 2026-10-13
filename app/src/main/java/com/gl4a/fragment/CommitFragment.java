@@ -68,6 +68,11 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
     // Diffs that arrived before onCreateView — applied in onViewCreated.
     private List<GitLabDiff> mPendingDiffs;
     private List<GitLabComment> mPendingDiffComments;
+    // A large commit shows its first files, more on request, so drawing them doesn't stall the
+    // screen (#272)
+    private static final int FILES_FIRST_SHOWN = 100;
+    private static final int FILES_MORE_STEP = 200;
+    private int mFilesShown = FILES_FIRST_SHOWN;
 
     private final ActivityResultLauncher<Intent> mDiffViewerLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -117,6 +122,208 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
         }
         fillHeader();
         fillStats(mCommit, mComments);
+        loadDetails();
+    }
+
+    /**
+     * Parent, branches, tags and merge requests of the commit, as on GitLab web (#273): compact,
+     * with the default branch and first tag shown and the rest a tap away.
+     */
+    @SuppressWarnings("unchecked")
+    private void loadDetails() {
+        if (mDetailsLoading) return;
+        mDetailsLoading = true;
+        com.gl4a.gitlab.service.GitLabCommitService service =
+                com.gl4a.ServiceFactory.get(com.gl4a.gitlab.service.GitLabCommitService.class,
+                        false);
+        final String sha = mCommit.sha() != null ? mCommit.sha() : mObjectSha;
+        // GitLab's own path for the project, from the commit's web URL, not names shown on
+        // screen (#244)
+        String[] project = ApiHelpers.projectFromWebUrl(mCommit.webUrl);
+        final String owner = project != null ? project[0] : mRepoOwner;
+        final String repo = project != null ? project[1] : mRepoName;
+        io.reactivex.Single<List<java.util.Map<String, Object>>> refs =
+                com.gl4a.utils.SingleFactory.getProjectId(owner, repo)
+                        .flatMap(projectId -> ApiHelpers.<java.util.Map<String, Object>>allPages(
+                                page -> service.getCommitRefs(projectId, sha, page, 100)))
+                        .onErrorReturnItem(new java.util.ArrayList<>());
+        io.reactivex.Single<List<com.gl4a.gitlab.model.GitLabIssue>> mrs =
+                com.gl4a.utils.SingleFactory.getProjectId(owner, repo)
+                        .flatMap(projectId -> service.getCommitMergeRequests(projectId, sha))
+                        .map(ApiHelpers::throwOnFailure)
+                        .onErrorReturnItem(new java.util.ArrayList<>());
+        // The project's default branch, shown first among the branches as GitLab web does
+        io.reactivex.Single<String> defaultBranch = com.gl4a.ServiceFactory.get(
+                        com.gl4a.gitlab.service.GitLabProjectService.class, false)
+                .getProjectByPath(android.net.Uri.encode(owner + "/" + repo))
+                .map(ApiHelpers::throwOnFailure)
+                .map(p -> p.defaultBranch() != null ? p.defaultBranch() : "")
+                .onErrorReturnItem("");
+        io.reactivex.Single.zip(refs, mrs, defaultBranch,
+                        (r, m, d) -> new Object[] { r, m, d })
+                .subscribeOn(io.reactivex.schedulers.Schedulers.io())
+                .observeOn(io.reactivex.android.schedulers.AndroidSchedulers.mainThread())
+                .subscribe(result -> showDetails(
+                                (List<java.util.Map<String, Object>>) result[0],
+                                (List<com.gl4a.gitlab.model.GitLabIssue>) result[1],
+                                (String) result[2], owner, repo),
+                        error -> { });
+    }
+
+    private boolean mDetailsLoading;
+
+    private void showDetails(List<java.util.Map<String, Object>> refs,
+            List<com.gl4a.gitlab.model.GitLabIssue> mergeRequests, String defaultBranch,
+            String owner, String repo) {
+        if (mContentView == null || getContext() == null) return;
+        android.content.Context context = getContext();
+        LinearLayout container = mContentView.findViewById(R.id.ll_commit_details);
+        container.removeAllViews();
+
+        // Parent(s), each opening that commit
+        List<String> parents = mCommit.parentIds;
+        if (parents != null && !parents.isEmpty()) {
+            SpannableStringBuilder text = new SpannableStringBuilder(getString(
+                    parents.size() > 1 ? R.string.commit_parents : R.string.commit_parent));
+            for (String parent : parents) {
+                text.append("  ");
+                int start = text.length();
+                text.append(parent.substring(0, Math.min(8, parent.length())));
+                text.setSpan(new com.gl4a.widget.IntentSpan(context,
+                                c -> com.gl4a.activities.CommitActivity.makeIntent(c,
+                                        owner, repo, parent)),
+                        start, text.length(), 0);
+                text.setSpan(new android.text.style.TypefaceSpan("monospace"),
+                        start, text.length(), 0);
+            }
+            container.addView(detailRow(context, R.drawable.commit, text, null));
+        }
+
+        List<String> branches = new java.util.ArrayList<>();
+        List<String> tags = new java.util.ArrayList<>();
+        for (java.util.Map<String, Object> ref : refs) {
+            Object name = ref.get("name");
+            if (!(name instanceof String)) continue;
+            if ("tag".equals(ref.get("type"))) tags.add((String) name);
+            else branches.add((String) name);
+        }
+        if (!branches.isEmpty()) {
+            String first = branches.contains(defaultBranch)
+                    ? defaultBranch : branches.get(0);
+            container.addView(refsRow(context, R.drawable.branch, R.string.commit_branches,
+                    first, branches, R.string.commit_branches_containing));
+        }
+        if (!tags.isEmpty()) {
+            container.addView(refsRow(context, R.drawable.tag, R.string.commit_tags,
+                    tags.get(0), tags, R.string.commit_tags_containing));
+        }
+
+        // Merge requests the commit is part of, each opening the MR
+        if (mergeRequests.isEmpty()) {
+            container.addView(detailRow(context, R.drawable.pull_request,
+                    getString(R.string.commit_no_related_mrs), null));
+        } else {
+            for (com.gl4a.gitlab.model.GitLabIssue mr : mergeRequests) {
+                String line = "!" + mr.iid + " " + (mr.title != null ? mr.title : "");
+                View row = detailRow(context, R.drawable.pull_request, line, null);
+                if (mr.webUrl != null) {
+                    row.setBackgroundResource(android.R.drawable.list_selector_background);
+                    row.setOnClickListener(v -> com.gl4a.utils.IntentUtils
+                            .openLinkInternallyOrExternally(requireActivity(),
+                                    android.net.Uri.parse(mr.webUrl)));
+                }
+                container.addView(row);
+            }
+        }
+        mContentView.findViewById(R.id.card_details).setVisibility(
+                container.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    /** A details row: an icon, then text, then an optional view (e.g. pills) below. */
+    private View detailRow(android.content.Context context, int icon, CharSequence text,
+            @androidx.annotation.Nullable View below) {
+        float density = context.getResources().getDisplayMetrics().density;
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.VERTICAL);
+        int pad = Math.round(6 * density);
+        row.setPadding(0, pad, 0, pad);
+        TextView label = new TextView(context);
+        label.setTextAppearance(android.R.style.TextAppearance_Small);
+        label.setTextColor(UiUtils.resolveColor(context, android.R.attr.textColorPrimary));
+        label.setText(text);
+        // Links (parents, "… containing commit") only where there are any, so a merge
+        // request row's own tap still works
+        if (text instanceof android.text.Spanned && ((android.text.Spanned) text).getSpans(0,
+                text.length(), android.text.style.ClickableSpan.class).length > 0) {
+            label.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+        }
+        android.graphics.drawable.Drawable drawable =
+                androidx.core.content.ContextCompat.getDrawable(context, icon).mutate();
+        int size = Math.round(18 * density);
+        drawable.setBounds(0, 0, size, size);
+        drawable.setTint(UiUtils.resolveColor(context, android.R.attr.textColorSecondary));
+        label.setCompoundDrawablesRelative(drawable, null, null, null);
+        label.setCompoundDrawablePadding(Math.round(8 * density));
+        label.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.addView(label);
+        if (below != null) row.addView(below);
+        return row;
+    }
+
+    /**
+     * Branches or tags: the label, the first one as a pill and "… containing commit", which
+     * shows all of them as pills (#273).
+     */
+    private View refsRow(android.content.Context context, int icon, int labelRes, String first,
+            List<String> all, int containingRes) {
+        float density = context.getResources().getDisplayMetrics().density;
+        com.google.android.material.chip.ChipGroup pills =
+                new com.google.android.material.chip.ChipGroup(context);
+        pills.setChipSpacingHorizontal(Math.round(6 * density));
+        pills.setChipSpacingVertical(Math.round(6 * density));
+        pills.setPadding(Math.round(26 * density), Math.round(4 * density), 0, 0);
+        pills.setVisibility(View.GONE);
+        for (String name : all) {
+            pills.addView(pill(context, name));
+        }
+        SpannableStringBuilder text = new SpannableStringBuilder(getString(labelRes));
+        text.append("  ");
+        int start = text.length();
+        text.append(" ").append(first).append(" ");
+        text.setSpan(new android.text.style.BackgroundColorSpan(
+                UiUtils.resolveColor(context, android.R.attr.colorControlHighlight)),
+                start, text.length(), 0);
+        if (all.size() > 1 || !all.contains(first)) {
+            text.append("   ");
+            int linkStart = text.length();
+            text.append("\u25B8 ").append(getString(containingRes));
+            text.setSpan(new android.text.style.ClickableSpan() {
+                @Override
+                public void onClick(@androidx.annotation.NonNull View widget) {
+                    pills.setVisibility(pills.getVisibility() == View.VISIBLE
+                            ? View.GONE : View.VISIBLE);
+                }
+
+                @Override
+                public void updateDrawState(@androidx.annotation.NonNull android.text.TextPaint ds) {
+                    ds.setColor(UiUtils.resolveColor(context, android.R.attr.textColorLink));
+                    ds.setUnderlineText(false);
+                }
+            }, linkStart, text.length(), 0);
+        }
+        return detailRow(context, icon, text, pills);
+    }
+
+    private TextView pill(android.content.Context context, String name) {
+        float density = context.getResources().getDisplayMetrics().density;
+        TextView pill = new TextView(context);
+        pill.setText(name);
+        pill.setTextAppearance(android.R.style.TextAppearance_Small);
+        pill.setTextColor(UiUtils.resolveColor(context, android.R.attr.textColorPrimary));
+        pill.setBackgroundResource(R.drawable.shortcut_pill);
+        int horizontal = Math.round(10 * density), vertical = Math.round(3 * density);
+        pill.setPadding(horizontal, vertical, horizontal, vertical);
+        return pill;
     }
 
     private void fillHeader() {
@@ -221,8 +428,10 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
         llDeleted.removeAllViews();
 
         int addedFiles = 0, changedFiles = 0, renamedFiles = 0, deletedFiles = 0;
+        int shownAdded = 0, shownChanged = 0, shownRenamed = 0, shownDeleted = 0;
         int totalAdditions = 0, totalDeletions = 0;
         int filesCount = diffs != null ? diffs.size() : 0;
+        int shown = 0;
         int highlightColor = UiUtils.resolveColor(getActivity(), android.R.attr.textColorPrimary);
         ForegroundColorSpan additionsSpan = new ForegroundColorSpan(
                 UiUtils.resolveColor(getActivity(), R.attr.colorCommitAddition));
@@ -256,6 +465,14 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
 
             totalAdditions += diff.additions();
             totalDeletions += diff.deletions();
+            if (shown >= mFilesShown) {
+                continue;
+            }
+            shown++;
+            if (parent == llAdded) shownAdded++;
+            else if (parent == llChanged) shownChanged++;
+            else if (parent == llRenamed) shownRenamed++;
+            else shownDeleted++;
 
             View fileView = getLayoutInflater().inflate(R.layout.commit_filename, parent, false);
             TextView fileNameView = fileView.findViewById(R.id.filename);
@@ -274,15 +491,34 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
             parent.addView(fileView);
         }
 
-        adjustVisibility(R.id.card_added, addedFiles);
-        adjustVisibility(R.id.card_changed, changedFiles);
-        adjustVisibility(R.id.card_renamed, renamedFiles);
-        adjustVisibility(R.id.card_deleted, deletedFiles);
+        adjustVisibility(R.id.card_added, shownAdded);
+        adjustVisibility(R.id.card_changed, shownChanged);
+        adjustVisibility(R.id.card_renamed, shownRenamed);
+        adjustVisibility(R.id.card_deleted, shownDeleted);
 
+        // GitLab's own totals for the commit, as GitLab web shows them; adding up the diffs
+        // missed what GitLab doesn't send in them (#272)
+        if (mCommit != null && mCommit.stats != null) {
+            totalAdditions = mCommit.stats.additions;
+            totalDeletions = mCommit.stats.deletions;
+        }
         TextView tvSummary = mContentView.findViewById(R.id.tv_desc);
         tvSummary.setText(getString(R.string.commit_summary,
                 addedFiles + changedFiles + renamedFiles + deletedFiles,
                 totalAdditions, totalDeletions));
+
+        TextView showMore = mContentView.findViewById(R.id.tv_show_more_files);
+        int listed = addedFiles + changedFiles + renamedFiles + deletedFiles;
+        if (shown < listed) {
+            showMore.setText(getString(R.string.commit_show_more_files, listed - shown, listed));
+            showMore.setVisibility(View.VISIBLE);
+            showMore.setOnClickListener(v -> {
+                mFilesShown += FILES_MORE_STEP;
+                fillStatsFromDiffs(diffs, comments);
+            });
+        } else {
+            showMore.setVisibility(View.GONE);
+        }
     }
 
     private void fillFileName(TextView fileNameView, GitLabDiff diff) {

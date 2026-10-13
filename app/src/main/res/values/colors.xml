@@ -69,17 +69,17 @@
     <color name="nav_header_primary_text">#1F1E24</color>
     <color name="nav_header_secondary_text">#1F1E24</color><!-- same as primary — ensure max visibility on light nav -->
 
-    <!-- Diff viewer backgrounds (tinted) -->
-    <color name="diff_add">#ecfdf0</color><!-- green-50 equivalent -->
-    <color name="diff_remove">#FCECEA</color><!-- Pajamas red-50 -->
-    <color name="diff_add_line_number">#d3f5dc</color>
-    <color name="diff_remove_line_number">#fad8d3</color>
+    <!-- Diff viewer: GitLab light theme's diff colours (#274) -->
+    <color name="diff_add">#ecfdf0</color><!-- GitLab's added line (8.6:1 with diff text) -->
+    <color name="diff_remove">#FBE9EB</color><!-- GitLab's removed line (7.8:1 with diff text) -->
+    <color name="diff_add_line_number">#ddfbe6</color>
+    <color name="diff_remove_line_number">#f9d7dc</color>
     <color name="diff_default_background">#14aaaaaa</color>
     <color name="diff_default_line_number_background">#30aaaaaa</color>
 
-    <!-- Diff text: Pajamas green-500 / red-500 on their tinted backgrounds -->
-    <color name="commit_addition">#108548</color><!-- green-500 (4.70:1 on white) -->
-    <color name="commit_deletion">#DD2B0E</color><!-- red-500 (4.74:1 on white) -->
+    <!-- +/- counts: GitLab light green-600 / red-600 -->
+    <color name="commit_addition">#2F7549</color><!-- 5.58:1 on white -->
+    <color name="commit_deletion">#C02F12</color><!-- 5.74:1 on white -->
     <color name="code_background">#30aaaaaa</color>
 
     <!-- Was @color/background_floating_material_light (AOSP pure #FFFFFF) — clashed

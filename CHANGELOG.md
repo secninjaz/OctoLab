@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [1.5.0] - 2026-10-09
+## [1.5.0] - 2026-10-12
 
 ### Added
 - Profiles show Personal projects, Contributed projects and, for admins, Member of: the user's groups as an expandable tree with their roles, and a full list with every group expanded (#232, #236, #240)
@@ -13,6 +13,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Explore's tabs list the projects active today, this week, this month or this year, most-starred first, with a new Year tab (#228)
 - The account chooser for links shows each account's avatar and name in bold (#229)
 - The project screen shows the project's logo (#235)
+- Bookmarks for groups, issues, merge requests, commits and snippets; bookmarks open in-app without asking for an account and show users' avatars and groups' and projects' logos (#263, #265)
+- Merge requests get a Participating tab; the Participating tabs and comment notifications share one definition: created, assigned, reviewing or commented on (#267)
+- The project's About tab shows a languages bar, the last commit, file shortcuts and the created date (#271)
+- The commit screen shows the parent, branches, tags and merge requests (#273)
+- Items in My Activity open in-app: projects, branches, tags, commits, issues, merge requests and comments (#140)
+- Videos fit the screen, with a full-screen button; turning a horizontal video to landscape goes full screen (#259)
 
 ### Changed
 - All project lists use the same rows as Projects (#233)
@@ -21,6 +27,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Collaborators include members through groups (#238)
 - Search suggestions are kept per account (#237)
 - New screenshots (#221)
+- Search looks in everything by default, with your own groups, projects, issues and merge requests first (#262, #264)
+- Descriptions and comments share one style however they're shown, with GitLab's alerts, task lists, diff lines, code blocks and collapsible sections as on GitLab web (#251, #254)
+- The editor preview shows GitLab's own rendering (#266)
+- Files open in-app or in an installed app, downloaded with the account and with progress, instead of in the browser (#245)
+- Logos have the same corners everywhere; notification logos follow the system's light or dark mode (#246)
+- Diffs and +/- counts use GitLab's colours in both themes (#274)
+- Commit messages are fixed-width (#273)
+- Issue, pull request and merge request templates, the same on GitHub and GitLab (#268)
 
 ### Fixed
 - Long lines cut off in diffs (#223)
@@ -29,6 +43,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Group and project logos were sometimes missing or wrong (#234)
 - Pull-to-refresh fired while scrolling back up (#241)
 - No loading indicator when opening or expanding a group (#242)
+- Wide tables and code blocks made the whole description scroll sideways (#248)
+- A reply's avatar didn't open its author's profile (#252)
+- Sharing a comment shared nothing (#253)
+- List bullets were cut off in some comments (#254)
+- Replies toggle, reactions and "Edited" overlapped comments with tables or code (#255)
+- Comments jumped or flickered on reply toggle and when scrolling back up (#256, #258)
+- Switching account briefly failed with 401 Unauthorized (#260)
+- A video opened from a repository's files was titled "raw" (#261)
+- The branch and tag picker missed branches and tags beyond the first 100 (#269)
+- The commit screen listed only the first 100 changed files (#272)
 
 ## [1.4.0] - 2026-10-06
 

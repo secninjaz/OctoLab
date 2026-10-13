@@ -452,6 +452,17 @@ public abstract class BaseActivity extends AppCompatActivity implements
         mHeader.setExpanded(false);
     }
 
+    /**
+     * Shows or hides the whole app bar, e.g. for a full-screen video (#259). Hidden by giving
+     * it no height: when GONE, the content was still laid out below where it had been.
+     */
+    protected void setAppBarShown(boolean shown) {
+        ViewGroup.LayoutParams lp = mHeader.getLayoutParams();
+        lp.height = shown ? ViewGroup.LayoutParams.WRAP_CONTENT : 0;
+        mHeader.setLayoutParams(lp);
+        mHeader.setVisibility(shown ? View.VISIBLE : View.INVISIBLE);
+    }
+
     public void setAppBarLocked(boolean locked) {
         mAppBarLocked = locked;
         updateAppBarEnabledState();

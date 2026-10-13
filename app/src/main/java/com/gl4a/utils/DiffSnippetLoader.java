@@ -4,9 +4,7 @@ import android.content.Context;
 import android.text.SpannableStringBuilder;
 import android.text.style.BackgroundColorSpan;
 
-import androidx.core.content.ContextCompat;
 
-import com.gl4a.R;
 import com.gl4a.ServiceFactory;
 import com.gl4a.gitlab.model.GitLabComment;
 import com.gl4a.gitlab.model.GitLabDiff;
@@ -141,10 +139,12 @@ public final class DiffSnippetLoader {
      */
     public static CharSequence render(Context themedContext, List<Line> lines) {
         SpannableStringBuilder text = new SpannableStringBuilder();
-        int add = ContextCompat.getColor(themedContext, R.color.diff_add);
-        int remove = ContextCompat.getColor(themedContext, R.color.diff_remove);
-        int addNumber = ContextCompat.getColor(themedContext, R.color.diff_add_line_number);
-        int removeNumber = ContextCompat.getColor(themedContext, R.color.diff_remove_line_number);
+        // The shared diff colours, as in ```diff blocks of descriptions and comments (#251)
+        MarkdownStyle style = MarkdownStyle.of(themedContext);
+        int add = style.diffAdd;
+        int remove = style.diffRemove;
+        int addNumber = style.diffAddNumber;
+        int removeNumber = style.diffRemoveNumber;
         for (int i = 0; i < lines.size(); i++) {
             Line line = lines.get(i);
             int start = text.length();

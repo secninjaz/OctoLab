@@ -38,6 +38,7 @@ import java.util.zip.InflaterInputStream;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import android.text.TextUtils;
 import androidx.browser.customtabs.CustomTabColorSchemeParams;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.fragment.app.FragmentActivity;
@@ -206,6 +207,16 @@ public class IntentUtils {
         // GitLab raw file URL: <instance>/<owner>/<repo>/-/raw/<ref>/<path>
         String instanceUrl = com.gl4a.Gl4Application.get().getInstanceUrl();
         return instanceUrl + "/" + repoOwner + "/" + repoName + "/-/raw/" + ref + "/" + path;
+    }
+
+    /**
+     * A comment's link, as GitLab web links it: the web address GitLab gives the issue, merge
+     * request or commit it's on, with "#note_" and its id. Null without that address. GitLab's
+     * note data has no link of its own (#253).
+     */
+    @Nullable
+    public static String commentWebUrl(@Nullable String pageWebUrl, long noteId) {
+        return TextUtils.isEmpty(pageWebUrl) ? null : pageWebUrl + "#note_" + noteId;
     }
 
     public static void share(Context context, String subject, Uri url) {

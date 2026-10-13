@@ -192,8 +192,20 @@ public static Intent makeIntent(Context context, String repoOwner, String repoNa
         }
         // GitLab has no pending-review concept in the same form; remove review menu item
         menu.removeItem(R.id.pull_review);
+        com.gl4a.utils.BookmarkActions.prepareMenu(this, menu, bookmarkTarget());
 
         return super.onCreateOptionsMenu(menu);
+    }
+
+    /** Bookmarked by GitLab's address for it, with its project and number below (#263). */
+    @androidx.annotation.Nullable
+    private com.gl4a.utils.BookmarkActions.Target bookmarkTarget() {
+        if (mMergeRequest == null || mMergeRequest.htmlUrl() == null) return null;
+        String project = mRepoOwner != null && mRepoName != null
+                ? mRepoOwner + "/" + mRepoName : "";
+        return new com.gl4a.utils.BookmarkActions.Target(com.gl4a.db.BookmarksProvider.Columns.TYPE_MERGE_REQUEST,
+                mMergeRequest.htmlUrl(), mMergeRequest.title(),
+                project + "!" + mMergeRequest.number());
     }
 
     @Override
@@ -203,6 +215,9 @@ public static Intent makeIntent(Context context, String repoOwner, String repoNa
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        if (com.gl4a.utils.BookmarkActions.onMenuItemSelected(this, item, bookmarkTarget())) {
+            return true;
+        }
         switch (item.getItemId()) {
             case R.id.pull_merge:
                 showMergeConfirmDialog();

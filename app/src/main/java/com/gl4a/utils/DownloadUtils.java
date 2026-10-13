@@ -48,6 +48,31 @@ public class DownloadUtils {
                 () -> enqueueDownload(activity, url, fileName, description, mimeType, null, false));
     }
 
+    /**
+     * A GitLab file saved to Downloads with the account token, e.g. an attachment or a
+     * repository file the app can't open itself; shows the system's download notification,
+     * from which it opens (#245).
+     */
+    public static void enqueueAuthenticatedDownload(final BaseActivity activity,
+            final String url, final String fileName, final String mimeType,
+            @androidx.annotation.Nullable final Runnable afterEnqueue) {
+        handleDownloadPermissionCheck(activity, () -> {
+            enqueueDownload(activity, Uri.parse(url), fileName, null, mimeType, null, false,
+                    true /* addAuthHeader */);
+            android.widget.Toast.makeText(activity,
+                    activity.getString(R.string.downloading_file, fileName),
+                    android.widget.Toast.LENGTH_SHORT).show();
+            if (afterEnqueue != null) afterEnqueue.run();
+        });
+    }
+
+    /** The API link to a repository file's content, which works with the account token. */
+    public static String repositoryFileUrl(long projectId, String path, String ref) {
+        return Gl4Application.get().getApiBaseUrl() + "projects/" + projectId
+                + "/repository/files/" + Uri.encode(path) + "/raw?ref="
+                + Uri.encode(ref != null ? ref : "HEAD");
+    }
+
     private static void handleDownloadPermissionCheck(final BaseActivity activity, Runnable func) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // API 29+ doesn't require WRITE_EXTERNAL_STORAGE permission anymore,

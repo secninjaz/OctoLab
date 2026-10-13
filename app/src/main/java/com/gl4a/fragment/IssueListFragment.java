@@ -215,7 +215,52 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
     @Override
     public void onRefresh() {
         mSeenMentionedIds.clear();
+        // Pull to refresh reads the activity feed again for the Participating tab (#267)
+        mRebuildParticipation = true;
         super.onRefresh();
+    }
+
+    // The Participating tab (#267): the shared definition's list, built on its first page and
+    // served from it for the next ones
+    private java.util.List<GitLabIssue> mParticipating;
+    private boolean mRebuildParticipation;
+    private static final int PARTICIPATING_PAGE_SIZE = 25;
+
+    private Single<Response<GitLabPage<GitLabIssue>>> loadParticipating(int page,
+            boolean bypassCache) {
+        Single<java.util.List<GitLabIssue>> all;
+        if (page == 1 || mParticipating == null) {
+            final boolean rebuild = mRebuildParticipation;
+            mRebuildParticipation = false;
+            final android.content.Context context = requireContext().getApplicationContext();
+            final boolean mergeRequests = mIsMR;
+            all = Single.fromCallable(() -> com.gl4a.utils.Participation
+                            .forActiveAccount(context, bypassCache)
+                            .items(mergeRequests, null, rebuild))
+                    .subscribeOn(io.reactivex.schedulers.Schedulers.io())
+                    .doOnSuccess(items -> mParticipating = items);
+        } else {
+            all = Single.just(mParticipating);
+        }
+        // Open, or closed (merged MRs count as closed), as the tab's state toggle shows
+        final String state = mIssueState != null ? mIssueState : "opened";
+        return all.map(items -> {
+            java.util.List<GitLabIssue> shown = new java.util.ArrayList<>();
+            for (GitLabIssue item : items) {
+                String itemState = "merged".equals(item.state) ? "closed"
+                        : "locked".equals(item.state) ? "opened" : item.state;
+                if (itemState == null || state.equals(itemState)) shown.add(item);
+            }
+            int from = (page - 1) * PARTICIPATING_PAGE_SIZE;
+            int to = Math.min(shown.size(), from + PARTICIPATING_PAGE_SIZE);
+            java.util.List<GitLabIssue> slice = from < to
+                    ? new java.util.ArrayList<>(shown.subList(from, to))
+                    : new java.util.ArrayList<>();
+            boolean more = to < shown.size();
+            int pages = (shown.size() + PARTICIPATING_PAGE_SIZE - 1) / PARTICIPATING_PAGE_SIZE;
+            return Response.success(new GitLabPage<>(slice, page, more ? page + 1 : 0,
+                    Math.max(1, pages), shown.size()));
+        });
     }
 
     @Override
@@ -275,6 +320,8 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
                             return Response.<GitLabPage<GitLabIssue>>error(response.errorBody(), response.raw());
                         });
             }
+        } else if ("participating".equals(mScope)) {
+            return loadParticipating(page, bypassCache);
         } else if (mIsMR && !"mentioned".equals(mScope) && !"participating".equals(mScope)) {
             // Merge Requests REST tabs: created_by_me / assigned_to_me / reviews_for_me
             // For the "closed" view, GitLab uses separate state=closed (rejected) and state=merged.

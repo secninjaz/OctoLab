@@ -149,12 +149,26 @@ public class GistActivity extends BaseActivity implements View.OnClickListener {
         if (mSnippet == null) {
             menu.removeItem(R.id.share);
         }
+        com.gl4a.utils.BookmarkActions.prepareMenu(this, menu, bookmarkTarget());
 
         return super.onPrepareOptionsMenu(menu);
     }
 
+    /** Bookmarked by GitLab's address for it (#263). */
+    @androidx.annotation.Nullable
+    private com.gl4a.utils.BookmarkActions.Target bookmarkTarget() {
+        if (mSnippet == null || mSnippet.htmlUrl() == null) return null;
+        String title = mSnippet.title != null && !mSnippet.title.isEmpty()
+                ? mSnippet.title : "$" + mSnippetId;
+        return new com.gl4a.utils.BookmarkActions.Target(com.gl4a.db.BookmarksProvider.Columns.TYPE_SNIPPET, mSnippet.htmlUrl(), title,
+                "$" + mSnippetId);
+    }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        if (com.gl4a.utils.BookmarkActions.onMenuItemSelected(this, item, bookmarkTarget())) {
+            return true;
+        }
         switch (item.getItemId()) {
             case R.id.share:
                 String login = ApiHelpers.getUserLogin(this, mSnippet.owner());

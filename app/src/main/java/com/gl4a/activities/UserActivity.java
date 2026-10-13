@@ -135,14 +135,7 @@ public class UserActivity extends BaseFragmentPagerActivity {
 
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
-        MenuItem bookmarkAction = menu.findItem(R.id.bookmark);
-        if (bookmarkAction != null) {
-            String url = Gl4Application.get().getInstanceUrl() + "/" + mUserLogin;
-            bookmarkAction.setTitle(BookmarksProvider.hasBookmarked(this, url)
-                    ? R.string.remove_bookmark
-                    : R.string.bookmark);
-            bookmarkAction.setVisible(mUser != null);
-        }
+        com.gl4a.utils.BookmarkActions.prepareMenu(this, menu, bookmarkTarget());
 
         return super.onPrepareOptionsMenu(menu);
     }
@@ -152,8 +145,20 @@ public class UserActivity extends BaseFragmentPagerActivity {
         return getToplevelActivityIntent();
     }
 
+    /** As saved before #263: the login, the name and the profile's address. */
+    @Nullable
+    private com.gl4a.utils.BookmarkActions.Target bookmarkTarget() {
+        if (mUser == null) return null;
+        return new com.gl4a.utils.BookmarkActions.Target(BookmarksProvider.Columns.TYPE_USER,
+                IntentUtils.createBaseUriForUser(mUserLogin).build().toString(), mUserLogin,
+                mUser.name(), mUser.id(), mUser.avatarUrl());
+    }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        if (com.gl4a.utils.BookmarkActions.onMenuItemSelected(this, item, bookmarkTarget())) {
+            return true;
+        }
         Uri url = IntentUtils.createBaseUriForUser(mUserLogin).build();
         switch (item.getItemId()) {
             case R.id.share: {
@@ -166,17 +171,6 @@ public class UserActivity extends BaseFragmentPagerActivity {
             case R.id.browser:
                 IntentUtils.launchBrowser(this, url);
                 return true;
-            case R.id.bookmark: {
-                String urlString = url.toString();
-                if (BookmarksProvider.hasBookmarked(this, urlString)) {
-                    BookmarksProvider.removeBookmark(this, urlString);
-                } else {
-                    BookmarksProvider.saveBookmark(this, mUserLogin,
-                            BookmarksProvider.Columns.TYPE_USER,
-                            urlString, mUser.name(), true);
-                }
-                return true;
-            }
         }
         return super.onOptionsItemSelected(item);
     }

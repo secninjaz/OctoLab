@@ -37,6 +37,26 @@ public interface GitLabMergeRequestService {
     );
 
     // state must be "opened", "closed", "locked", or "merged" — NOT "open"
+    /**
+     * Merge requests the user can see, filtered by any of the list API's parameters, read as
+     * issues for the shared issue rows (#264).
+     */
+    @GET("merge_requests")
+    Single<Response<List<com.gl4a.gitlab.model.GitLabIssue>>> listMergeRequestsAsIssues(
+            @retrofit2.http.QueryMap Map<String, String> params,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
+    /** A project's merge requests by number, read as issues for the shared rows (#267). */
+    @GET("projects/{id}/merge_requests")
+    Single<Response<List<com.gl4a.gitlab.model.GitLabIssue>>> getMergeRequestsByIidsAsIssues(
+            @Path("id") long projectId,
+            @Query("iids[]") java.util.List<Integer> iids,
+            @Query("with_labels_details") boolean withLabelsDetails,
+            @Query("per_page") int perPage
+    );
+
     @GET("merge_requests")
     Single<Response<List<GitLabMergeRequest>>> listMyMergeRequests(
             @Query("state") String state,       // "opened" | "closed" | "merged" | "all"

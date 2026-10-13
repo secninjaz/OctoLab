@@ -247,6 +247,7 @@ public class ServiceFactory {
     private static <S> S createService(Class<S> serviceClass, boolean bypassCache,
             String token, Integer pageSize) {
         int perPage = pageSize != null ? pageSize : DEFAULT_PER_PAGE;
+        final String createdForBase = Gl4Application.get().getApiBaseUrl();
         OkHttpClient.Builder cb = sApiHttpClient.newBuilder()
                 .addInterceptor(new GitLabPaginationInterceptor(perPage))
                 .addNetworkInterceptor(CACHE_MAX_AGE_INTERCEPTOR)
@@ -254,6 +255,16 @@ public class ServiceFactory {
                     Request original = chain.request();
                     Request.Builder rb = original.newBuilder()
                             .method(original.method(), original.body());
+                    if (token == null) {
+                        // The active account's server, chosen now together with its token: a
+                        // request set up before an account switch and sent after it went to the
+                        // previous account's server with the new token, and got 401 (#260)
+                        String currentBase = Gl4Application.get().getApiBaseUrl();
+                        String url = original.url().toString();
+                        if (!currentBase.equals(createdForBase) && url.startsWith(createdForBase)) {
+                            rb.url(currentBase + url.substring(createdForBase.length()));
+                        }
+                    }
                     String tok = token != null ? token : Gl4Application.get().getAuthToken();
                     if (tok != null) {
                         // PATs use PRIVATE-TOKEN header; OAuth2 access tokens use Bearer.

@@ -196,14 +196,12 @@ public class ContentListFragment extends ListDataBaseFragment<GitLabTreeItem> im
                 return true;
             }
             case R.id.download: {
-                String pwn2 = mRepository.pathWithNamespace;
-                int sl2 = pwn2 != null && pwn2.contains("/") ? pwn2.lastIndexOf('/') : -1;
-                String owner = sl2 >= 0 ? pwn2.substring(0, sl2) : mRepository.owner().login();
-                String name = mRepository.path != null ? mRepository.path : mRepository.name();
-                String url = IntentUtils.createRawFileUrl(owner, name, mRef, treeItem.path());
-                DownloadUtils.enqueueDownloadWithPermissionCheck(getBaseActivity(),
-                        url, FileUtils.getMimeTypeFor(treeItem.name()),
-                        treeItem.name(), null);
+                // The API link with the account token: the web raw link needs a browser
+                // login and failed for private projects (#245)
+                String ref = mRef != null ? mRef : mRepository.defaultBranch();
+                DownloadUtils.enqueueAuthenticatedDownload(getBaseActivity(),
+                        DownloadUtils.repositoryFileUrl(mRepository.id(), treeItem.path(), ref),
+                        treeItem.name(), FileUtils.getMimeTypeFor(treeItem.name()), null);
                 return true;
             }
         }

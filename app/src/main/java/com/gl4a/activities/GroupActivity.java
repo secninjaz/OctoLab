@@ -94,11 +94,15 @@ public class GroupActivity extends BaseActivity implements
         getMenuInflater().inflate(R.menu.group, menu);
         getMenuInflater().inflate(R.menu.group_sort, menu);
         GroupTree.prepareSortMenu(menu, this);
+        com.gl4a.utils.BookmarkActions.prepareMenu(this, menu, bookmarkTarget());
         return super.onCreateOptionsMenu(menu);
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        if (com.gl4a.utils.BookmarkActions.onMenuItemSelected(this, item, bookmarkTarget())) {
+            return true;
+        }
         if (GroupTree.onSortItemSelected(item, this)) {
             mTreeState.clear();
             loadSubgroups(true);
@@ -155,6 +159,19 @@ public class GroupActivity extends BaseActivity implements
         return mGroup != null && mGroup.fullPath != null ? mGroup.fullPath : mGroupPath;
     }
 
+    /**
+     * Bookmarked by its /groups/ address, which always opens the group, also a subgroup that
+     * would otherwise read as a project path (#263).
+     */
+    @androidx.annotation.Nullable
+    private com.gl4a.utils.BookmarkActions.Target bookmarkTarget() {
+        if (mGroup == null || mGroup.fullPath == null) return null;
+        return new com.gl4a.utils.BookmarkActions.Target(com.gl4a.db.BookmarksProvider.Columns.TYPE_GROUP,
+                com.gl4a.Gl4Application.get().getInstanceUrl() + "/groups/" + mGroup.fullPath,
+                mGroup.name != null ? mGroup.name : mGroup.fullPath, mGroup.fullPath, mGroup.id,
+                mGroup.avatarUrl);
+    }
+
     private void loadGroup(boolean force) {
         GitLabGroupService service = ServiceFactory.get(GitLabGroupService.class, force);
         service.getGroupByPath(Uri.encode(mGroupPath))
@@ -163,6 +180,7 @@ public class GroupActivity extends BaseActivity implements
                 .subscribe(group -> {
                     mGroup = group;
                     bindGroup();
+                    supportInvalidateOptionsMenu();
                     setContentShown(true);
                     loadSubgroups(force);
                 }, this::handleLoadFailure);

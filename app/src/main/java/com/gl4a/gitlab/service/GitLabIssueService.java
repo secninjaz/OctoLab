@@ -38,6 +38,14 @@ public interface GitLabIssueService {
     );
 
     // state must be "opened" or "closed" — GitLab API v4 does not accept "open"
+    /** Issues the user can see, filtered by any of the list API's parameters (#264). */
+    @GET("issues")
+    Single<Response<List<GitLabIssue>>> listIssuesWithParams(
+            @retrofit2.http.QueryMap Map<String, String> params,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
     @GET("issues")
     Single<Response<List<GitLabIssue>>> listMyIssues(
             @Query("state") String state,       // "opened" | "closed" | "all"

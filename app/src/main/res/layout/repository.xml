@@ -29,11 +29,10 @@
                     android:orientation="horizontal"
                     android:paddingLeft="@dimen/content_padding">
 
-                    <com.gl4a.widget.FixedSizeImageView
+                    <com.gl4a.widget.LogoImageView
                         android:id="@+id/iv_repo_logo"
                         android:layout_width="48dp"
                         android:layout_height="48dp"
-                        android:background="@drawable/avatar_frame"
                         tools:src="@drawable/default_avatar" />
 
                     <LinearLayout
@@ -76,6 +75,84 @@
                             android:textColorLink="?android:attr/textColorLink"
                             app:needsLinkHandling="true"
                             tools:text="https://example.com" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- The languages GitLab detected, as on GitLab web: a bar in its colours and
+                     a legend (#271) -->
+                <LinearLayout
+                    android:id="@+id/ll_languages"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="vertical"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:id="@+id/ll_language_bar"
+                        android:layout_width="match_parent"
+                        android:layout_height="8dp"
+                        android:background="@drawable/language_bar_background"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:id="@+id/tv_language_legend"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textAppearance="@style/TextAppearance.VerySmall"
+                        tools:text="● Java 95.2%  ● JavaScript 4.4%" />
+
+                </LinearLayout>
+
+                <!-- The selected branch's last commit, as on GitLab web (#271) -->
+                <LinearLayout
+                    android:id="@+id/ll_last_commit"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingTop="4dp"
+                    android:paddingRight="@dimen/content_padding"
+                    android:paddingBottom="4dp"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:id="@+id/iv_last_commit_avatar"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:contentDescription="@string/commit_author_avatar"
+                        tools:src="@drawable/default_avatar" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tv_last_commit_title"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:singleLine="true"
+                            android:textAppearance="?android:attr/textAppearanceSmall"
+                            tools:text="feat: profile projects and memberships" />
+
+                        <TextView
+                            android:id="@+id/tv_last_commit_meta"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="@style/TextAppearance.VerySmall"
+                            tools:text="37ec95d1 · 2 days ago" />
 
                     </LinearLayout>
 
@@ -150,6 +227,30 @@
                     app:rowIconActionHintOff="@string/repo_watch_action"
                     app:rowIconActionHintOn="@string/repo_unwatch_action"
                     tools:rowText="54 Watchers" />
+
+                <!-- README, licence, CHANGELOG and CONTRIBUTING, those on the selected branch,
+                     as on GitLab web (#271) -->
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/cg_file_shortcuts"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:chipSpacingHorizontal="8dp"
+                    app:chipSpacingVertical="8dp"
+                    android:layout_marginTop="8dp"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tv_created_on"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:paddingLeft="@dimen/content_padding"
+                    android:paddingRight="@dimen/content_padding"
+                    android:textAppearance="@style/TextAppearance.VerySmall"
+                    android:visibility="gone"
+                    tools:text="Created on June 8, 2026" />
 
             </LinearLayout>
         </androidx.cardview.widget.CardView>

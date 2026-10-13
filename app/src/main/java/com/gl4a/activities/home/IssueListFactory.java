@@ -21,7 +21,9 @@ public class IssueListFactory extends FragmentFactory {
     };
     // MRs: Created / Assigned / Reviews / Mentioned  (Reviews = scope=reviews_for_me)
     private static final int[] MR_TAB_TITLES = new int[] {
-            R.string.created, R.string.assigned, R.string.reviews, R.string.mentioned
+            R.string.created, R.string.assigned, R.string.reviews, R.string.mentioned,
+            // The shared definition of participating, as for issues (#267)
+            R.string.participating
     };
 
     private boolean mShowingClosed;
@@ -74,7 +76,7 @@ public class IssueListFactory extends FragmentFactory {
             { "created_by_me", "assigned_to_me", "mentioned", "participating" };
     // MR scopes:   Created / Assigned / Reviews / Mentioned
     private static final String[] MR_SCOPES =
-            { "created_by_me", "assigned_to_me", "reviews_for_me", "mentioned" };
+            { "created_by_me", "assigned_to_me", "reviews_for_me", "mentioned", "participating" };
 
     @Override
     protected Fragment makeFragment(int position) {

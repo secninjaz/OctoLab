@@ -13,6 +13,19 @@ import retrofit2.http.Path;
 import retrofit2.http.Query;
 
 public interface GitLabGroupService {
+    /**
+     * Groups matching a search (#262): with minAccessLevel 10, the user's own (as member);
+     * with allAvailable, every group the user can see.
+     */
+    @GET("groups?order_by=name&sort=asc")
+    Single<Response<List<GitLabGroup>>> searchGroups(
+            @Query("search") String query,
+            @Query("min_access_level") Integer minAccessLevel,
+            @Query("all_available") Boolean allAvailable,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
     @GET("groups")
     Single<Response<List<GitLabGroup>>> listGroups(
             @Query("owned") boolean owned,

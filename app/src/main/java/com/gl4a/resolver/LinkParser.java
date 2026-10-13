@@ -90,7 +90,13 @@ public class LinkParser {
         }
 
         String first = parts.get(0);
-        // Other instance-wide /-/ routes (/-/user_settings, /-/snippets/...) have no in-app screen
+        // A personal snippet (/-/snippets/ID, older /snippets/ID) opens in-app, e.g. from a
+        // bookmark (#263)
+        Long snippetId = personalSnippetId(parts);
+        if (snippetId != null) {
+            return new ParseResult(com.gl4a.activities.GistActivity.makeIntent(activity, snippetId));
+        }
+        // Other instance-wide /-/ routes (/-/user_settings, ...) have no in-app screen
         if ("-".equals(first)) {
             return null;
         }
@@ -239,6 +245,16 @@ public class LinkParser {
         int n = parts.size();
         return n >= 4 && "uploads".equals(parts.get(n - 3))
                 && parts.get(n - 2).matches("[0-9a-f]{32}");
+    }
+
+    @Nullable
+    private static Long personalSnippetId(List<String> parts) {
+        int at = "-".equals(parts.get(0)) ? 1 : 0;
+        if (parts.size() < at + 2 || !"snippets".equals(parts.get(at))) {
+            return null;
+        }
+        String id = parts.get(at + 1);
+        return id.matches("[0-9]+") ? Long.valueOf(id) : null;
     }
 
     @Nullable

@@ -37,6 +37,8 @@ public class BookmarkAdapter extends RecyclerView.Adapter<BookmarkAdapter.ViewHo
     private int mNameColumnIndex;
     private int mExtraColumnIndex;
     private int mUrlColumnIndex;
+    private int mObjectIdColumnIndex;
+    private int mAvatarUrlColumnIndex;
 
     private final List<Integer> mPositions = new ArrayList<>();
 
@@ -61,6 +63,8 @@ public class BookmarkAdapter extends RecyclerView.Adapter<BookmarkAdapter.ViewHo
             mNameColumnIndex = cursor.getColumnIndexOrThrow(Columns.NAME);
             mExtraColumnIndex = cursor.getColumnIndexOrThrow(Columns.EXTRA);
             mUrlColumnIndex = cursor.getColumnIndexOrThrow(Columns.URI);
+            mObjectIdColumnIndex = cursor.getColumnIndexOrThrow(Columns.OBJECT_ID);
+            mAvatarUrlColumnIndex = cursor.getColumnIndexOrThrow(Columns.AVATAR_URL);
 
             mPositions.clear();
             for (int i = 0; i < mCursor.getCount(); i++) {
@@ -105,11 +109,10 @@ public class BookmarkAdapter extends RecyclerView.Adapter<BookmarkAdapter.ViewHo
         String name = mCursor.getString(mNameColumnIndex);
         String extraData = mCursor.getString(mExtraColumnIndex);
 
-        switch (type) {
-            case Columns.TYPE_REPO: holder.mIcon.setImageResource(R.drawable.repo_bookmark); break;
-            case Columns.TYPE_USER: holder.mIcon.setImageResource(R.drawable.user_bookmark); break;
-            default: holder.mIcon.setImageDrawable(null); break;
-        }
+        // A user's avatar, a group's or project's logo, else the type's icon (#265)
+        com.gl4a.utils.BookmarkActions.bindIcon(holder.mIcon, mCursor.getLong(mIdColumnIndex),
+                type, name, mCursor.getString(mUrlColumnIndex),
+                mCursor.getLong(mObjectIdColumnIndex), mCursor.getString(mAvatarUrlColumnIndex));
 
         holder.mTitle.setText(name);
         if (StringUtils.isBlank(extraData)) {
@@ -157,6 +160,8 @@ public class BookmarkAdapter extends RecyclerView.Adapter<BookmarkAdapter.ViewHo
         final int type = mCursor.getInt(mTypeColumnIndex);
         final String url = mCursor.getString(mUrlColumnIndex);
         final String extraData = mCursor.getString(mExtraColumnIndex);
+        final long objectId = mCursor.getLong(mObjectIdColumnIndex);
+        final String avatarUrl = mCursor.getString(mAvatarUrlColumnIndex);
 
         updateOrder(context);
 
@@ -165,7 +170,8 @@ public class BookmarkAdapter extends RecyclerView.Adapter<BookmarkAdapter.ViewHo
 
         Snackbar.make(viewHolder.itemView, R.string.bookmark_removed, Snackbar.LENGTH_LONG)
                 .setAction(R.string.undo,
-                        v -> BookmarksProvider.saveBookmark(context, name, type, url, extraData, false))
+                        v -> BookmarksProvider.saveBookmark(context, name, type, url, extraData,
+                                objectId, avatarUrl, false))
                 .show();
     }
 

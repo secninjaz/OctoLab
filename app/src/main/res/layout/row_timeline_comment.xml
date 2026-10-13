@@ -135,11 +135,19 @@
 
         </HorizontalScrollView>
 
+        <!-- The comment's content, as text or in the web view; what follows is placed below
+             this, so it comes after whichever is shown (#254) -->
+        <LinearLayout
+            android:id="@+id/ll_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/sv_diff_snippet"
+            android:orientation="vertical">
+
         <com.gl4a.widget.LinkHandlingTextView
             android:id="@+id/tv_desc"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_below="@id/sv_diff_snippet"
             android:layout_marginTop="6dp"
             android:textAppearance="?android:attr/textAppearanceSmall"
             android:textColor="?android:attr/textColorPrimary"
@@ -152,16 +160,17 @@
             android:id="@+id/wv_table"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_below="@id/sv_diff_snippet"
             android:layout_marginTop="6dp"
             android:visibility="gone" />
+
+        </LinearLayout>
 
         <!-- "Edited 2 days ago by Jay B" under the text, like GitLab web (#151) -->
         <TextView
             android:id="@+id/tv_edited"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_below="@id/tv_desc"
+            android:layout_below="@id/ll_content"
             android:layout_marginTop="4dp"
             android:textAppearance="@style/TextAppearance.VerySmall"
             android:visibility="gone"

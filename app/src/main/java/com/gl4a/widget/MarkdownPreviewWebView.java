@@ -22,9 +22,8 @@ import android.webkit.WebViewClient;
 import android.widget.EditText;
 
 import com.gl4a.R;
-import com.gl4a.activities.WebViewerActivity;
-import com.gl4a.utils.HtmlUtils;
 import com.gl4a.utils.IntentUtils;
+import com.gl4a.utils.MarkdownStyle;
 import com.gl4a.utils.StringUtils;
 
 public class MarkdownPreviewWebView extends WebView implements NestedScrollingChild2 {
@@ -33,7 +32,16 @@ public class MarkdownPreviewWebView extends WebView implements NestedScrollingCh
     private final int[] mScrollConsumed = new int[2];
     private int mNestedOffsetY;
     private int mLastY;
-    private final String mCssTheme;
+
+    // The text to preview, and whether the shown preview is older than it (#266)
+    private String mText = "";
+    private boolean mStale;
+    private io.reactivex.disposables.Disposable mRendering;
+    private final Runnable mRenderIfShown = this::renderIfShown;
+    /** Typing pause after which the preview is rendered again. */
+    private static final long RENDER_DELAY_MS = 600;
+    /** The preview's own margin around the content (the shared page has none). */
+    private static final String PREVIEW_CSS = "body{padding:16px}";
 
     public MarkdownPreviewWebView(Context context) {
         this(context, null);
@@ -49,13 +57,17 @@ public class MarkdownPreviewWebView extends WebView implements NestedScrollingCh
         mChildHelper = new NestedScrollingChildHelper(this);
         setNestedScrollingEnabled(true);
 
-        mCssTheme = getResources().getBoolean(R.bool.is_dark_theme)
-                ? WebViewerActivity.DARK_CSS_THEME : WebViewerActivity.LIGHT_CSS_THEME;
-
         if (!isInEditMode()) {
             initWebViewSettings(getSettings());
             setWebViewClient(getUrlHandlingClient());
-            setContent("");
+            setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            showPage("");
+            // Switching to the Preview tab scrolls it into sight: render then if needed
+            getViewTreeObserver().addOnScrollChangedListener(() -> {
+                if (mStale) {
+                    renderIfShown();
+                }
+            });
         }
     }
 
@@ -197,36 +209,91 @@ public class MarkdownPreviewWebView extends WebView implements NestedScrollingCh
         s.setAllowFileAccess(false);
     }
 
+    /**
+     * The preview is GitLab's own rendering of the text, as GitLab web's preview, in the shared
+     * page and style (MarkdownStyle), so it looks as the posted comment will (#266). It's
+     * rendered once typing pauses and only while the preview is on screen.
+     */
     private void setContent(String content) {
-        String html = generateMarkdownHtml(StringUtils.toBase64(content), mCssTheme);
-        loadDataWithBaseURL("file:///android_asset/", html, null, "utf-8", null);
+        mText = content;
+        mStale = true;
+        removeCallbacks(mRenderIfShown);
+        postDelayed(mRenderIfShown, RENDER_DELAY_MS);
     }
 
-    private String generateMarkdownHtml(String base64Data, String cssTheme) {
-        StringBuilder content = new StringBuilder();
-        content.append("<html><head>");
-        HtmlUtils.writeScriptInclude(content, "showdown");
-        HtmlUtils.writeCssInclude(content, "markdown", cssTheme);
-        HtmlUtils.writeCssInclude(content, "mdpreview", cssTheme);
-        content.append("</head>");
+    private void renderIfShown() {
+        if (!mStale || !isAttachedToWindow() || !getGlobalVisibleRect(new android.graphics.Rect())) {
+            return;
+        }
+        mStale = false;
+        final String text = mText;
+        if (text.trim().isEmpty()) {
+            showPage("");
+            return;
+        }
+        if (mRendering != null) {
+            mRendering.dispose();
+        }
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("text", text);
+        body.put("gfm", true);
+        String project = com.gl4a.Gl4Application.get().getCurrentProjectPath();
+        if (project != null) {
+            body.put("project", project);
+        }
+        mRendering = com.gl4a.ServiceFactory.get(
+                com.gl4a.gitlab.service.GitLabMarkdownService.class, false)
+                .render(body)
+                .map(response -> {
+                    com.gl4a.gitlab.model.GitLabMarkdownResult result = response.body();
+                    if (!response.isSuccessful() || result == null || result.html == null) {
+                        throw new java.io.IOException("Markdown API " + response.code());
+                    }
+                    return result.html;
+                })
+                .subscribeOn(io.reactivex.schedulers.Schedulers.io())
+                .observeOn(io.reactivex.android.schedulers.AndroidSchedulers.mainThread())
+                .subscribe(html -> {
+                    if (text.equals(mText)) {
+                        showPage(html);
+                    }
+                }, error -> {
+                    // Offline or refused: the in-app rendering, in the same page and style
+                    if (text.equals(mText)) {
+                        showLocalRendering(text);
+                    }
+                });
+    }
 
-        content.append("<body>");
-        content.append("<div id='content'></div>");
+    /** Shows GitLab's HTML in the shared page. */
+    private void showPage(String html) {
+        String base = com.gl4a.Gl4Application.get().getInstanceUrl() + "/";
+        loadDataWithBaseURL(base, MarkdownStyle.webViewPage(getContext(), html, PREVIEW_CSS),
+                "text/html", "utf-8", null);
+    }
 
+    /** The text rendered in the app (showdown.js), when GitLab's rendering isn't available. */
+    private void showLocalRendering(String text) {
         addJavascriptInterface(new Base64JavascriptInterface(), "Base64");
-        content.append("<script>");
-        content.append("var text = Base64.decode('");
-        content.append(base64Data);
-        content.append("');\n");
-        content.append("var converter = new showdown.Converter();\n");
-        content.append("converter.setFlavor('github');\n");
-        content.append("var html = converter.makeHtml(text);\n");
-        content.append("document.getElementById('content').innerHTML = html;");
-        content.append("</script>");
+        String page = MarkdownStyle.webViewPage(getContext(),
+                "<div id='content'></div>"
+                        + "<script src='file:///android_asset/showdown.js'></script>"
+                        + "<script>var text = Base64.decode('" + StringUtils.toBase64(text)
+                        + "');var converter = new showdown.Converter();"
+                        + "converter.setFlavor('github');"
+                        + "document.getElementById('content').innerHTML ="
+                        + " converter.makeHtml(text);</script>",
+                PREVIEW_CSS);
+        loadDataWithBaseURL("file:///android_asset/", page, "text/html", "utf-8", null);
+    }
 
-        content.append("</body></html>");
-
-        return content.toString();
+    @Override
+    protected void onDetachedFromWindow() {
+        removeCallbacks(mRenderIfShown);
+        if (mRendering != null) {
+            mRendering.dispose();
+        }
+        super.onDetachedFromWindow();
     }
 
     private static class Base64JavascriptInterface {

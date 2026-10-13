@@ -107,6 +107,19 @@ public class ReviewFragment extends ListDataBaseFragment<TimelineItem> implement
     }
 
     @Override
+    protected androidx.recyclerview.widget.LinearLayoutManager createLayoutManager(
+            android.content.Context context) {
+        // The shared list setup of every screen of comments (#258)
+        return com.gl4a.widget.StableScrollbarLayoutManager.forComments(context, null);
+    }
+
+    @Override
+    protected void onRecyclerViewInflated(RecyclerView view, LayoutInflater inflater) {
+        super.onRecyclerViewInflated(view, inflater);
+        com.gl4a.widget.StableScrollbarLayoutManager.setUpCommentList(view);
+    }
+
+    @Override
     protected int getEmptyTextResId() {
         return 0;
     }

@@ -8,13 +8,7 @@ body {
     background-color: #3a3c3d;
 }
 
-.add {
-    background-color: #244224;
-}
-
-.remove {
-    background-color: #581616;
-}
+/* .add and .remove: the theme's diff colours, added by the app from MarkdownStyle (#274) */
 
 .highlighted {
     background: #48480F;

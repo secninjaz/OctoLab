@@ -305,6 +305,9 @@
     <string name="user_follow_action">Follow</string>
     <string name="user_unfollow_action">Unfollow</string>
     <string name="user_no_repos">No repositories found</string>
+    <string name="download_progress">Downloading %1$s of %2$s</string>
+    <string name="download_progress_unknown">Downloading %1$s</string>
+    <string name="downloading_file">Downloading %1$s to Downloads…</string>
     <string name="git_author_no_account">No GitLab account found for this author</string>
     <!-- Profile sections, named as on GitLab's profile page (#232) -->
     <string name="user_personal_projects">Personal projects</string>
@@ -609,6 +612,25 @@
     <string name="search_hint_repo">Search for repositories</string>
     <string name="search_hint_user">Search for users</string>
     <string name="search_hint_code">Search for code</string>
+    <!-- Search everything, like GitLab web (#262) -->
+    <string name="search_type_all">All</string>
+    <string name="search_type_group">Group</string>
+    <string name="search_type_issue">Issue</string>
+    <string name="search_type_merge_request">Merge request</string>
+    <string name="search_hint_all">Search groups, projects, issues and more</string>
+    <string name="search_hint_group">Search for groups</string>
+    <string name="search_hint_issue">Search for issues</string>
+    <string name="search_hint_merge_request">Search for merge requests</string>
+    <string name="no_search_results_found">Nothing found matching the criteria.</string>
+    <string name="no_search_groups_found">No groups found matching the criteria.</string>
+    <string name="no_search_merge_requests_found">No merge requests found matching the criteria.</string>
+    <string name="search_section_groups">Groups</string>
+    <string name="search_section_projects">Projects</string>
+    <string name="search_section_issues">Issues</string>
+    <string name="search_section_merge_requests">Merge requests</string>
+    <string name="search_section_users">Users</string>
+    <string name="search_section_code">Code</string>
+    <string name="search_show_all">Show all</string>
 
     <!-- Sharing -->
     <string name="send_email_title">Select email application</string>
@@ -766,6 +788,27 @@
     <string name="thread_resolved_by_push">Automatically resolved %1$s by %2$s</string>
     <string name="view_video_named">Play video: %1$s</string>
     <string name="media_not_playable">This video or audio file couldn\'t be played</string>
+    <string name="media_full_screen">Full screen</string>
+    <!-- Project About, as on GitLab web (#271) -->
+    <string name="commit_author_avatar">Commit author\'s avatar</string>
+    <string name="repo_created_on">Created on %1$s</string>
+    <string name="repo_shortcut_license">License</string>
+    <string name="repo_last_commit_meta">%1$s · %2$s</string>
+    <!-- Commit screen (#272) -->
+    <string name="commit_show_more_files">Show more (%1$d of %2$d files left)</string>
+    <!-- Commit details (#273) -->
+    <string name="commit_parent">parent</string>
+    <string name="commit_parents">parents</string>
+    <string name="commit_branches">Branches</string>
+    <string name="commit_tags">Tags</string>
+    <string name="commit_branches_containing">Branches containing commit</string>
+    <string name="commit_tags_containing">Tags containing commit</string>
+    <string name="commit_no_related_mrs">No related merge requests found</string>
+    <string name="commit_related_mrs">Merge requests</string>
+    <!-- #267 -->
+    <string name="notify_participating_title">Comments on issues and MRs I\'m in</string>
+    <string name="notify_participating_summary">Notify new comments on issues and merge requests you created, are assigned to, review or commented on</string>
+    <string name="media_exit_full_screen">Exit full screen</string>
     <!-- MR version compare (#198) -->
     <string name="mr_version_title">Version %1$d</string>
     <string name="mr_version_title_unknown">Merge request version</string>

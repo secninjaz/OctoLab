@@ -195,6 +195,12 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
         return mRepository != null ? mRepository.defaultBranch() : "";
     }
 
+    /** The title the screen shows, as bookmarks of projects were always named. */
+    private String bookmarkName() {
+        CharSequence title = mActionBar.getTitle();
+        return title != null ? title.toString() : mRepoName;
+    }
+
     private String getBookmarkUrl() {
         if (mRepository == null) {
             return Gl4Application.get().getInstanceUrl() + "/" + mRepoOwner + "/" + mRepoName;
@@ -304,12 +310,9 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
             menu.removeItem(R.id.bookmark);
             menu.removeItem(R.id.zip_download);
         } else {
-            MenuItem bookmarkAction = menu.findItem(R.id.bookmark);
-            if (bookmarkAction != null) {
-                bookmarkAction.setTitle(BookmarksProvider.hasBookmarked(this, getBookmarkUrl())
-                        ? R.string.remove_bookmark
-                        : R.string.bookmark);
-            }
+            com.gl4a.utils.BookmarkActions.prepareMenu(this, menu, new com.gl4a.utils.BookmarkActions.Target(
+                    BookmarksProvider.Columns.TYPE_REPO, getBookmarkUrl(),
+                    bookmarkName(), getCurrentRef(), mRepository.id, mRepository.avatarUrl));
         }
 
         return super.onPrepareOptionsMenu(menu);
@@ -344,24 +347,20 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
                         SearchActivity.SEARCH_TYPE_CODE, false));
                 return true;
             case R.id.bookmark:
-                String bookmarkUrl = getBookmarkUrl();
-                if (BookmarksProvider.hasBookmarked(this, bookmarkUrl)) {
-                    BookmarksProvider.removeBookmark(this, bookmarkUrl);
-                } else {
-                    BookmarksProvider.saveBookmark(this, mActionBar.getTitle().toString(),
-                            BookmarksProvider.Columns.TYPE_REPO, bookmarkUrl, getCurrentRef(), true);
-                }
-                return true;
+                return com.gl4a.utils.BookmarkActions.onMenuItemSelected(this, item,
+                        new com.gl4a.utils.BookmarkActions.Target(
+                                BookmarksProvider.Columns.TYPE_REPO, getBookmarkUrl(),
+                                bookmarkName(), getCurrentRef(),
+                                mRepository != null ? mRepository.id : 0,
+                                mRepository != null ? mRepository.avatarUrl : null));
             case R.id.zip_download: {
-                final String zipUrl = Uri.parse(mRepository.htmlUrl())
-                        .buildUpon()
-                        .appendPath("-")
-                        .appendPath("archive")
-                        .appendPath(getCurrentRef())
-                        .appendPath(mRepoName + "-" + getCurrentRef() + ".zip")
-                        .toString();
-                DownloadUtils.enqueueDownloadWithPermissionCheck(this, zipUrl, "application/zip",
-                        mRepoName + "-" + getCurrentRef() + ".zip", null);
+                // The API archive with the account token; the web link needs a browser login
+                // and failed for private projects (#245)
+                final String zipUrl = com.gl4a.Gl4Application.get().getApiBaseUrl() + "projects/"
+                        + mRepository.id() + "/repository/archive.zip?sha="
+                        + Uri.encode(getCurrentRef());
+                DownloadUtils.enqueueAuthenticatedDownload(this, zipUrl,
+                        mRepoName + "-" + getCurrentRef() + ".zip", "application/zip", null);
                 return true;
             }
         }
@@ -430,12 +429,13 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
                     ServiceFactory.getForFullPagedLists(GitLabProjectService.class, false);
             long projectId = mRepository.id();
 
-            Single<List<GitLabBranch>> branchSingle = projectService.getBranches(projectId, 1, 100)
-                    .<List<GitLabBranch>>map(ApiHelpers::throwOnFailure)
+            // Every page: a project can have more than 100 branches or tags (#269)
+            Single<List<GitLabBranch>> branchSingle = ApiHelpers.<GitLabBranch>allPages(
+                            page -> projectService.getBranches(projectId, page, 100))
                     .subscribeOn(Schedulers.io());
             // GitLab tags use GitLabTag, convert to GitLabBranch-compatible wrapper list
-            Single<List<GitLabBranch>> tagSingle = projectService.getTags(projectId, 1, 100)
-                    .<List<GitLabTag>>map(ApiHelpers::throwOnFailure)
+            Single<List<GitLabBranch>> tagSingle = ApiHelpers.<GitLabTag>allPages(
+                            page -> projectService.getTags(projectId, page, 100))
                     .map(tags -> {
                         List<GitLabBranch> branchLike = new ArrayList<>();
                         for (GitLabTag t : tags) {

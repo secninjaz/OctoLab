@@ -52,7 +52,8 @@ public class CommitDiffLoadTask extends DiffLoadTask {
     protected Single<List<GitLabDiff>> getFiles() throws ApiRequestException {
         GitLabCommitService service = ServiceFactory.get(GitLabCommitService.class, false);
         return SingleFactory.getProjectId(mRepoOwner, mRepoName)
-                .flatMap(projectId -> service.getCommitDiff(projectId, mSha, 1, 100)
-                        .map(ApiHelpers::throwOnFailure));
+                // Every page: a commit can change more than 100 files (#272)
+                .flatMap(projectId -> ApiHelpers.<GitLabDiff>allPages(
+                        page -> service.getCommitDiff(projectId, mSha, page, 100)));
     }
 }

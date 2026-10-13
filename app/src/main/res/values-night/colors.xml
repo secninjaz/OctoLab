@@ -55,15 +55,15 @@
 
     <color name="scrollbar_thumb">#5dffffff</color>
 
-    <!-- Diff viewer — dark tinted backgrounds -->
-    <color name="diff_add">#0d2e18</color>
-    <color name="diff_remove">#2e100d</color>
-    <color name="diff_add_line_number">#1a4428</color>
-    <color name="diff_remove_line_number">#441a15</color>
+    <!-- Diff viewer: GitLab dark theme's diff colours (#274) -->
+    <color name="diff_add">#233726</color><!-- 11.2:1 with diff text -->
+    <color name="diff_remove">#4b2526</color><!-- 11.6:1 with diff text -->
+    <color name="diff_add_line_number">#233726</color><!-- GitLab: same as the line -->
+    <color name="diff_remove_line_number">#4b2526</color>
 
-    <!-- Diff text: lighter Pajamas green/red on dark diff backgrounds -->
-    <color name="commit_addition">#4aab6e</color><!-- 6.55:1 on #121212 -->
-    <color name="commit_deletion">#e0674e</color><!-- 5.55:1 on #121212 -->
+    <!-- +/- counts: GitLab dark green-300 / red-300 -->
+    <color name="commit_addition">#52B87A</color><!-- GitLab dark added (7.58:1 on #121212) -->
+    <color name="commit_deletion">#F6806D</color><!-- GitLab dark removed (7.34:1 on #121212) -->
     <color name="code_background">#30ffffff</color>
 
     <color name="drawer_background">@color/background_floating_material_dark</color>

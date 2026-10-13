@@ -86,6 +86,14 @@ public interface GitLabUserService {
             @Query("per_page") int perPage
     );
 
+    /** The authenticated user's own events of one kind, e.g. "commented", newest first (#267). */
+    @GET("events")
+    Single<Response<List<GitLabEvent>>> getCurrentUserEventsByAction(
+            @Query("action") String action,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
     // Events for the authenticated user (personal activity)
     @GET("events")
     Single<Response<List<GitLabEvent>>> getCurrentUserEvents(

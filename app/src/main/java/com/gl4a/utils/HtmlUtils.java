@@ -131,6 +131,13 @@ public class HtmlUtils {
         }
     }
 
+    /** A task list item's checkbox. */
+    private static class CheckboxSpan extends ImageSpan {
+        CheckboxSpan(Drawable d) {
+            super(d, ImageSpan.ALIGN_BOTTOM);
+        }
+    }
+
     private static class CodeBlockSpan implements LineBackgroundSpan {
         private final int mColor;
 
@@ -165,7 +172,7 @@ public class HtmlUtils {
         public int getLeadingMargin(boolean first) {
             // Since we don't have access to the Paint object to measure text width here, we have to
             // compute the width in a more approximate way by taking into account the current text scaling
-            return 4 + Math.round(getItemText().length() * 6 * mTextScaling);
+            return MarkdownStyle.numberedItemMarginPx(getItemText().length(), mTextScaling);
         }
 
         @Override
@@ -392,10 +399,9 @@ public class HtmlUtils {
     }
 
     private static class HtmlToSpannedConverter implements ContentHandler {
-        private static final float[] HEADING_SIZES = {
-            1.75f, 1.5f, 1.25f, 1.1f, 1f, 0.9f
-        };
-        private static final float SMALL_TEXT_SIZE = 0.8f;
+        // Sizes, colours and margins: the one shared look of GitLab content (#251)
+        private static final float[] HEADING_SIZES = MarkdownStyle.HEADING_SIZES;
+        private static final float SMALL_TEXT_SIZE = MarkdownStyle.SMALL_TEXT_SIZE;
 
 
         private final float mDividerHeight;
@@ -406,6 +412,8 @@ public class HtmlUtils {
         private final int mReplyMarkerColor;
         private final int mReplyBackground;
         private final int mCodeBlockBackgroundColor;
+        private final int mDiffAddColor;
+        private final int mDiffRemoveColor;
 
         private final Context mContext;
         private final String mSource;
@@ -452,14 +460,17 @@ public class HtmlUtils {
         public HtmlToSpannedConverter(Context context, String source,
                 ImageGetter imageGetter, Parser parser) {
             final Resources res = context.getResources();
-            mDividerHeight = res.getDimension(R.dimen.divider_span_height);
+            final MarkdownStyle style = MarkdownStyle.of(context);
+            mDividerHeight = style.ruleHeightPx;
             mDisplayTextScaling = res.getDisplayMetrics().scaledDensity;
-            mBulletMargin = res.getDimensionPixelSize(R.dimen.bullet_span_margin);
-            mReplyMargin = res.getDimensionPixelSize(R.dimen.reply_span_margin);
-            mReplyMarkerSize = res.getDimensionPixelSize(R.dimen.reply_span_size);
-            mReplyMarkerColor = res.getColor(R.color.quote_bar);
-            mReplyBackground = res.getColor(R.color.quote_bg);
-            mCodeBlockBackgroundColor = UiUtils.resolveColor(context, R.attr.colorCodeBackground);
+            mBulletMargin = style.bulletMarginPx;
+            mReplyMargin = style.quoteMarginPx;
+            mReplyMarkerSize = style.quoteBarPx;
+            mReplyMarkerColor = style.quoteBar;
+            mReplyBackground = style.quoteBackground;
+            mCodeBlockBackgroundColor = style.codeBackground;
+            mDiffAddColor = style.diffAdd;
+            mDiffRemoveColor = style.diffRemove;
 
             mContext = context;
             mSource = source;
@@ -537,7 +548,9 @@ public class HtmlUtils {
                 // We don't need to handle this. TagSoup will ensure that there's a </br> for each <br>
                 // so we can safely emit the linebreaks when we handle the close tag.
             } else if (tag.equalsIgnoreCase("p")) {
-                startBlockElement(attributes);
+                // A task's text stays beside its checkbox, also when GitLab puts it in a
+                // paragraph (tasks in a loose list), as GitLab web shows it (#251)
+                startBlockElement(attributes, followsCheckbox() ? 0 : 2);
                 startCssStyle(attributes);
             } else if (tag.equalsIgnoreCase("ul")) {
                 startBlockElement(attributes);
@@ -554,7 +567,7 @@ public class HtmlUtils {
                             ? R.drawable.checkbox_checked_small
                             : R.drawable.checkbox_unchecked_small);
                     d.setBounds(0, 0, d.getIntrinsicWidth(), d.getIntrinsicHeight());
-                    ImageSpan span = new ImageSpan(d, ImageSpan.ALIGN_BOTTOM);
+                    ImageSpan span = new CheckboxSpan(d);
 
                     mSpannableStringBuilder.append("  ");
                     mSpannableStringBuilder.setSpan(span, mSpannableStringBuilder.length() - 2,
@@ -567,7 +580,7 @@ public class HtmlUtils {
             } else if (tag.equalsIgnoreCase("span")) {
                 startCssStyle(attributes);
             } else if (tag.equalsIgnoreCase("hr")) {
-                HorizontalLineSpan span = new HorizontalLineSpan(mDividerHeight, 0x60aaaaaa);
+                HorizontalLineSpan span = new HorizontalLineSpan(mDividerHeight, MarkdownStyle.RULE_COLOR);
                 appendNewlines(1);
                 mSpannableStringBuilder.append(' '); // enforce the following newline to be written
                 appendNewlines(1);
@@ -679,7 +692,7 @@ public class HtmlUtils {
             } else if (tag.equalsIgnoreCase("i")) {
                 end(Italic.class, new StyleSpan(Typeface.ITALIC));
             } else if (tag.equalsIgnoreCase("big")) {
-                end(Big.class, new RelativeSizeSpan(1.25f));
+                end(Big.class, new RelativeSizeSpan(MarkdownStyle.BIG_TEXT_SIZE));
             } else if (tag.equalsIgnoreCase("small")) {
                 end(Small.class, new RelativeSizeSpan(SMALL_TEXT_SIZE));
             } else if (tag.equalsIgnoreCase("font")) {
@@ -789,22 +802,51 @@ public class HtmlUtils {
             startBlockElement(attributes, 2);
         }
 
+        /** Whether the text so far ends with a task's checkbox (and spaces). */
+        private boolean followsCheckbox() {
+            int len = mSpannableStringBuilder.length();
+            CheckboxSpan[] spans = mSpannableStringBuilder.getSpans(Math.max(0, len - 3), len,
+                    CheckboxSpan.class);
+            for (CheckboxSpan span : spans) {
+                int end = mSpannableStringBuilder.getSpanEnd(span);
+                boolean onlySpaces = true;
+                for (int i = end; i < len; i++) {
+                    if (mSpannableStringBuilder.charAt(i) != ' ') {
+                        onlySpaces = false;
+                        break;
+                    }
+                }
+                if (onlySpaces) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private void startBlockElement(Attributes attributes, int newlines) {
             appendNewlines(newlines);
             start(new BlockElement(newlines, getBlockElementTypeFor(attributes)));
 
             String style = attributes.getValue("", "style");
+            String alignment = null;
             if (style != null) {
                 Matcher m = getTextAlignPattern().matcher(style);
                 if (m.find()) {
-                    String alignment = m.group(1);
-                    if (alignment.equalsIgnoreCase("start")) {
-                        start(new Alignment(Layout.Alignment.ALIGN_NORMAL));
-                    } else if (alignment.equalsIgnoreCase("center")) {
-                        start(new Alignment(Layout.Alignment.ALIGN_CENTER));
-                    } else if (alignment.equalsIgnoreCase("end")) {
-                        start(new Alignment(Layout.Alignment.ALIGN_OPPOSITE));
-                    }
+                    alignment = m.group(1);
+                }
+            }
+            if (alignment == null) {
+                // GitLab keeps HTML's align attribute, e.g. <p align="center"> (#254)
+                alignment = attributes.getValue("", "align");
+            }
+            if (alignment != null) {
+                if (alignment.equalsIgnoreCase("start") || alignment.equalsIgnoreCase("left")) {
+                    start(new Alignment(Layout.Alignment.ALIGN_NORMAL));
+                } else if (alignment.equalsIgnoreCase("center")) {
+                    start(new Alignment(Layout.Alignment.ALIGN_CENTER));
+                } else if (alignment.equalsIgnoreCase("end")
+                        || alignment.equalsIgnoreCase("right")) {
+                    start(new Alignment(Layout.Alignment.ALIGN_OPPOSITE));
                 }
             }
         }
@@ -921,13 +963,11 @@ public class HtmlUtils {
         private void startCodeSnippetLineIfAppropriate(String tdCssClass) {
             if (tdCssClass.contains("blob-num-addition")) {
                 start(new Pre());
-                int color = UiUtils.resolveColor(mContext, R.attr.colorDiffAddBackground);
-                start(new Code(color));
+                start(new Code(mDiffAddColor));
                 mSpannableStringBuilder.append('+');
             } else if (tdCssClass.contains("blob-num-deletion")) {
                 start(new Pre());
-                int color = UiUtils.resolveColor(mContext, R.attr.colorDiffRemoveBackground);
-                start(new Code(color));
+                start(new Code(mDiffRemoveColor));
                 mSpannableStringBuilder.append('-');
             } else if (tdCssClass.contains("blob-num")) {
                 start(new Pre());

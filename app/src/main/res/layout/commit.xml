@@ -90,29 +90,53 @@
                     android:textIsSelectable="true"
                     tools:text="Commit title" />
 
+                <!-- Fixed-width, as GitLab web shows commit messages (#273) -->
                 <com.gl4a.widget.LinkHandlingTextView
                     android:id="@+id/tv_message"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
+                    android:fontFamily="monospace"
                     android:autoLink="web|email"
                     android:textAppearance="?android:attr/textAppearanceSmall"
                     android:textIsSelectable="true"
                     app:needsLinkHandling="true"
                     tools:text="Commit message" />
 
-                <com.gl4a.widget.LinkHandlingTextView
-                    android:id="@+id/tv_desc"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:textAppearance="?android:attr/textAppearanceSmall"
-                    android:textStyle="italic"
-                    tools:text="10 files added with 42 additions and 32 deletions." />
-
             </LinearLayout>
 
         </androidx.cardview.widget.CardView>
+
+        <!-- Parent, branches, tags and merge requests of the commit, as on GitLab web (#273) -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/card_details"
+            style="?attr/cardViewTheme"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/ll_commit_details"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingLeft="@dimen/content_padding"
+                android:paddingTop="8dp"
+                android:paddingRight="@dimen/content_padding"
+                android:paddingBottom="8dp" />
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- The changed files count and GitLab's totals, after the commit's details and before
+             the files, as on GitLab web (#272, #273) -->
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_desc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:paddingLeft="@dimen/content_padding"
+            android:paddingRight="@dimen/content_padding"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textStyle="italic"
+            tools:text="10 files added with 42 additions and 32 deletions." />
 
         <androidx.cardview.widget.CardView
             android:id="@+id/card_changed"
@@ -229,6 +253,19 @@
             </LinearLayout>
 
         </androidx.cardview.widget.CardView>
+
+        <!-- A large commit shows its first files; the rest on request, in steps (#272) -->
+        <TextView
+            android:id="@+id/tv_show_more_files"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:padding="@dimen/content_padding"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="?android:attr/textColorLink"
+            android:visibility="gone"
+            tools:text="Show more (14 files)" />
 
     </LinearLayout>
 

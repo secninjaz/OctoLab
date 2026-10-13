@@ -425,6 +425,22 @@ public class ApiHelpers {
         }
     }
 
+    /**
+     * Every item of a paged GitLab list, page by page as GitLab's next-page header says
+     * (#269). {@code pageCall} gives one page of up to 100 for a page number.
+     */
+    public static <T> Single<List<T>> allPages(
+            java.util.function.IntFunction<Single<Response<List<T>>>> pageCall) {
+        return PageIterator.<T>toSingle(page -> pageCall.apply((int) page)
+                .map(response -> {
+                    if (!response.isSuccessful() || response.body() == null) {
+                        return Response.<GitLabPage<T>>error(response.errorBody(),
+                                response.raw());
+                    }
+                    return Response.success(toPage(response));
+                }));
+    }
+
     public static class PageIterator<T> {
         public interface PageProducer<T> {
             Single<Response<GitLabPage<T>>> getPage(long page);

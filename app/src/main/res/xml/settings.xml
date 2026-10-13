@@ -63,6 +63,14 @@
         android:summary="%s"
         android:title="@string/notification_interval" />
 
+    <SwitchPreference
+        app:iconSpaceReserved="false"
+        android:defaultValue="true"
+        android:dependency="notifications"
+        android:key="notify_participating"
+        android:title="@string/notify_participating_title"
+        android:summary="@string/notify_participating_summary" />
+
     <PreferenceCategory
         app:iconSpaceReserved="false"
         android:dependency="notifications"

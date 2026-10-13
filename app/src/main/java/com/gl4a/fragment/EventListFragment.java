@@ -67,6 +67,12 @@ public abstract class EventListFragment extends PagedDataBaseFragment<GitLabEven
 
     @Override
     public void onItemClick(GitLabEvent event) {
+        // The item's own target, as GitLab web links it (#140)
+        String url = com.gl4a.utils.EventLinks.mainUrl(event, mProjectPaths.get(event.projectId));
+        if (url != null && getActivity() != null) {
+            com.gl4a.utils.IntentUtils.openLinkInternallyOrExternally(getActivity(),
+                    android.net.Uri.parse(url));
+        }
     }
 
     @Override

@@ -9,13 +9,12 @@
     android:orientation="horizontal"
     android:padding="@dimen/content_padding">
 
-    <com.gl4a.widget.FixedSizeImageView
+    <com.gl4a.widget.LogoImageView
         android:id="@+id/iv_avatar"
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:layout_gravity="center_vertical"
         android:layout_marginRight="12dp"
-        android:background="@drawable/avatar_frame"
         tools:src="@drawable/default_avatar" />
 
     <LinearLayout

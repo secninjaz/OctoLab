@@ -230,8 +230,19 @@ public class IssueActivity extends BaseActivity implements
             menu.removeItem(R.id.share);
             menu.removeItem(R.id.copy_number);
         }
+        com.gl4a.utils.BookmarkActions.prepareMenu(this, menu, bookmarkTarget());
 
         return super.onCreateOptionsMenu(menu);
+    }
+
+    /** Bookmarked by GitLab's address for it, with its project and number below (#263). */
+    @androidx.annotation.Nullable
+    private com.gl4a.utils.BookmarkActions.Target bookmarkTarget() {
+        if (mIssue == null || mIssue.htmlUrl() == null) return null;
+        String project = mRepoOwner != null && mRepoName != null
+                ? mRepoOwner + "/" + mRepoName : "";
+        return new com.gl4a.utils.BookmarkActions.Target(com.gl4a.db.BookmarksProvider.Columns.TYPE_ISSUE, mIssue.htmlUrl(),
+                mIssue.title(), project + "#" + mIssueNumber);
     }
 
     @Override
@@ -249,6 +260,9 @@ public class IssueActivity extends BaseActivity implements
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        if (com.gl4a.utils.BookmarkActions.onMenuItemSelected(this, item, bookmarkTarget())) {
+            return true;
+        }
         int itemId = item.getItemId();
         switch (itemId) {
             case R.id.issue_close:

@@ -13,7 +13,7 @@ public class DbHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "gl4adb.db";
     // Pre-GitLab-port name, still the live file on upgrading installs.
     private static final String LEGACY_DATABASE_NAME = "gh4adb.db";
-    private static final int DATABASE_VERSION = 6;
+    private static final int DATABASE_VERSION = 7;
 
     static final String BOOKMARKS_TABLE = "bookmarks";
     static final String SUGGESTIONS_TABLE = "suggestions";
@@ -68,6 +68,9 @@ public class DbHelper extends SQLiteOpenHelper {
         if (oldVersion >= 2 && oldVersion < 6) {
             addSuggestionsAccountColumn(db);
         }
+        if (oldVersion < 7) {
+            addBookmarksAvatarColumns(db);
+        }
     }
 
     private void createBookmarksTable(SQLiteDatabase db, String tableName) {
@@ -78,7 +81,35 @@ public class DbHelper extends SQLiteOpenHelper {
                 + "uri text not null, "
                 + "extra_data text, "
                 + "order_id integer not null, "
-                + "account text not null default '');");
+                + "account text not null default '', "
+                + "object_id integer not null default 0, "
+                + "avatar_url text);");
+    }
+
+    /** What a bookmarked user's, group's or project's picture is found by (#265). */
+    private void addBookmarksAvatarColumns(SQLiteDatabase db) {
+        // An earlier step of the same upgrade may have rebuilt the table with them already
+        if (!hasColumn(db, BOOKMARKS_TABLE, "object_id")) {
+            db.execSQL("ALTER TABLE " + BOOKMARKS_TABLE
+                    + " ADD COLUMN object_id integer not null default 0;");
+        }
+        if (!hasColumn(db, BOOKMARKS_TABLE, "avatar_url")) {
+            db.execSQL("ALTER TABLE " + BOOKMARKS_TABLE + " ADD COLUMN avatar_url text;");
+        }
+    }
+
+    private static boolean hasColumn(SQLiteDatabase db, String table, String column) {
+        Cursor c = db.rawQuery("PRAGMA table_info(" + table + ")", null);
+        try {
+            while (c.moveToNext()) {
+                if (column.equals(c.getString(c.getColumnIndexOrThrow("name")))) {
+                    return true;
+                }
+            }
+            return false;
+        } finally {
+            c.close();
+        }
     }
 
     private void addBookmarksAccountColumn(SQLiteDatabase db) {

@@ -37,4 +37,7 @@
         android:title="@string/copy_number"
         app:showAsAction="never" />
 
+    <item android:id="@+id/bookmark"
+        android:title="@string/bookmark"
+        app:showAsAction="never" />
 </menu>

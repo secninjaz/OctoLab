@@ -68,6 +68,8 @@ public class TimelineItemAdapter
         /** The MR's current head commit, to tell threads on older versions (#179); null otherwise. */
         default String getMergeRequestHeadSha() { return null; }
         String getShareSubject(GitLabComment comment);
+        /** The comment's web link, for sharing; null when there's none (#253). */
+        default String getShareUrl(GitLabComment comment) { return null; }
         Single<List<GitLabReaction>> loadReactionDetails(GitLabComment comment, boolean bypassCache);
         Single<GitLabReaction> addReaction(GitLabComment comment, String content);
         Single<Boolean> deleteReaction(GitLabComment comment, long reactionId);
@@ -186,10 +188,14 @@ public class TimelineItemAdapter
                     mActionCallback.deleteComment(comment.comment());
                     return true;
 
-                case R.id.share:
-                    IntentUtils.share(mContext, mActionCallback.getShareSubject(comment.comment()),
-                            Uri.parse(comment.comment().htmlUrl()));
+                case R.id.share: {
+                    String url = mActionCallback.getShareUrl(comment.comment());
+                    if (url != null) {
+                        IntentUtils.share(mContext,
+                                mActionCallback.getShareSubject(comment.comment()), Uri.parse(url));
+                    }
                     return true;
+                }
 
                 case R.id.view_in_file:
                     Intent intent = comment.makeDiffIntent(mContext);
@@ -474,10 +480,14 @@ public class TimelineItemAdapter
             TimelineItem item = getItem(i);
             if (item instanceof TimelineItem.TimelineComment && discussionId.equals(
                     ((TimelineItem.TimelineComment) item).comment().discussionId())) {
-                notifyItemChanged(getAdapterPositionForIndex(i));
+                // With a payload, the change animation keeps the row instead of drawing the
+                // comment in a new one, whose web view would load again and jump (#256)
+                notifyItemChanged(getAdapterPositionForIndex(i), PAYLOAD_THREAD_TOGGLE);
             }
         }
     }
+
+    private static final Object PAYLOAD_THREAD_TOGGLE = new Object();
 
     /** Whether a timeline row is a reply inside a comment thread (#123). */
     public static boolean isThreadReplyRow(RecyclerView.ViewHolder holder) {
