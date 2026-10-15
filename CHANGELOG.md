@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [1.5.0] - 2026-10-12
+## [1.5.0] - 2026-10-15
 
 ### Added
 - Profiles show Personal projects, Contributed projects and, for admins, Member of: the user's groups as an expandable tree with their roles, and a full list with every group expanded (#232, #236, #240)
@@ -14,7 +14,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The account chooser for links shows each account's avatar and name in bold (#229)
 - The project screen shows the project's logo (#235)
 - Bookmarks for groups, issues, merge requests, commits and snippets; bookmarks open in-app without asking for an account and show users' avatars and groups' and projects' logos (#263, #265)
-- Merge requests get a Participating tab; the Participating tabs and comment notifications share one definition: created, assigned, reviewing or commented on (#267)
+- Merge requests get a Participating tab; the Participating tabs and notifications for new comments on issues and merge requests you take part in share one definition: created, assigned, reviewing or commented on. The check takes only a few requests, however many projects you're in, and notifications lost to a restart or app update come back (#267, #275)
 - The project's About tab shows a languages bar, the last commit, file shortcuts and the created date (#271)
 - The commit screen shows the parent, branches, tags and merge requests (#273)
 - Items in My Activity open in-app: projects, branches, tags, commits, issues, merge requests and comments (#140)
@@ -35,6 +35,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Diffs and +/- counts use GitLab's colours in both themes (#274)
 - Commit messages are fixed-width (#273)
 - Issue, pull request and merge request templates, the same on GitHub and GitLab (#268)
+- The notification check's log names why a check failed (e.g. no connection or a timeout); with debug logging on, background checks are logged too, and the log is kept on the device across restarts (#277)
+- Share logs offers a redacted copy, with server addresses, usernames and project paths replaced, or the original; the report templates ask for the redacted one (#278)
 
 ### Fixed
 - Long lines cut off in diffs (#223)
@@ -53,6 +55,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A video opened from a repository's files was titled "raw" (#261)
 - The branch and tag picker missed branches and tags beyond the first 100 (#269)
 - The commit screen listed only the first 100 changed files (#272)
+- Every notification check ran twice since 1.3.1, doubling its network use (#277)
 
 ## [1.4.0] - 2026-10-06
 

@@ -15,7 +15,18 @@ public class DebugLoggingInterceptor implements Interceptor {
     @Override
     public Response intercept(Chain chain) throws IOException {
         Request request = chain.request();
-        Response response = chain.proceed(request);
+        Response response;
+        try {
+            response = chain.proceed(request);
+        } catch (IOException e) {
+            // A request that got no answer (no connection, timeout…), with why (#277)
+            DebugLogger logger = DebugLogger.get();
+            if (logger.isEnabled()) {
+                logger.error("API", request.method() + " "
+                        + sanitizeUrl(request.url().toString()) + " failed", e);
+            }
+            throw e;
+        }
 
         DebugLogger logger = DebugLogger.get();
         if (logger.isEnabled()) {

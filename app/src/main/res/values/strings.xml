@@ -741,9 +741,17 @@
     <!-- Debug logging -->
     <string name="debug_category">Debug</string>
     <string name="debug_logging_title">Enable debug logging</string>
-    <string name="debug_logging_summary">Records API calls and errors in memory for bug reports</string>
+    <string name="debug_logging_summary">Records API calls and errors on this device for bug reports, background checks included</string>
     <string name="debug_share_logs">Share logs</string>
     <string name="debug_share_logs_summary">Send the current log buffer to a bug report</string>
+    <string name="debug_share_title">Share debug log</string>
+    <string name="debug_share_redacted">Share redacted (recommended)</string>
+    <string name="debug_share_redacted_summary">Server addresses, usernames, names and paths are replaced with placeholders like server1.example.com, user1 and name1. Numbers stay.</string>
+    <string name="debug_share_original">Share original</string>
+    <string name="debug_share_original_summary">Unchanged: it contains your GitLab server addresses, usernames and project paths. Only send it to someone you trust with them. Tokens are never logged.</string>
+    <string name="debug_share_replaced_title">Replaced in the shared log</string>
+    <string name="debug_share_replaced_none">Nothing needed replacing.</string>
+    <string name="debug_share_replaced_note">Only you see this list; it isn\'t in the shared log.</string>
     <string name="debug_clear_logs">Clear logs</string>
     <string name="debug_no_logs">No log entries — enable logging and reproduce the issue first</string>
     <string name="debug_logs_cleared">Logs cleared</string>

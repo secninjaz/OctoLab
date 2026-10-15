@@ -9,7 +9,7 @@ Text between these arrows is only a hint and isn't shown in the issue.
 ### Checks
 - [ ] I searched the existing issues, open and closed
 - [ ] This issue is about one idea only
-- [ ] I reviewed the attachments and removed any tokens or private information
+- [ ] I reviewed my screenshots and attachments, and shared the redacted debug log or removed anything I don't want public (tokens are never logged)
 
 ### What problem would this solve?
 <!-- What are you trying to do, and what gets in the way today? -->

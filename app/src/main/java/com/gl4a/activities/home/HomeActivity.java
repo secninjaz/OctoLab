@@ -141,7 +141,8 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
 
     /**
      * Opens a to-do notification's target in-app, with the to-do's account now active, and
-     * marks the to-do done (#178). Without a target URL the To-dos list stays open.
+     * marks the to-do done (#178). Without a target URL the To-dos list stays open. Every way
+     * in from a notification comes here, the app running or not (#275).
      */
     private void openTodoTarget(android.content.Intent intent) {
         String url = intent.getStringExtra(EXTRA_OPEN_URL);
@@ -154,6 +155,9 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
                     .subscribeOn(io.reactivex.schedulers.Schedulers.io())
                     .subscribe(response -> { }, error -> android.util.Log.d(
                             Gl4Application.LOG_TAG, "Marking to-do done failed", error));
+        } else if (todoId < -1) {
+            // A participating comment's notification (#267): not shown again once opened (#275)
+            com.gl4a.worker.NotificationsWorker.handleParticipatingOpened(this, todoId);
         }
         if (url != null && !url.trim().isEmpty()) {
             com.gl4a.utils.IntentUtils.openLinkInternallyOrExternally(this,

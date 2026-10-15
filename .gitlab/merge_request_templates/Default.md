@@ -13,7 +13,7 @@ Text between these arrows is only a hint and isn't shown in the request.
 - [ ] Follows the existing code style; shared helpers used and extended, not re-implemented per screen
 - [ ] No hardcoded credentials, tokens or API keys; nothing private in logs
 - [ ] CHANGELOG updated under "Unreleased", for user-visible changes
-- [ ] I reviewed the attachments and removed any tokens or private information
+- [ ] I reviewed my screenshots and attachments, and shared the redacted debug log or removed anything I don't want public (tokens are never logged)
 
 ### What this changes and why
 

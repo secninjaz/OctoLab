@@ -10,7 +10,7 @@ Text between these arrows is only a hint and isn't shown in the issue.
 ### Checks
 - [ ] I searched the existing issues, open and closed
 - [ ] I'm on the latest OctoLab release
-- [ ] I reviewed the attachments and removed any tokens or private information
+- [ ] I reviewed my screenshots and attachments, and shared the redacted debug log or removed anything I don't want public (tokens are never logged)
 
 ### What you were doing
 <!-- The screen you were on and the last thing you tapped. -->
@@ -31,9 +31,9 @@ Text between these arrows is only a hint and isn't shown in the issue.
 
 ### Debug log or crash details
 <!-- Optional but very helpful. OctoLab settings → Debug → Enable debug logging, make it crash again,
-     reopen OctoLab, then OctoLab settings → Debug → Share logs. If Android showed crash details,
-     paste them too. Before pasting, remove anything private: tokens, private project names,
-     a self-hosted instance's address. -->
+     reopen OctoLab, then OctoLab settings → Debug → Share logs → Share redacted, which hides
+     server addresses, usernames and project paths. If Android showed crash details, paste them
+     too, after removing anything private. -->
 ```text
 
 ```

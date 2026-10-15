@@ -63,6 +63,7 @@ public class NotificationsWorker extends Worker {
     // Include applicationId so debug/internal/release installs don't share
     // the same WorkManager unique work ID and cancel each other's worker.
     public static final String WORK_TAG = "job_notifications_" + com.gl4a.BuildConfig.APPLICATION_ID;
+    private static final String LEGACY_WORK_NAME = "job_notifications";
 
     private static final String KEY_LAST_NOTIFICATION_CHECK = "last_notification_check";
     private static final String KEY_LAST_NOTIFICATION_SEEN = "last_notification_seen";
@@ -78,7 +79,19 @@ public class NotificationsWorker extends Worker {
     // summary counts them (#178)
     private static final int MAX_TODO_NOTIFICATIONS_PER_ACCOUNT = 20;
 
+    /** Registers the check unless it already is: e.g. on every start of the app (#277). */
     public static void schedule(Context context, int intervalMinutes) {
+        schedule(context, intervalMinutes, false);
+    }
+
+    /**
+     * Registers the check.
+     *
+     * @param newInterval the interval was changed: a registered check takes it. Otherwise a
+     *                    registered check is kept as it is, as re-registering it stopped and
+     *                    restarted a check that had just started (#277)
+     */
+    public static void schedule(Context context, int intervalMinutes, boolean newInterval) {
         Constraints constraints = new Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build();
@@ -88,15 +101,27 @@ public class NotificationsWorker extends Worker {
                 .addTag(WORK_TAG)
                 .build();
         Log.d(TAG, "Scheduling notification fetch to happen every " + intervalMinutes + " min");
-        WorkManager.getInstance(context).cancelAllWorkByTag(WORK_TAG);
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(WORK_TAG,
-                ExistingPeriodicWorkPolicy.REPLACE, request);
+        // Never REPLACE: it cancelled and restarted the check on every start of the app, Android
+        // starting it for a check included, so each check ran twice at once (#277)
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(WORK_TAG, newInterval
+                ? ExistingPeriodicWorkPolicy.UPDATE : ExistingPeriodicWorkPolicy.KEEP, request);
+        cancelLegacyWork(context);
     }
 
     public static void cancel(Context context) {
         Log.d(TAG, "Canceling notification fetch");
         WorkManager.getInstance(context).cancelAllWorkByTag(WORK_TAG);
         WorkManager.getInstance(context).cancelUniqueWork(WORK_TAG);
+        cancelLegacyWork(context);
+    }
+
+    /**
+     * The check as registered before 1.3.1, under a name without the app ID: renaming it left it
+     * running beside the new one, so every check ran twice since (#277).
+     */
+    private static void cancelLegacyWork(Context context) {
+        WorkManager.getInstance(context).cancelUniqueWork(LEGACY_WORK_NAME);
+        WorkManager.getInstance(context).cancelAllWorkByTag(LEGACY_WORK_NAME);
     }
 
     /**
@@ -230,6 +255,186 @@ public class NotificationsWorker extends Worker {
             editor.apply();
             // Android removes a project's summary itself once its last to-do is gone
         }
+        forgetParticipating(context, id);
+    }
+
+    /**
+     * The real cause of an error, which RxJava and Retrofit wrap (#277): the first network error
+     * in its causes, else the innermost cause. Test builds add a debugging cause of their own
+     * (Traceur's) at the very end, which is skipped.
+     */
+    private static Throwable rootCause(Throwable error) {
+        Throwable root = error;
+        for (Throwable t = error; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            if (t instanceof java.io.IOException) return t;
+            if (!t.getClass().getName().contains("traceur")) root = t;
+        }
+        return root;
+    }
+
+    /**
+     * Why a check failed, for the Worker log: the real cause, not its wrapper (#277), e.g.
+     * "no connection (UnknownHostException)" or "timeout (SocketTimeoutException)".
+     */
+    private static String failureReason(Throwable error) {
+        Throwable root = rootCause(error);
+        String name = root.getClass().getSimpleName();
+        String what;
+        if (root instanceof java.net.UnknownHostException) {
+            what = "no connection";
+        } else if (root instanceof java.io.InterruptedIOException) {
+            what = "timeout";
+        } else if (root instanceof java.net.ConnectException
+                || root instanceof java.net.NoRouteToHostException) {
+            what = "can't connect";
+        } else if (root instanceof javax.net.ssl.SSLException) {
+            what = "secure connection failed";
+        } else if (root instanceof java.io.IOException) {
+            what = "connection error";
+        } else {
+            String message = root.getMessage();
+            if (message == null || message.isEmpty()) return name;
+            if (message.length() > 80) message = message.substring(0, 80) + "…";
+            return name + ": " + message;
+        }
+        return what + " (" + name + ")";
+    }
+
+    private static String keyParticipatingShown(String login) {
+        return "participating_shown_" + login;
+    }
+
+    /**
+     * A participating comment's notification (#267) was opened: it isn't shown again after an
+     * update or restart (#275).
+     */
+    public static void handleParticipatingOpened(Context context, long todoId) {
+        // Whichever account it was: the ID includes the account, so only its own matches
+        for (String login : com.gl4a.Gl4Application.get().getAllLogins()) {
+            forgetParticipating(context, todoNotificationId(login, todoId));
+        }
+    }
+
+    /** Drops a participating comment's notification from those shown again if lost (#275). */
+    private static void forgetParticipating(Context context, int id) {
+        SharedPreferences prefs = getPrefs(context);
+        String prefix = id + "|";
+        synchronized (sPrefsLock) {
+            SharedPreferences.Editor editor = prefs.edit();
+            for (String login : com.gl4a.Gl4Application.get().getAllLogins()) {
+                Set<String> shown = StringUtils.getEditableStringSetFromPrefs(
+                        prefs, keyParticipatingShown(login));
+                if (shown == null) continue;
+                boolean removed = false;
+                for (java.util.Iterator<String> it = shown.iterator(); it.hasNext(); ) {
+                    if (it.next().startsWith(prefix)) {
+                        it.remove();
+                        removed = true;
+                    }
+                }
+                if (removed) editor.putStringSet(keyParticipatingShown(login), shown);
+            }
+            editor.apply();
+        }
+    }
+
+    /**
+     * Shows again the participating comments' notifications (#267) that Android removed on an
+     * app update or a restart, as to-dos' are (#275). One gone without either was opened by the
+     * user, also when the app wasn't running and the check started as it opened, so it's dropped.
+     * They're kept with what they show, so this needs no requests.
+     */
+    private void restoreParticipating(NotificationManagerCompat nm, SharedPreferences prefs,
+            String login, Map<Long, android.graphics.Bitmap> logos,
+            Map<String, android.graphics.Bitmap> icons) {
+        Set<String> shown = StringUtils.getEditableStringSetFromPrefs(
+                prefs, keyParticipatingShown(login));
+        if (shown == null || shown.isEmpty()) return;
+        Set<Integer> active = new HashSet<>();
+        NotificationManager manager = (NotificationManager) getApplicationContext()
+                .getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager == null) return;
+        for (android.service.notification.StatusBarNotification sbn
+                : manager.getActiveNotifications()) {
+            active.add(sbn.getId());
+        }
+        long bootTime = System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime();
+        long updateTime = 0;
+        try {
+            updateTime = getApplicationContext().getPackageManager().getPackageInfo(
+                    getApplicationContext().getPackageName(), 0).lastUpdateTime;
+        } catch (Exception ignored) {
+        }
+        com.squareup.moshi.JsonAdapter<GitLabTodo> adapter =
+                ServiceFactory.moshi().adapter(GitLabTodo.class);
+        List<Integer> opened = new ArrayList<>();
+        for (String entry : shown) {
+            // "id|created|shown|json"; builds before this had no "shown"
+            String[] parts = entry.split("\\|", 4);
+            if (parts.length < 3) continue;
+            boolean withShown = parts.length == 4 && !parts[2].startsWith("{");
+            try {
+                int nid = Integer.parseInt(parts[0]);
+                if (active.contains(nid)) continue;
+                long shownAt = withShown ? Long.parseLong(parts[2]) : 0;
+                if (shownAt >= bootTime && shownAt >= updateTime) {
+                    opened.add(nid);
+                    continue;
+                }
+                GitLabTodo comment = adapter.fromJson(withShown ? parts[3]
+                        : entry.substring(parts[0].length() + parts[1].length() + 2));
+                if (comment == null) continue;
+                showTodoNotification(nm, comment, nid, false, login, "participating:" + login,
+                        logos, icons);
+                rememberParticipating(prefs, login, nid, comment);
+            } catch (Exception e) {
+                Log.d(TAG, "Couldn't show a participating comment again", e);
+            }
+        }
+        for (int nid : opened) {
+            forgetParticipating(getApplicationContext(), nid);
+        }
+    }
+
+    /** Keeps a participating comment's notification, to show it again if lost (#275). */
+    private static void rememberParticipating(SharedPreferences prefs, String login, int nid,
+            GitLabTodo comment) {
+        String json;
+        try {
+            json = ServiceFactory.moshi().adapter(GitLabTodo.class).toJson(comment);
+        } catch (Exception e) {
+            return;
+        }
+        synchronized (sPrefsLock) {
+            Set<String> shown = StringUtils.getEditableStringSetFromPrefs(
+                    prefs, keyParticipatingShown(login));
+            if (shown == null) shown = new HashSet<>();
+            String prefix = nid + "|";
+            for (java.util.Iterator<String> it = shown.iterator(); it.hasNext(); ) {
+                if (it.next().startsWith(prefix)) it.remove();
+            }
+            shown.add(nid + "|" + parseIso8601Ms(comment.createdAt) + "|"
+                    + System.currentTimeMillis() + "|" + json);
+            // At most as many as are shown at once: the oldest go first
+            while (shown.size() > MAX_TODO_NOTIFICATIONS_PER_ACCOUNT) {
+                String oldest = null;
+                long oldestTime = Long.MAX_VALUE;
+                for (String entry : shown) {
+                    String[] parts = entry.split("\\|", 3);
+                    long time = 0;
+                    try {
+                        time = Long.parseLong(parts[1]);
+                    } catch (Exception ignored) {
+                    }
+                    if (time < oldestTime) {
+                        oldestTime = time;
+                        oldest = entry;
+                    }
+                }
+                shown.remove(oldest);
+            }
+            prefs.edit().putStringSet(keyParticipatingShown(login), shown).apply();
+        }
     }
 
     // One notification per to-do (#178): a stable ID from the account and the to-do; never 0,
@@ -269,11 +474,20 @@ public class NotificationsWorker extends Worker {
 
         // Track whether any notification was shown across all accounts for the summary.
         int totalUnseen = 0;
+        // For the summary: an "OK" when no account could be reached misled (#277)
+        int checked = 0;
+        int failed = 0;
         boolean anyNew = false;
 
         for (String login : logins) {
+            if (isStopped()) {
+                // Android stopped this check (and runs it again): don't carry on beside it (#277)
+                appendWorkerLog(getApplicationContext(), runStart, "Stopped by Android", 0, false);
+                return Result.success();
+            }
             String token = app.getTokenForLogin(login);
             if (token == null) continue;
+            checked++;
 
             String instanceUrl = app.getInstanceUrlForLogin(login);
             String apiBase = instanceUrl.endsWith("/")
@@ -291,8 +505,11 @@ public class NotificationsWorker extends Worker {
                         .blockingGet();
             } catch (Exception e) {
                 Log.d(TAG, "Failed fetching todos for " + login, e);
+                com.gl4a.utils.DebugLogger.get().error("Worker",
+                        "Checking to-dos failed for " + login, rootCause(e));
                 appendWorkerLog(getApplicationContext(), System.currentTimeMillis(),
-                        "FAILED [" + login + "]: " + e.getClass().getSimpleName(), 0, false);
+                        "FAILED [" + login + "]: " + failureReason(e), 0, false);
+                failed++;
                 continue;
             }
 
@@ -302,6 +519,14 @@ public class NotificationsWorker extends Worker {
                     int comments = notifyParticipatingComments(nm, prefs, login, apiBase, token);
                     totalUnseen += comments;
                     anyNew |= comments > 0;
+                } catch (com.gl4a.utils.Participation.UnreachableException e) {
+                    // Not marked as checked, so the next check covers this one (#275)
+                    Log.d(TAG, "GitLab not reachable for participating comments of " + login, e);
+                    com.gl4a.utils.DebugLogger.get().error("Worker",
+                            "Checking comments postponed for " + login, rootCause(e));
+                    appendWorkerLog(getApplicationContext(), System.currentTimeMillis(),
+                            "Comments [" + login + "]: GitLab not reachable ("
+                                    + failureReason(e) + "), next check", 0, false);
                 } catch (Exception e) {
                     Log.d(TAG, "Checking participating comments failed for " + login, e);
                 }
@@ -398,9 +623,15 @@ public class NotificationsWorker extends Worker {
         // Older builds put every to-do under one app-wide summary (ID 0)
         nm.cancel(0);
 
-        appendWorkerLog(getApplicationContext(), runStart,
-                totalUnseen > 0 ? "Notified: " + totalUnseen + " pending" : "OK — no new todos",
-                totalUnseen, anyNew);
+        String summary;
+        if (checked > 0 && failed == checked) {
+            summary = "FAILED — no account reachable";
+        } else {
+            summary = (totalUnseen > 0 ? "Notified: " + totalUnseen + " pending"
+                    : "OK — no new todos")
+                    + (failed > 0 ? " (" + failed + " of " + checked + " failed)" : "");
+        }
+        appendWorkerLog(getApplicationContext(), runStart, summary, totalUnseen, anyNew);
         return Result.success();
     }
 
@@ -441,6 +672,7 @@ public class NotificationsWorker extends Worker {
         Map<Long, com.gl4a.gitlab.model.GitLabProject> projectsById = new HashMap<>();
         Map<Long, android.graphics.Bitmap> logos = new HashMap<>();
         Map<String, android.graphics.Bitmap> icons = new HashMap<>();
+        restoreParticipating(nm, prefs, login, logos, icons);
         int posted = 0;
         for (com.gl4a.gitlab.model.GitLabIssue item : changed) {
             if (posted >= MAX_TODO_NOTIFICATIONS_PER_ACCOUNT) break;
@@ -454,6 +686,9 @@ public class NotificationsWorker extends Worker {
                         .map(ApiHelpers::throwOnFailure)
                         .blockingGet();
             } catch (Exception e) {
+                if (com.gl4a.utils.Participation.isUnreachable(e)) {
+                    throw new com.gl4a.utils.Participation.UnreachableException(e);
+                }
                 continue;
             }
             for (com.gl4a.gitlab.model.GitLabComment note : notes) {
@@ -485,8 +720,10 @@ public class NotificationsWorker extends Worker {
                 comment.targetUrl = item.webUrl + "#note_" + note.id;
                 comment.body = body;
                 comment.createdAt = note.createdAt;
-                showTodoNotification(nm, comment, todoNotificationId(login, comment.id), true,
-                        login, "participating:" + login, logos, icons);
+                int nid = todoNotificationId(login, comment.id);
+                showTodoNotification(nm, comment, nid, true, login, "participating:" + login,
+                        logos, icons);
+                rememberParticipating(prefs, login, nid, comment);
                 posted++;
             }
         }

@@ -224,6 +224,30 @@ build:release:
 # F-Droid and reproducible-builds.org (signing stays private; content
 # equality is what's verified).
 # ─────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# Debug log redaction tests (#278): plain Java and JUnit, no Gradle or Android SDK, so it takes
+# seconds. Kept apart on purpose: no other job needs it, it needs nothing, and a failure only
+# shows here; it doesn't block or delay builds, scans, the gate or releases.
+# ─────────────────────────────────────────────
+test:redaction:
+  image: eclipse-temurin:21-jdk-jammy
+  stage: build
+  tags:
+    - docker
+  needs: []
+  allow_failure: true
+  script:
+    - command -v curl >/dev/null || (apt-get update -q && apt-get install -y -q curl)
+    - mkdir -p /tmp/junit /tmp/redaction
+    - curl -sSfL -o /tmp/junit/junit.jar https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar
+    - curl -sSfL -o /tmp/junit/hamcrest.jar https://repo1.maven.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar
+    - javac -encoding UTF-8 -d /tmp/redaction -cp /tmp/junit/junit.jar
+        app/src/main/java/com/gl4a/utils/LogRedactor.java
+        app/src/test/java/com/gl4a/utils/LogRedactorTest.java
+    - java -cp /tmp/redaction:/tmp/junit/junit.jar:/tmp/junit/hamcrest.jar org.junit.runner.JUnitCore com.gl4a.utils.LogRedactorTest
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
+
 verify:reproducible:
   stage: security
   image: eclipse-temurin:21-jdk-jammy

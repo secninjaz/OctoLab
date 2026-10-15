@@ -200,7 +200,8 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         }
         if (pref == mNotificationIntervalPref) {
             if (mNotificationsPref.isChecked()) {
-                NotificationsWorker.schedule(getContext(), Integer.parseInt((String) newValue));
+                NotificationsWorker.schedule(getContext(), Integer.parseInt((String) newValue),
+                        true);
             }
             return true;
         }
@@ -239,13 +240,76 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         return false;
     }
 
+    /**
+     * Shares the debug log redacted (recommended) or original, as ntfy does (#278). The log has
+     * the GitLab servers' addresses, usernames and project paths, never tokens.
+     */
     private void shareLogs() {
         DebugLogger logger = DebugLogger.get();
         if (logger.size() == 0) {
             Toast.makeText(getContext(), R.string.debug_no_logs, Toast.LENGTH_LONG).show();
             return;
         }
-        File logFile = logger.writeToFile(requireContext());
+        CharSequence[] choices = {
+                choice(R.string.debug_share_redacted, R.string.debug_share_redacted_summary),
+                choice(R.string.debug_share_original, R.string.debug_share_original_summary) };
+        new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setTitle(R.string.debug_share_title)
+                .setItems(choices, (dialog, which) -> {
+                    if (which == 0) {
+                        shareRedactedLogs();
+                    } else {
+                        shareLogText(logger.getText());
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /** A choice's title, and below it what it does, smaller. */
+    private CharSequence choice(int title, int summary) {
+        android.text.SpannableStringBuilder text =
+                new android.text.SpannableStringBuilder(getString(title));
+        text.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0,
+                text.length(), 0);
+        int start = text.length();
+        text.append('\n').append(getString(summary));
+        text.setSpan(new android.text.style.RelativeSizeSpan(0.85f), start, text.length(), 0);
+        return text;
+    }
+
+    /**
+     * Redacts the log with every account's server, username, name and token known (#278), shows
+     * what was replaced (only here, not in the log), then shares it.
+     */
+    private void shareRedactedLogs() {
+        com.gl4a.utils.LogRedactor redactor = new com.gl4a.utils.LogRedactor();
+        Gl4Application app = Gl4Application.get();
+        for (String login : app.getAllLogins()) {
+            redactor.addServer(app.getInstanceUrlForLogin(login))
+                    .addAccount(login, app.getNameForLogin(login))
+                    .addSecret(app.getTokenForLogin(login));
+        }
+        com.gl4a.utils.LogRedactor.Result result = redactor.redact(DebugLogger.get().getText());
+        StringBuilder replaced = new StringBuilder();
+        for (java.util.Map.Entry<String, String> e : result.replacements.entrySet()) {
+            replaced.append(e.getKey()).append(" → ").append(e.getValue()).append('\n');
+        }
+        String message = result.replacements.isEmpty()
+                ? getString(R.string.debug_share_replaced_none)
+                : replaced + "\n" + getString(R.string.debug_share_replaced_note);
+        new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setTitle(R.string.debug_share_replaced_title)
+                .setMessage(message)
+                .setPositiveButton(R.string.debug_share_logs,
+                        (dialog, which) -> shareLogText(result.text))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void shareLogText(String text) {
+        DebugLogger logger = DebugLogger.get();
+        File logFile = logger.writeToFile(requireContext(), text);
         if (logFile == null) {
             Toast.makeText(getContext(), R.string.debug_no_logs, Toast.LENGTH_LONG).show();
             return;

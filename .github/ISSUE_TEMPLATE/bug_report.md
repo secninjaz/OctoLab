@@ -18,7 +18,7 @@ Text between these arrows is only a hint and isn't shown in the issue.
 ### Checks
 - [ ] I searched the existing issues, open and closed
 - [ ] I'm on the latest OctoLab release
-- [ ] I reviewed the attachments and removed any tokens or private information
+- [ ] I reviewed my screenshots and attachments, and shared the redacted debug log or removed anything I don't want public (tokens are never logged)
 
 ### What happened
 
@@ -43,6 +43,6 @@ Text between these arrows is only a hint and isn't shown in the issue.
 
 ### Screenshots, recordings or debug log
 <!-- Optional. For a log: OctoLab settings → Debug → Enable debug logging, reproduce the problem, then
-     OctoLab settings → Debug → Share logs. Before attaching, remove anything private: tokens,
-     private project names, a self-hosted instance's address. -->
+     OctoLab settings → Debug → Share logs → Share redacted, which hides server addresses,
+     usernames and project paths. Check screenshots for anything private too. -->
 

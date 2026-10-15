@@ -322,6 +322,8 @@ public class ServiceFactory {
                     }
                     return chain.proceed(rb.build());
                 })
+                // Background checks in the debug log too (#277)
+                .addInterceptor(new com.gl4a.utils.DebugLoggingInterceptor())
                 .build();
         return new Retrofit.Builder()
                 .baseUrl(apiBaseUrl)
@@ -340,6 +342,9 @@ public class ServiceFactory {
         return getForAccount(serviceClass, Gl4Application.get().getInstanceUrl() + "/api/",
                 Gl4Application.get().getAuthToken());
     }
+
+    /** The JSON reader and writer the API uses, e.g. to keep a model locally. */
+    public static Moshi moshi() { return MOSHI; }
 
     public static void invalidateCache() { sCache.clear(); }
     public static OkHttpClient.Builder getHttpClientBuilder() { return sApiHttpClient.newBuilder(); }

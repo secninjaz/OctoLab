@@ -103,9 +103,14 @@ public class Gl4Application extends Application implements
     }
 
     private void updateNotificationWorker(SharedPreferences prefs) {
+        updateNotificationWorker(prefs, false);
+    }
+
+    /** @param newInterval the interval was changed, so a registered check takes it (#277) */
+    private void updateNotificationWorker(SharedPreferences prefs, boolean newInterval) {
         if (isAuthorized() && prefs.getBoolean(SettingsFragment.KEY_NOTIFICATIONS, false)) {
             int intervalMinutes = prefs.getInt(SettingsFragment.KEY_NOTIFICATION_INTERVAL, 15);
-            NotificationsWorker.schedule(this, intervalMinutes);
+            NotificationsWorker.schedule(this, intervalMinutes, newInterval);
         } else {
             NotificationsWorker.cancel(this);
         }
@@ -420,7 +425,8 @@ public class Gl4Application extends Application implements
         } else if (key.equals(KEY_ACTIVE_LOGIN)
                 || key.equals(SettingsFragment.KEY_NOTIFICATIONS)
                 || key.equals(SettingsFragment.KEY_NOTIFICATION_INTERVAL)) {
-            updateNotificationWorker(prefs);
+            updateNotificationWorker(prefs,
+                    key.equals(SettingsFragment.KEY_NOTIFICATION_INTERVAL));
         }
     }
 
