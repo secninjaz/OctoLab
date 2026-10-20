@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- A to-do's or participating comment's row menu (#289): the adapter shows what applies -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
@@ -8,5 +9,13 @@
     <item
         android:id="@+id/unsubscribe"
         android:title="@string/unsubscribe"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/bookmark"
+        android:title="@string/bookmark"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/remove"
+        android:title="@string/delete"
         app:showAsAction="never" />
 </menu>

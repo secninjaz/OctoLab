@@ -61,7 +61,6 @@ import com.gl4a.utils.IntentUtils;
 import com.gl4a.utils.RxUtils;
 import com.gl4a.utils.StringUtils;
 import com.gl4a.utils.UiUtils;
-import com.gl4a.widget.IntentSpan;
 import com.gl4a.widget.OverviewRow;
 import com.vdurmont.emoji.EmojiParser;
 
@@ -243,22 +242,17 @@ public class RepositoryFragment extends LoadingFragmentBase implements
     }
 
     private void fillData() {
-        final com.gl4a.gitlab.model.GitLabUser ownerUser = mRepository.owner();
         // Use full path-derived owner so nested groups (e.g. "it/int") are included.
         final String owner = ownerFromPath(mRepository);
         // Use path (URL slug) not name() (display name) — display names may contain spaces
         // which break API calls when used as the project path identifier.
         final String name = mRepository.path != null ? mRepository.path : mRepository.name();
 
+        // The project's name as GitLab writes it, as GitLab shows it; its path is in the title
+        // bar and its link below, and the back arrow goes to its group or user (#293)
         TextView tvRepoName = mContentView.findViewById(R.id.tv_repo_name);
-        IntentSpan repoSpan = new IntentSpan(tvRepoName.getContext(),
-                context -> UserActivity.makeIntent(context, ownerUser));
-        SpannableStringBuilder repoName = new SpannableStringBuilder();
-        repoName.append(owner);
-        repoName.append("/");
-        repoName.append(name);
-        repoName.setSpan(repoSpan, 0, owner.length(), 0);
-        tvRepoName.setText(repoName);
+        String displayName = mRepository.name();
+        tvRepoName.setText(displayName != null && !displayName.isEmpty() ? displayName : name);
         // The one shared project logo, as in every project list (#235)
         com.gl4a.utils.AvatarHandler.assignProjectLogo(
                 mContentView.findViewById(R.id.iv_repo_logo), mRepository);
@@ -905,8 +899,10 @@ public class RepositoryFragment extends LoadingFragmentBase implements
             if (!url.startsWith("http") && !url.startsWith("data:") && !url.startsWith("#")) {
                 String data = fetchAsDataUri(buildUrl(instanceUrl, owner, repo, url, ref), tok);
                 if (data != null) {
+                    // Keeping its file's address, to open it on tap (#281)
                     m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(
-                            "![" + alt + "](" + data + ")"));
+                            com.gl4a.utils.MarkdownImages.embeddedImage(data, alt,
+                                    com.gl4a.utils.MarkdownImages.fileUrl(owner, repo, ref, url))));
                     continue;
                 }
             }
@@ -924,7 +920,11 @@ public class RepositoryFragment extends LoadingFragmentBase implements
                 String data = fetchAsDataUri(buildUrl(instanceUrl, owner, repo, url, ref), tok);
                 if (data != null) {
                     m2.appendReplacement(sb2, java.util.regex.Matcher.quoteReplacement(
-                            before + "\"" + data + "\"" + after));
+                            before + "\"" + data + "\""
+                                    + com.gl4a.utils.MarkdownImages.originalAttribute(
+                                            com.gl4a.utils.MarkdownImages.fileUrl(
+                                                    owner, repo, ref, url))
+                                    + after));
                     continue;
                 }
             }

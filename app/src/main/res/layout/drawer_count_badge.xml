@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- THE count at a drawer row's right end (#290): To-dos' pending count, and each other
+     account's in the accounts list, all at the same spot. -->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="match_parent">
+
+    <TextView
+        android:id="@+id/count_badge"
+        style="@style/CountBadge"
+        android:layout_gravity="center_vertical|end"
+        android:background="@drawable/count_badge_active"
+        android:visibility="gone"
+        tools:text="4"
+        tools:visibility="visible" />
+</FrameLayout>

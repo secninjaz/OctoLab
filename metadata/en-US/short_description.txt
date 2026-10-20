@@ -1,1 +1,1 @@
-GitLab client for Android: gitlab.com and self-hosted instances
+Unofficial GitLab client for gitlab.com and self-hosted instances

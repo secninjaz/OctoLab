@@ -23,7 +23,25 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"
         android:layout_marginLeft="16dp"
+        android:layout_weight="1"
         android:textAppearance="?attr/textAppearanceListItemSmall"
         tools:text="branch" />
+
+    <!-- As GitLab web marks them (#298) -->
+    <TextView
+        android:id="@+id/tv_default"
+        style="@style/OutlinedBadge"
+        android:layout_gravity="center_vertical"
+        android:text="@string/branch_default"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+    <TextView
+        android:id="@+id/tv_protected"
+        style="@style/OutlinedBadge"
+        android:layout_gravity="center_vertical"
+        android:text="@string/branch_protected"
+        android:visibility="gone"
+        tools:visibility="visible" />
 
 </LinearLayout>

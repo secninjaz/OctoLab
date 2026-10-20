@@ -2,7 +2,7 @@
 
 <img src="octolab-logo/octolab-mark.svg" alt="OctoLab" width="120" align="right">
 
-**OctoLab** is a free and open-source Android client for GitLab — supporting both [gitlab.com](https://gitlab.com) and self-hosted GitLab instances.
+**OctoLab** is a free and open-source, unofficial GitLab client for Android. It works with [gitlab.com](https://gitlab.com) and self-hosted GitLab instances (Community or Enterprise Edition).
 
 Built and maintained by [SecNinjaz](https://secninjaz.com).
 
@@ -14,17 +14,36 @@ Built and maintained by [SecNinjaz](https://secninjaz.com).
 
 ## Features
 
-- **Issues** — browse, create, edit, comment, filter, label, assign
-- **Merge Requests** — view, comment, review diffs, navigate pipelines
-- **To-dos** — view and filter by action type (assigned, mentioned, review requested, etc.)
-- **Your Activity** — event feed, your projects' activity, starred projects' activity
-- **Repository** — browse files, README, branches, tags, commits, releases
-- **Notifications** — push notifications for new to-do items
-- **Self-hosted support** — works with any GitLab instance (CE or EE)
-- **Multi-account** — add and switch between multiple GitLab accounts (self-hosted + gitlab.com)
-- **Authentication** — Personal Access Token (PAT) login (OAuth2 coming soon)
-- **Dark / Light mode**
-- **Markdown rendering** — GFM tables, task lists, code blocks, images
+**Accounts**
+- Personal Access Token (PAT) login (OAuth login planned)
+- Multi-account: self-hosted and gitlab.com side by side
+
+**Issues and merge requests**
+- Browse, create, edit and comment on issues
+- Filter by label, assignee or milestone
+- View merge requests, comment and review diffs
+- Subscribe to or unsubscribe from issues and merge requests
+
+**To-dos and notifications**
+- To-dos | Participating: your to-dos, and new comments on issues and merge requests you take part in
+- Group by project, filter, mark as done or read
+- Notifications for new to-dos and comments, with counts per account
+
+**Activity**
+- Your activity, your projects' and starred projects' activity
+
+**Projects**
+- Browse files, README, branches, tags, commits and releases
+- Search a project's code
+- Images, videos and files open in the app
+
+**Also**
+- Bookmarks for projects, groups, issues, merge requests, commits and snippets
+- Snippets, groups, Explore and search
+- Dark and light theme
+- Markdown rendering: GFM tables, task lists, code blocks, images
+
+No tracking, no analytics, no proprietary services.
 
 ---
 
@@ -143,3 +162,5 @@ OctoLab is a GitLab port of Octodroid, maintained by [SecNinjaz](https://secninj
 ## License
 
 [Apache License 2.0](LICENSE)
+
+OctoLab is not affiliated with or endorsed by GitLab Inc. GitLab is a trademark of GitLab Inc.

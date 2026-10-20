@@ -132,11 +132,18 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
     private SearchView mSearch;
     private int mSelectedSearchType;
     private String mQuery;
+    // Searching one project's code (#295): its ID, name and branch; 0 for the app-wide search
+    private long mProjectId;
+    private String mProjectName;
+    private String mProjectRef;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
+        mProjectId = getArguments().getLong("project_id", 0);
+        mProjectName = getArguments().getString("project_name");
+        mProjectRef = getArguments().getString("ref");
         if (savedInstanceState != null) {
             mQuery = savedInstanceState.getString(STATE_KEY_QUERY);
             mSelectedSearchType = savedInstanceState.getInt(STATE_KEY_SEARCH_TYPE, SEARCH_TYPE_ALL);
@@ -155,6 +162,8 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
         mSearchType.setAdapter(new SearchTypeAdapter(mSearchType.getContext(), getActivity()));
         mSearchType.setOnItemSelectedListener(this);
         mSearchType.setSelection(spinnerPositionOf(mSelectedSearchType));
+        // One project's code: no other kinds to choose (#295)
+        menu.findItem(R.id.type).setVisible(mProjectId <= 0);
         // android.widget.Spinner doesn't respond to colorControlNormal from AppCompat theme overlays.
         // Force-tint its background drawable (dropdown arrow) to the dark theme text colour.
         if (mSearchType.getBackground() != null) {
@@ -212,6 +221,15 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
             GitLabPage<Object> empty = new GitLabPage<>();
             empty.setItems(java.util.Collections.emptyList());
             return Single.just(Response.success(empty));
+        }
+        // From All to one kind, same search: the results All already has, no new request (#294)
+        if (page == 1 && !bypassCache && mSelectedSearchType != SEARCH_TYPE_ALL
+                && mQuery.equals(mAllQuery)) {
+            Response<GitLabPage<Object>> kept = mAllResults.get(mSelectedSearchType);
+            if (kept != null && kept.body() != null) {
+                GitLabPage<Object> body = kept.body();
+                return Single.just(objectPage(body.items(), 1, body.nextPage()));
+            }
         }
         switch (mSelectedSearchType) {
             case SEARCH_TYPE_ALL: return makeAllSearchSingle(page, bypassCache);
@@ -398,7 +416,9 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
 
     private void updateSearchViewHint() {
         int[] hintAndEmptyTextResIds = hintAndEmptyTextsFor(mSelectedSearchType);
-        mSearch.setQueryHint(getString(hintAndEmptyTextResIds[0]));
+        mSearch.setQueryHint(mProjectId > 0
+                ? getString(R.string.search_hint_code_in_project, mProjectName)
+                : getString(hintAndEmptyTextResIds[0]));
         updateEmptyText(hintAndEmptyTextResIds[1]);
     }
 
@@ -651,25 +671,63 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
         if (page > 1) {
             return Single.just(objectPage(java.util.Collections.emptyList(), page, 0));
         }
+        String query = mQuery;
+        mAllResults.clear();
+        mAllQuery = query;
+        // A section GitLab refused for too many requests: shown as such when nothing came (#294)
+        java.util.concurrent.atomic.AtomicReference<Response<?>> limited =
+                new java.util.concurrent.atomic.AtomicReference<>();
         List<Single<List<Object>>> sections = java.util.Arrays.asList(
                 section(SEARCH_TYPE_GROUP, R.string.search_section_groups,
-                        makeGroupSearchSingle(1, bypassCache)),
+                        keep(SEARCH_TYPE_GROUP, query, limited,
+                                makeGroupSearchSingle(1, bypassCache))),
                 section(SEARCH_TYPE_REPO, R.string.search_section_projects,
-                        makeRepoSearchSingle(1, bypassCache)),
+                        keep(SEARCH_TYPE_REPO, query, limited,
+                                makeRepoSearchSingle(1, bypassCache))),
                 section(SEARCH_TYPE_ISSUE, R.string.search_section_issues,
-                        makeIssueSearchSingle("issues", 1, bypassCache)),
+                        keep(SEARCH_TYPE_ISSUE, query, limited,
+                                makeIssueSearchSingle("issues", 1, bypassCache))),
                 section(SEARCH_TYPE_MERGE_REQUEST, R.string.search_section_merge_requests,
-                        makeIssueSearchSingle("merge_requests", 1, bypassCache)),
+                        keep(SEARCH_TYPE_MERGE_REQUEST, query, limited,
+                                makeIssueSearchSingle("merge_requests", 1, bypassCache))),
                 section(SEARCH_TYPE_USER, R.string.search_section_users,
-                        makeUserSearchSingle(1, bypassCache)),
+                        keep(SEARCH_TYPE_USER, query, limited,
+                                makeUserSearchSingle(1, bypassCache))),
                 section(SEARCH_TYPE_CODE, R.string.search_section_code,
-                        makeCodeSearchSingle(1, bypassCache)));
+                        keep(SEARCH_TYPE_CODE, query, limited,
+                                makeCodeSearchSingle(1, bypassCache))));
         return Single.zip(sections, results -> {
             List<Object> items = new java.util.ArrayList<>();
             for (Object result : results) {
                 items.addAll((List<?>) result);
             }
+            Response<?> refused = limited.get();
+            if (items.isEmpty() && refused != null) {
+                // Not "nothing found": GitLab didn't search
+                throw new com.gl4a.ApiRequestException(refused);
+            }
             return objectPage(items, 1, 0);
+        });
+    }
+
+    /** The search All last ran, and each kind's first page of it (#294). */
+    @androidx.annotation.Nullable private String mAllQuery;
+    private final java.util.Map<Integer, Response<GitLabPage<Object>>> mAllResults =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Keeps a kind's first page from All, for switching to that kind; notes a refusal for
+     * too many requests.
+     */
+    private Single<Response<GitLabPage<Object>>> keep(int type, String query,
+            java.util.concurrent.atomic.AtomicReference<Response<?>> limited,
+            Single<Response<GitLabPage<Object>>> results) {
+        return results.doOnSuccess(response -> {
+            if (response.isSuccessful() && response.body() != null) {
+                if (query.equals(mAllQuery)) mAllResults.put(type, response);
+            } else if (response.code() == 429) {
+                limited.compareAndSet(null, response);
+            }
         });
     }
 
@@ -705,10 +763,27 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
     private Single<Response<GitLabPage<Object>>> makeCodeSearchSingle(int page, boolean bypassCache) {
         GitLabSearchService service = ServiceFactory.get(GitLabSearchService.class, bypassCache);
 
+        if (mProjectId > 0) {
+            // One project's code, on its branch: no advanced search needed (#295)
+            return service.searchInProject(mProjectId, "blobs", mQuery, mProjectRef, page, 25)
+                    .map(response -> response.isSuccessful() ? toObjectPage(response)
+                            : Response.<GitLabPage<Object>>error(response.errorBody(),
+                                    response.raw()));
+        }
+        boolean codeOnly = mSelectedSearchType == SEARCH_TYPE_CODE;
         return service.searchCode("blobs", mQuery, page, 25)
                 .map(response -> {
                     if (response.isSuccessful()) {
                         return toObjectPage(response);
+                    }
+                    if (response.code() == 400 && codeOnly) {
+                        // The server can't search all projects' code (no advanced search):
+                        // said so, instead of GitLab's own error (#295)
+                        View view = getView();
+                        if (view != null) {
+                            view.post(() -> updateEmptyText(R.string.search_code_unavailable));
+                        }
+                        return objectPage(java.util.Collections.emptyList(), page, 0);
                     }
                     return Response.<GitLabPage<Object>>error(response.errorBody(), response.raw());
                 });
@@ -779,6 +854,11 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
 
             ImageView icon = convertView.findViewById(R.id.icon);
             icon.setImageResource(mResources[position][2]);
+            // Every icon in the theme's icon colour, whatever colour it's drawn in: some are
+            // fixed black, invisible on the dark theme (#283)
+            icon.setColorFilter(com.gl4a.utils.UiUtils.resolveColor(mPopupContext,
+                    androidx.appcompat.R.attr.colorControlNormal),
+                    android.graphics.PorterDuff.Mode.SRC_IN);
 
             TextView label = convertView.findViewById(R.id.label);
             label.setText(mResources[position][0]);

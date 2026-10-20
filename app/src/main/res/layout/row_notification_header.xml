@@ -12,37 +12,50 @@
         android:layout_height="1dp"
         android:background="@drawable/top_shadow" />
 
+    <!-- Fading from the surface colour at the top to the list at the bottom (#290) -->
     <FrameLayout
-        style="@style/CardContainer"
         android:layout_width="match_parent"
+        android:background="@drawable/feed_group_header_bg"
         android:layout_height="wrap_content">
 
+        <!-- The bar expands and collapses the group; the logo and name open the project (#288) -->
         <LinearLayout
+            android:id="@+id/header_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="?selectableItemBackground"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:paddingRight="4dp">
 
-            <ImageView
+            <!-- As big as the feed's avatars, over the timeline line (#288) -->
+            <com.gl4a.widget.LogoImageView
                 android:id="@+id/iv_avatar"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_marginLeft="16dp"
-                android:background="?selectableItemBackgroundBorderless"
+                android:layout_width="@dimen/feed_avatar_size"
+                android:layout_height="@dimen/feed_avatar_size"
+                android:layout_marginLeft="@dimen/feed_side_padding"
+                android:foreground="?selectableItemBackgroundBorderless"
                 android:contentDescription="@string/repository_owner_avatar"
                 tools:src="@drawable/default_avatar" />
 
             <TextView
                 android:id="@+id/tv_title"
                 style="@style/HeaderLabel"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:background="?selectableItemBackground"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:paddingBottom="8dp"
                 android:paddingTop="8dp"
                 android:textAllCaps="false"
                 tools:text="owner/repository" />
+
+            <!-- The rest of the bar: expands and collapses the group -->
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
             <com.gl4a.widget.FixedSizeImageView
                 android:id="@+id/iv_action"
@@ -52,6 +65,17 @@
                 android:paddingLeft="@dimen/content_padding"
                 android:paddingRight="@dimen/content_padding"
                 android:src="@drawable/mark_read_all" />
+
+            <!-- Expands and collapses the group (#288) -->
+            <ImageView
+                android:id="@+id/iv_expand"
+                android:layout_width="40dp"
+                android:layout_height="48dp"
+                android:background="?selectableItemBackgroundBorderless"
+                android:contentDescription="@string/feed_group_expand"
+                android:scaleType="center"
+                android:src="@drawable/drop_down_arrow_white"
+                android:visibility="gone" />
 
         </LinearLayout>
 

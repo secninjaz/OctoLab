@@ -37,6 +37,15 @@ public class SearchActivity extends FragmentContainerActivity {
                 .putExtra("search_immediately", startSearchImmediately);
     }
 
+    /** Searching one project's code on a branch (#295). */
+    public static Intent makeProjectCodeIntent(Context context, long projectId,
+            String projectName, String ref) {
+        return makeIntent(context, null, SEARCH_TYPE_CODE, false)
+                .putExtra("project_id", projectId)
+                .putExtra("project_name", projectName)
+                .putExtra("ref", ref);
+    }
+
     public static Intent makeIntent(Context context) {
         return new Intent(context, SearchActivity.class);
     }
@@ -55,6 +64,15 @@ public class SearchActivity extends FragmentContainerActivity {
         String initialQuery = intent.getStringExtra("initial_search");
         boolean startSearchImmediately = intent.getBooleanExtra("search_immediately", true);
 
-        return SearchFragment.newInstance(searchType, initialQuery, startSearchImmediately);
+        SearchFragment fragment =
+                SearchFragment.newInstance(searchType, initialQuery, startSearchImmediately);
+        long projectId = intent.getLongExtra("project_id", 0);
+        if (projectId > 0) {
+            fragment.getArguments().putLong("project_id", projectId);
+            fragment.getArguments().putString("project_name",
+                    intent.getStringExtra("project_name"));
+            fragment.getArguments().putString("ref", intent.getStringExtra("ref"));
+        }
+        return fragment;
     }
 }

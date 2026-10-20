@@ -27,6 +27,9 @@ public class NotificationHandlingService extends IntentService {
     private static final String ACTION_MARK_TODO_DONE = "com.gl4a.action.MARK_TODO_DONE";
     private static final String EXTRA_ACCOUNT = "account";
     private static final String EXTRA_TODO_ID = "todo_id";
+    private static final String ACTION_MARK_PARTICIPATING_READ =
+            "com.gl4a.action.MARK_PARTICIPATING_READ";
+    private static final String EXTRA_NOTE_ID = "note_id";
     private static final String ACTION_HANDLE_NOTIFICATION_DISMISS =
             "com.gl4a.action.HANDLE_NOTIFICATION_DISMISS";
 
@@ -65,6 +68,16 @@ public class NotificationHandlingService extends IntentService {
                 .setData(android.net.Uri.parse("notification://done/" + notificationId))
                 .putExtra(EXTRA_ACCOUNT, accountLogin)
                 .putExtra(EXTRA_TODO_ID, todoId);
+    }
+
+    /** "Mark as read" on a participating comment's notification (#280). */
+    public static Intent makeMarkParticipatingReadIntent(Context context, int notificationId,
+            String accountLogin, long noteId) {
+        return new Intent(context, NotificationHandlingService.class)
+                .setAction(ACTION_MARK_PARTICIPATING_READ)
+                .setData(android.net.Uri.parse("notification://read/" + notificationId))
+                .putExtra(EXTRA_ACCOUNT, accountLogin)
+                .putExtra(EXTRA_NOTE_ID, noteId);
     }
 
     public NotificationHandlingService() {
@@ -121,6 +134,18 @@ public class NotificationHandlingService extends IntentService {
                     } catch (RuntimeException e) {
                         Log.d(Gl4Application.LOG_TAG, "Marking to-do " + todoId + " done failed", e);
                     }
+                }
+                if (notificationId != 0 && notificationId != -1) {
+                    NotificationsWorker.handleNotificationDismiss(this, notificationId);
+                    androidx.core.app.NotificationManagerCompat.from(this).cancel(notificationId);
+                }
+                break;
+            }
+            case ACTION_MARK_PARTICIPATING_READ: {
+                String login = intent.getStringExtra(EXTRA_ACCOUNT);
+                long noteId = intent.getLongExtra(EXTRA_NOTE_ID, -1);
+                if (login != null && noteId > 0) {
+                    com.gl4a.utils.ParticipatingInbox.get(this).markRead(login, noteId);
                 }
                 if (notificationId != 0 && notificationId != -1) {
                     NotificationsWorker.handleNotificationDismiss(this, notificationId);

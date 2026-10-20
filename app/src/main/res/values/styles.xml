@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Unread count badges (#280) -->
+    <style name="CountBadge">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">18dp</item>
+        <item name="android:minWidth">18dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingLeft">5dp</item>
+        <item name="android:paddingRight">5dp</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+    </style>
+
     <style name="TextAppearance.VerySmall" parent="TextAppearance.AppCompat.Small">
         <item name="android:textSize">12sp</item>
     </style>
@@ -50,7 +65,8 @@
         <item name="android:textColor">?attr/colorAccent</item>
         <item name="android:textAppearance">?android:attr/textAppearanceSmall</item>
         <item name="android:textSize">@dimen/abc_text_size_button_material</item>
-        <item name="android:textAllCaps">true</item>
+        <!-- As written, as GitLab does (#292) -->
+        <item name="android:textAllCaps">false</item>
     </style>
 
     <style name="SelectableItem">
@@ -76,7 +92,8 @@
         <item name="android:gravity">center_vertical</item>
         <item name="android:fontFamily">sans-serif-condensed</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:textAllCaps">true</item>
+        <!-- Section names as written, in sentence case as GitLab writes them (#292) -->
+        <item name="android:textAllCaps">false</item>
     </style>
 
     <style name="ReactionBarButton" parent="SelectableBorderlessItem">
@@ -173,4 +190,25 @@
         <item name="android:scaleType">center</item>
     </style>
 
+
+    <!-- Tab titles as written, in sentence case as on GitLab (#292) -->
+    <style name="TabText" parent="TextAppearance.Design.Tab">
+        <item name="android:textAllCaps">false</item>
+        <item name="textAllCaps">false</item>
+    </style>
+
+    <!-- THE outlined badge: roles (#233) and the branch picker's default / protected (#298) -->
+    <style name="OutlinedBadge">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginLeft">8dp</item>
+        <item name="android:background">@drawable/role_badge_background</item>
+        <item name="android:paddingLeft">8dp</item>
+        <item name="android:paddingRight">8dp</item>
+        <item name="android:paddingTop">1dp</item>
+        <item name="android:paddingBottom">1dp</item>
+        <item name="android:textAppearance">?android:attr/textAppearanceSmall</item>
+        <item name="android:textColor">?android:attr/textColorSecondary</item>
+        <item name="android:textSize">12sp</item>
+    </style>
 </resources>

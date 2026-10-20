@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The type icon's badge on a feed row's avatar (#288): the theme's surface, so the icon
+     (the theme's icon colour, colorControlNormal) stands out from the avatar in both themes -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <solid android:color="@color/theme_surface" />
+</shape>

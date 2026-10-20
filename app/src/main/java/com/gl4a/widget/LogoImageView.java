@@ -26,6 +26,6 @@ public class LogoImageView extends FixedSizeImageView {
     }
 
     private void init() {
-        setBackground(AvatarHandler.newLogoFrame());
+        AvatarHandler.setLogoFrame(this, true);
     }
 }

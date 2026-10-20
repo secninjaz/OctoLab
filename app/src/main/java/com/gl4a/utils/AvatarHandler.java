@@ -686,6 +686,14 @@ public class AvatarHandler {
      * The frame behind every project and group logo: a translucent rounded square with the
      * logo's own corner curve at any size. {@link com.gl4a.widget.LogoImageView} uses it.
      */
+    /**
+     * THE way a view gets the logo frame, or loses it (#286): LogoImageView always has it; a view
+     * that shows either a user's round avatar or a logo (the bookmark list) switches it per row.
+     */
+    public static void setLogoFrame(android.view.View view, boolean on) {
+        view.setBackground(on ? newLogoFrame() : null);
+    }
+
     public static Drawable newLogoFrame() {
         return new LogoFrameDrawable();
     }

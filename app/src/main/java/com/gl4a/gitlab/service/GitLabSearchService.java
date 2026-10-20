@@ -47,11 +47,13 @@ public interface GitLabSearchService {
             @Query("per_page") int perPage
     );
 
+    /** One project's search, e.g. its code on a branch; works without advanced search (#295). */
     @GET("projects/{id}/search")
     Single<Response<List<GitLabSearchResult.GitLabBlob>>> searchInProject(
             @retrofit2.http.Path("id") long projectId,
             @Query("scope") String scope,
             @Query("search") String query,
+            @Query("ref") String ref,
             @Query("page") int page,
             @Query("per_page") int perPage
     );

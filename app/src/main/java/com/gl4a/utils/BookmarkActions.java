@@ -56,6 +56,44 @@ public final class BookmarkActions {
             this.objectId = objectId;
             this.avatarUrl = avatarUrl;
         }
+
+        /** Its address, which identifies the bookmark. */
+        public String url() {
+            return url;
+        }
+
+        /**
+         * An issue, as its screen and the To-dos and Participating rows (#289) bookmark it: by
+         * GitLab's address for it, with its project and number below.
+         */
+        public static Target issue(String url, String title, String project, long iid) {
+            return new Target(BookmarksProvider.Columns.TYPE_ISSUE, url, title,
+                    project + "#" + iid);
+        }
+
+        /** A merge request, as {@link #issue} (#289). */
+        public static Target mergeRequest(String url, String title, String project, long iid) {
+            return new Target(BookmarksProvider.Columns.TYPE_MERGE_REQUEST, url, title,
+                    project + "!" + iid);
+        }
+
+        /** A commit, with its project and short ID below, as {@link #issue} (#289). */
+        public static Target commit(String url, @Nullable String title, String project,
+                String sha) {
+            String shortId = sha.length() > 8 ? sha.substring(0, 8) : sha;
+            return new Target(BookmarksProvider.Columns.TYPE_COMMIT, url,
+                    title != null ? title : shortId, project + "@" + shortId);
+        }
+    }
+
+    /** Saves the bookmark, or removes it if it's saved; each says so in a toast. */
+    public static void toggle(Context context, Target target) {
+        if (BookmarksProvider.hasBookmarked(context, target.url)) {
+            BookmarksProvider.removeBookmark(context, target.url);
+        } else {
+            BookmarksProvider.saveBookmark(context, target.name, target.type, target.url,
+                    target.extra, target.objectId, target.avatarUrl, true);
+        }
     }
 
     /**
@@ -83,12 +121,7 @@ public final class BookmarkActions {
         if (item.getItemId() != R.id.bookmark || target == null) {
             return false;
         }
-        if (BookmarksProvider.hasBookmarked(activity, target.url)) {
-            BookmarksProvider.removeBookmark(activity, target.url);
-        } else {
-            BookmarksProvider.saveBookmark(activity, target.name, target.type, target.url,
-                    target.extra, target.objectId, target.avatarUrl, true);
-        }
+        toggle(activity, target);
         activity.invalidateOptionsMenu();
         return true;
     }
@@ -109,7 +142,7 @@ public final class BookmarkActions {
      */
     public static void bindIcon(android.widget.ImageView view, long bookmarkId, int type,
             String name, String url, long objectId, @Nullable String avatarUrl) {
-        view.setBackground(null);
+        AvatarHandler.setLogoFrame(view, false);
         switch (type) {
             case BookmarksProvider.Columns.TYPE_USER:
             case BookmarksProvider.Columns.TYPE_GROUP:
@@ -126,7 +159,7 @@ public final class BookmarkActions {
             group.id = objectId;
             group.name = name;
             group.avatarUrl = avatarUrl;
-            view.setBackground(AvatarHandler.newLogoFrame());
+            AvatarHandler.setLogoFrame(view, true);
             AvatarHandler.assignGroupLogo(view, group);
         } else if (type == BookmarksProvider.Columns.TYPE_REPO && objectId > 0) {
             com.gl4a.gitlab.model.GitLabProject project =
@@ -134,7 +167,7 @@ public final class BookmarkActions {
             project.id = objectId;
             project.name = name;
             project.avatarUrl = avatarUrl;
-            view.setBackground(AvatarHandler.newLogoFrame());
+            AvatarHandler.setLogoFrame(view, true);
             AvatarHandler.assignProjectLogo(view, project);
         } else {
             int icon = iconFor(type);

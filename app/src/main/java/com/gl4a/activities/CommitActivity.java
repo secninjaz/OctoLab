@@ -220,10 +220,8 @@ public class CommitActivity extends BaseFragmentPagerActivity implements
         String url = mCommit.webUrl != null ? mCommit.webUrl
                 : com.gl4a.Gl4Application.get().getInstanceUrl() + "/" + mRepoOwner + "/"
                         + mRepoName + "/-/commit/" + mObjectSha;
-        String shortId = mObjectSha.length() > 8 ? mObjectSha.substring(0, 8) : mObjectSha;
-        String title = mCommit.title != null ? mCommit.title : shortId;
-        return new com.gl4a.utils.BookmarkActions.Target(com.gl4a.db.BookmarksProvider.Columns.TYPE_COMMIT, url, title,
-                mRepoOwner + "/" + mRepoName + "@" + shortId);
+        return com.gl4a.utils.BookmarkActions.Target.commit(url, mCommit.title,
+                mRepoOwner + "/" + mRepoName, mObjectSha);
     }
 
     @Override

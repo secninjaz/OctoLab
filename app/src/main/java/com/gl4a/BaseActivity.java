@@ -693,7 +693,11 @@ public abstract class BaseActivity extends AppCompatActivity implements
 
             ApiRequestException re = e instanceof ApiRequestException ? (ApiRequestException) e : null;
 
-            if (re != null && re.getMessage() != null) {
+            if (re != null && re.isRateLimited()) {
+                // GitLab limits how many requests (e.g. searches) come in a short time (#294)
+                messageView.setText(R.string.load_failure_rate_limited);
+                retryButton.setVisibility(View.VISIBLE);
+            } else if (re != null && re.getMessage() != null) {
                 messageView.setText(
                         getString(R.string.load_failure_explanation_with_reason, re.getMessage()));
                 retryButton.setVisibility(View.VISIBLE);

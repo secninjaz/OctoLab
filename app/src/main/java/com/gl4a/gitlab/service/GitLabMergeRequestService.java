@@ -178,4 +178,12 @@ public interface GitLabMergeRequestService {
             @Path("discussionId") String discussionId,
             @Body Map<String, Object> body
     );
+
+    /** Stops notifications about the merge request (#289); 304 when not subscribed. */
+    @POST("projects/{id}/merge_requests/{iid}/unsubscribe")
+    Single<Response<Void>> unsubscribe(@Path("id") long projectId, @Path("iid") long iid);
+
+    /** Notifications about the merge request again, e.g. undoing an unsubscribe (#289). */
+    @POST("projects/{id}/merge_requests/{iid}/subscribe")
+    Single<Response<Void>> subscribe(@Path("id") long projectId, @Path("iid") long iid);
 }

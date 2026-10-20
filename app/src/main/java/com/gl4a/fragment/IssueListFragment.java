@@ -234,9 +234,10 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
             mRebuildParticipation = false;
             final android.content.Context context = requireContext().getApplicationContext();
             final boolean mergeRequests = mIsMR;
-            all = Single.fromCallable(() -> com.gl4a.utils.Participation
-                            .forActiveAccount(context, bypassCache)
-                            .items(mergeRequests, null, rebuild))
+            // The account is the one active now, even if it changes during the load (#282)
+            final com.gl4a.utils.Participation participation =
+                    com.gl4a.utils.Participation.forActiveAccount(context, bypassCache);
+            all = Single.fromCallable(() -> participation.items(mergeRequests, null, rebuild))
                     .subscribeOn(io.reactivex.schedulers.Schedulers.io())
                     .doOnSuccess(items -> mParticipating = items);
         } else {

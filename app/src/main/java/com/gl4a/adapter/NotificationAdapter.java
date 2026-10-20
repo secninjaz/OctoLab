@@ -35,7 +35,13 @@ public class NotificationAdapter extends
     public interface OnNotificationActionCallback {
         void markAsRead(NotificationHolder notificationHolder);
 
-        void unsubscribe(NotificationHolder notificationHolder);
+        /** The row menu's "Delete" (Participating, #280); shown when it has a title. */
+        default void remove(NotificationHolder notificationHolder) {
+        }
+
+        /** A project header's ▾/▴: expand or collapse its group (#288). */
+        default void toggleGroup(NotificationHolder header) {
+        }
     }
 
     private final int mBottomMargin;
@@ -48,7 +54,12 @@ public class NotificationAdapter extends
         mActionCallback = actionCallback;
 
         mBottomMargin = context.getResources().getDimensionPixelSize(R.dimen.card_margin);
+        int surface = androidx.core.content.ContextCompat.getColor(context, R.color.theme_surface);
+        mReadAvatarDim = (surface & 0x00FFFFFF) | 0x80000000;
     }
+
+    /** The list's colour at half strength, over a read row's avatar (#285). */
+    private final int mReadAvatarDim;
 
     public boolean hasUnreadNotifications() {
         for (int i = 0; i < getCount(); i++) {
@@ -116,9 +127,30 @@ public class NotificationAdapter extends
             int viewType) {
         int layoutResId = viewType == VIEW_TYPE_NOTIFICATION_HEADER
                 ? R.layout.row_notification_header
-                : R.layout.row_notification;
+                // THE feed row, as Your Activity uses it (#287)
+                : R.layout.row_feed_item;
         View v = inflater.inflate(layoutResId, parent, false);
         return new ViewHolder(v, mActionCallback);
+    }
+
+    /** The row menu's removing item, e.g. "Delete" (#280); none when 0, as on To-dos (#289). */
+    private int mRemoveTitle = 0;
+
+    public void setRemoveTitle(int titleResId) {
+        mRemoveTitle = titleResId;
+    }
+
+    /** Not grouped by project: each row names its project (#287). */
+    private boolean mShowProject;
+
+    public void setShowProject(boolean showProject) {
+        mShowProject = showProject;
+    }
+
+    /** Whether the row at an adapter position is a project header (no timeline line, #287). */
+    public boolean isHeaderAt(int adapterPosition) {
+        return adapterPosition >= 0 && adapterPosition < getItemCount()
+                && getItemViewType(adapterPosition) == VIEW_TYPE_NOTIFICATION_HEADER;
     }
 
     @Override
@@ -138,6 +170,19 @@ public class NotificationAdapter extends
 
         if (item.notification == null) {
             holder.ivAction.setVisibility(item.isRead() ? View.GONE : View.VISIBLE);
+            if (holder.ivExpand != null) {
+                // Kept in its column (above the rows' ⋮) even when there's nothing to expand
+                holder.ivExpand.setVisibility(item.canExpand ? View.VISIBLE : View.INVISIBLE);
+                holder.ivExpand.setImageResource(item.expanded
+                        ? R.drawable.drop_up_arrow_white : R.drawable.drop_down_arrow_white);
+                holder.ivExpand.setContentDescription(mContext.getString(item.expanded
+                        ? R.string.feed_group_collapse : R.string.feed_group_expand));
+                holder.ivExpand.setTag(item);
+            }
+            if (holder.headerBar != null) {
+                holder.headerBar.setTag(item);
+                holder.tvTitle.setTag(item.repository);
+            }
             holder.tvTitle.setText(ApiHelpers.formatRepoName(mContext, item.repository));
 
             // The one shared project logo (#176); it fetches the avatar itself when the Todos
@@ -152,37 +197,116 @@ public class NotificationAdapter extends
             return;
         }
 
-        holder.ivIcon.setAlpha(alpha);
-        holder.tvTimestamp.setAlpha(alpha);
-        holder.mPopupMenu.getMenu().findItem(R.id.mark_as_read).setVisible(!item.isRead());
-
+        holder.ivAction.setVisibility(View.VISIBLE);
         GitLabTodo todo = item.notification;
-        int iconResId = getIconResId(todo.type());
+        // What GitLab sends for the to-do, as Your Activity shows an event (#287): who, with
+        // their avatar, what and where with links, the item's title and the comment
+        GitLabUser author = todo.author;
+        if (author != null) {
+            AvatarHandler.assignAvatar(holder.ivGravatar, author);
+        } else {
+            holder.ivGravatar.setImageResource(R.drawable.default_avatar);
+        }
+        holder.ivGravatar.setTag(author);
+        holder.tvActor.setText(author != null
+                ? ApiHelpers.getUserNameWithType(mContext, author)
+                : mContext.getString(R.string.app_name));
+        holder.tvTimestamp.setText(StringUtils.formatRelativeTime(mContext,
+                todo.createdAt, true));
+
+        int iconResId = com.gl4a.utils.FeedTypeIcons.forTarget(todo.type());
         if (iconResId > 0) {
             holder.ivIcon.setImageResource(iconResId);
             holder.ivIcon.setVisibility(View.VISIBLE);
         } else {
-            holder.ivIcon.setVisibility(View.INVISIBLE);
+            holder.ivIcon.setVisibility(View.GONE);
         }
 
-        holder.tvReason.setText(formatActionText(todo));
-        holder.tvTitle.setText(todo.title());
-        holder.tvTimestamp.setText(StringUtils.formatRelativeTime(mContext,
-                todo.createdAt, true));
+        holder.tvTitle.setText(actionLine(todo));
+        String title = todo.title();
+        holder.tvSubtitle.setText(title);
+        holder.tvSubtitle.setVisibility(title != null && !title.isEmpty()
+                ? View.VISIBLE : View.GONE);
+        String body = todo.body != null ? todo.body.trim() : "";
+        boolean showBody = !body.isEmpty() && !body.equals(title);
+        holder.tvDesc.setText(showBody ? body : null);
+        holder.tvDesc.setVisibility(showBody ? View.VISIBLE : View.GONE);
 
-        ViewGroup.MarginLayoutParams layoutParams =
-                (ViewGroup.MarginLayoutParams) holder.vNotificationContent.getLayoutParams();
-        int bottomMargin = item.isLastRepositoryNotification() ? mBottomMargin : 0;
-        layoutParams.setMargins(0, 0, 0, bottomMargin);
-        holder.vNotificationContent.setLayoutParams(layoutParams);
+        for (View view : new View[] { holder.tvActor,
+                holder.tvTimestamp, holder.tvTitle, holder.tvSubtitle, holder.tvDesc }) {
+            view.setAlpha(alpha);
+        }
+        // The avatar stays solid, dimmed towards the list's colour: half see-through, it
+        // showed the timeline line through it (#285)
+        if (item.isRead()) {
+            holder.ivGravatar.setColorFilter(mReadAvatarDim,
+                    android.graphics.PorterDuff.Mode.SRC_ATOP);
+        } else {
+            holder.ivGravatar.clearColorFilter();
+        }
+        // Only the type icon fades: its badge stays solid, not showing the avatar through (#288)
+        holder.ivIcon.setImageAlpha(Math.round(255 * alpha));
+        android.view.Menu menu = holder.mPopupMenu.getMenu();
+        menu.findItem(R.id.mark_as_read).setVisible(!item.isRead());
+        menu.findItem(R.id.unsubscribe).setVisible(
+                com.gl4a.utils.FeedItemActions.canUnsubscribe(todo));
+        menu.findItem(R.id.remove).setVisible(mRemoveTitle != 0);
+        if (mRemoveTitle != 0) menu.findItem(R.id.remove).setTitle(mRemoveTitle);
+    }
 
-        holder.vBottomShadow.setVisibility(
-                item.isLastRepositoryNotification() ? View.VISIBLE : View.GONE);
+    /**
+     * "mentioned you in Issue #243", the reference linking to the issue or merge request itself,
+     * and, when not grouped by project, " · group/project" linking to it (#287).
+     */
+    private CharSequence actionLine(GitLabTodo todo) {
+        android.text.SpannableStringBuilder line =
+                new android.text.SpannableStringBuilder(formatActionText(todo, false).trim());
+        String reference = referenceText(todo);
+        String targetUrl = todo.target != null && todo.target.webUrl != null
+                ? todo.target.webUrl
+                : todo.targetUrl != null ? todo.targetUrl.replaceFirst("#.*$", "") : null;
+        int at = reference.isEmpty() ? -1 : line.toString().lastIndexOf(reference);
+        if (at >= 0 && targetUrl != null) {
+            line.setSpan(new com.gl4a.widget.LinkSpan(targetUrl), at, at + reference.length(),
+                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        GitLabProject project = todo.repository();
+        if (mShowProject && project != null) {
+            String name = ApiHelpers.formatRepoName(mContext, project).toString();
+            line.append(" \u00b7 ");
+            int start = line.length();
+            line.append(name);
+            if (project.webUrl != null) {
+                line.setSpan(new com.gl4a.widget.LinkSpan(project.webUrl), start, line.length(),
+                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+        }
+        return line;
+    }
+
+    /** "Issue #243", "MR #12", or a commit's short SHA, as the action line names the target. */
+    private static String referenceText(GitLabTodo todo) {
+        String typeLabel = typeLabel(todo.targetType);
+        if (todo.isCommit() && todo.commitSha != null) {
+            return typeLabel + " " + todo.commitSha.substring(0, Math.min(8,
+                    todo.commitSha.length()));
+        }
+        return typeLabel.isEmpty() || todo.target == null || todo.target.iid <= 0 ? ""
+                : typeLabel + " #" + todo.target.iid;
+    }
+
+    private static String typeLabel(String targetType) {
+        if ("Issue".equals(targetType) || "WorkItem".equals(targetType)) return "Issue";
+        if ("MergeRequest".equals(targetType)) return "MR";
+        if ("Commit".equals(targetType)) return "Commit";
+        if ("Epic".equals(targetType)) return "Epic";
+        return "";
     }
 
     /** Formats the action line matching GitLab web: "Jay mentioned you in Issue #34" */
-    private String formatActionText(com.gl4a.gitlab.model.GitLabTodo todo) {
-        String authorName = todo.author != null
+    private String formatActionText(com.gl4a.gitlab.model.GitLabTodo todo, boolean withAuthor) {
+        // The author has their own line in the feed row (#287)
+        String authorName = withAuthor && todo.author != null
                 ? com.gl4a.utils.ApiHelpers.getUserDisplayName(mContext, todo.author) : "";
 
         String targetType = todo.targetType;
@@ -207,6 +331,8 @@ public class NotificationAdapter extends
             case "directly_addressed":  verb = "mentioned you in";       break;
             case "assigned":            verb = "assigned you to";        break;
             case "review_requested":    verb = "requested your review on"; break;
+            // A participating comment (#267, #280); GitLab's to-dos have no such action
+            case "commented":           verb = "commented on";           break;
             case "approval_required":   verb = "requested your approval on"; break;
             case "build_failed":
                 return "Build failed on " + typeLabel + iidPart;
@@ -223,18 +349,6 @@ public class NotificationAdapter extends
         return (authorName + " " + verb + target).trim();
     }
 
-    private int getIconResId(String targetType) {
-        if (targetType == null) return 0;
-        return switch (targetType) {
-            case SUBJECT_ISSUE -> R.drawable.issue;
-            case SUBJECT_MERGE_REQUEST -> R.drawable.pull_request;
-            case SUBJECT_COMMIT -> R.drawable.commit;
-            case SUBJECT_RELEASE -> R.drawable.release;
-            case SUBJECT_DISCUSSION -> R.drawable.discussion;
-            default -> 0;
-        };
-    }
-
     public static class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener,
             PopupMenu.OnMenuItemClickListener {
         public ViewHolder(View view, OnNotificationActionCallback actionCallback) {
@@ -243,15 +357,35 @@ public class NotificationAdapter extends
 
             ivAction = view.findViewById(R.id.iv_action);
             ivAction.setOnClickListener(this);
-            ivIcon = view.findViewById(R.id.iv_icon);
-            tvReason = view.findViewById(R.id.tv_reason);
             tvTitle = view.findViewById(R.id.tv_title);
-            tvTimestamp = view.findViewById(R.id.tv_timestamp);
-            vNotificationContent = view.findViewById(R.id.v_notification_content);
-            vBottomShadow = view.findViewById(R.id.v_bottom_shadow);
+            ivExpand = view.findViewById(R.id.iv_expand);
+            if (ivExpand != null) {
+                ivExpand.setOnClickListener(this);
+            }
+            // A project header: the bar toggles the group, the name opens the project (#288)
+            headerBar = view.findViewById(R.id.header_bar);
+            if (headerBar != null) {
+                headerBar.setOnClickListener(this);
+                tvTitle.setOnClickListener(this);
+            }
             ivAvatar = view.findViewById(R.id.iv_avatar);
             if (ivAvatar != null) {
                 ivAvatar.setOnClickListener(this);
+            }
+            // The feed row's own views (#287); a project header has none of them
+            ivIcon = view.findViewById(R.id.iv_type_icon);
+            tvTimestamp = view.findViewById(R.id.tv_created_at);
+            tvActor = view.findViewById(R.id.tv_actor);
+            tvSubtitle = view.findViewById(R.id.tv_subtitle);
+            tvDesc = view.findViewById(R.id.tv_desc);
+            ivGravatar = view.findViewById(R.id.iv_gravatar);
+            if (ivGravatar != null) {
+                ivGravatar.setOnClickListener(this);
+                // Links in the action line; the rest of the row still opens the item
+                tvTitle.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+                tvTitle.setClickable(false);
+                tvTitle.setLongClickable(false);
+                tvTitle.setFocusable(false);
             }
 
             mPopupMenu = new PopupMenu(view.getContext(), ivAction);
@@ -262,11 +396,14 @@ public class NotificationAdapter extends
         private final ImageView ivIcon;
         private final ImageView ivAction;
         private final ImageView ivAvatar;
-        private final TextView tvReason;
+        private final ImageView ivExpand;
+        private final View headerBar;
+        private final ImageView ivGravatar;
         private final TextView tvTitle;
         private final TextView tvTimestamp;
-        private final View vNotificationContent;
-        private final View vBottomShadow;
+        private final TextView tvActor;
+        private final TextView tvSubtitle;
+        private final TextView tvDesc;
         private final PopupMenu mPopupMenu;
         private final OnNotificationActionCallback mActionCallback;
 
@@ -279,11 +416,29 @@ public class NotificationAdapter extends
                     if (notificationHolder.notification == null) {
                         mActionCallback.markAsRead(notificationHolder);
                     } else {
+                        // Bookmark or Remove bookmark, from the bookmarks on the phone (#289)
+                        com.gl4a.utils.BookmarkActions.Target target = com.gl4a.utils
+                                .FeedItemActions.bookmarkTarget(notificationHolder.notification);
+                        MenuItem bookmark = mPopupMenu.getMenu().findItem(R.id.bookmark);
+                        bookmark.setVisible(target != null);
+                        if (target != null) {
+                            bookmark.setTitle(com.gl4a.db.BookmarksProvider.hasBookmarked(
+                                    v.getContext(), target.url())
+                                    ? R.string.remove_bookmark : R.string.bookmark);
+                        }
                         mPopupMenu.show();
                     }
                     break;
                 }
-                case R.id.iv_avatar: {
+                case R.id.iv_expand:
+                case R.id.header_bar: {
+                    NotificationHolder header = (NotificationHolder) v.getTag();
+                    if (header != null && header.canExpand) mActionCallback.toggleGroup(header);
+                    break;
+                }
+                case R.id.tv_title:
+                case R.id.iv_avatar:
+                case R.id.iv_gravatar: {
                     Object tag = v.getTag();
                     if (tag instanceof GitLabProject) {
                         Intent intent = RepositoryActivity.makeIntent(v.getContext(),
@@ -310,7 +465,19 @@ public class NotificationAdapter extends
                     mActionCallback.markAsRead(notificationHolder);
                     return true;
                 case R.id.unsubscribe:
-                    mActionCallback.unsubscribe(notificationHolder);
+                    com.gl4a.utils.FeedItemActions.unsubscribe(itemView,
+                            notificationHolder.notification);
+                    return true;
+                case R.id.bookmark: {
+                    com.gl4a.utils.BookmarkActions.Target target = com.gl4a.utils
+                            .FeedItemActions.bookmarkTarget(notificationHolder.notification);
+                    if (target != null) {
+                        com.gl4a.utils.BookmarkActions.toggle(itemView.getContext(), target);
+                    }
+                    return true;
+                }
+                case R.id.remove:
+                    mActionCallback.remove(notificationHolder);
                     return true;
             }
 

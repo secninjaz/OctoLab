@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [1.5.0] - 2026-10-15
+## [1.5.0] - 2026-10-20
 
 ### Added
 - Profiles show Personal projects, Contributed projects and, for admins, Member of: the user's groups as an expandable tree with their roles, and a full list with every group expanded (#232, #236, #240)
@@ -19,6 +19,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The commit screen shows the parent, branches, tags and merge requests (#273)
 - Items in My Activity open in-app: projects, branches, tags, commits, issues, merge requests and comments (#140)
 - Videos fit the screen, with a full-screen button; turning a horizontal video to landscape goes full screen (#259)
+- To-dos | Participating: your Participating notifications are kept (up to 1,000 per account) to read, mark as read or delete, with a filter (#280)
+- A bell with your unread count; counts on the To-dos tabs, To-dos in the menu and each account; a dot on the account switcher when another account has some (#280, #290)
+- Your activity, To-dos and Participating in one timeline-style row with type badges; To-dos and Participating grouped by project (switchable per account), collapsible, with the project bar staying at the top (#287, #288, #290)
+- Unsubscribe and Bookmark on to-dos and Participating items (#289)
+- Subscribe / Unsubscribe on issues and merge requests; Participating notifications follow your GitLab subscription (#290)
+- Images in Markdown files (e.g. README) open in-app (#281)
 
 ### Changed
 - All project lists use the same rows as Projects (#233)
@@ -26,8 +32,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Commit authors are shown as the GitLab accounts GitLab links them to, with their avatar and a tap to their profile, in commit lists, commit screens and Contributors (#239, #244)
 - Collaborators include members through groups (#238)
 - Search suggestions are kept per account (#237)
-- New screenshots (#221)
-- Search looks in everything by default, with your own groups, projects, issues and merge requests first (#262, #264)
+- New screenshots
+- Search looks in everything by default, with your own groups, projects, issues and merge requests first, and switching from All to one kind reuses its results (#262, #264, #294)
 - Descriptions and comments share one style however they're shown, with GitLab's alerts, task lists, diff lines, code blocks and collapsible sections as on GitLab web (#251, #254)
 - The editor preview shows GitLab's own rendering (#266)
 - Files open in-app or in an installed app, downloaded with the account and with progress, instead of in the browser (#245)
@@ -37,6 +43,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Issue, pull request and merge request templates, the same on GitHub and GitLab (#268)
 - The notification check's log names why a check failed (e.g. no connection or a timeout); with debug logging on, background checks are logged too, and the log is kept on the device across restarts (#277)
 - Share logs offers a redacted copy, with server addresses, usernames and project paths replaced, or the original; the report templates ask for the redacted one (#278)
+- Each screen opens on its last tab for the account, also after a restart (#284)
+- Section names, "View more" and tabs in sentence case (#292)
+- The project page's heading shows the project's name (#293)
+- The branch picker lists the default branch first, then the newest, with default and protected badges (#298)
+- A group's Projects and Members show an arrow (#299)
+- Described as an unofficial GitLab client; the privacy policy covers what's kept on the device
 
 ### Fixed
 - Long lines cut off in diffs (#223)
@@ -56,6 +68,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The branch and tag picker missed branches and tags beyond the first 100 (#269)
 - The commit screen listed only the first 100 changed files (#272)
 - Every notification check ran twice since 1.3.1, doubling its network use (#277)
+- Read to-dos looked unread (#285)
+- Unsubscribe on a to-do did nothing (#289)
+- GitLab's limit on requests showed "error while parsing GitLab's response" (#294)
+- A project's Search code failed or searched all projects; it now searches that project's code (#295)
+- Find in page's bar was white with light text on the dark theme (#296)
+- Images in Markdown files ignored a set height and had no gap between them (#297)
 
 ## [1.4.0] - 2026-10-06
 

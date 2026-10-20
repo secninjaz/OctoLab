@@ -23,4 +23,10 @@
             </group>
         </menu>
     </item>
+    <!-- One setting for To-dos and Participating, per account (#287) -->
+    <item
+        android:id="@+id/group_by_project"
+        android:checkable="true"
+        android:title="@string/group_by_project"
+        app:showAsAction="never" />
 </menu>

@@ -7,6 +7,9 @@
     <dimen name="timeline_row_gap">6dp</dimen>
     <!-- Kept tight so comments get most of the width (user feedback on #179) -->
     <dimen name="timeline_side_padding">12dp</dimen>
+    <!-- The feed row (#287): its avatar, and where the timeline line runs through it -->
+    <dimen name="feed_avatar_size">32dp</dimen>
+    <dimen name="feed_side_padding">16dp</dimen>
     <dimen name="timeline_content_gap">8dp</dimen>
     <dimen name="overview_item_spacing">12dp</dimen>
     <dimen name="overview_header_spacing">4dp</dimen>

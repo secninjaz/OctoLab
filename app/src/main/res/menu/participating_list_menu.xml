@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- To-dos | Participating (#280): as the To-dos tab's menu -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+      xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/mark_all_as_read"
+        android:icon="@drawable/menu_mark_read_all"
+        android:title="@string/mark_all_as_read"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/participating_filter"
+        android:icon="@drawable/filter"
+        android:title="@string/issue_filter"
+        app:showAsAction="ifRoom">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item android:id="@+id/participating_filter_unread" android:checked="true" android:title="@string/todo_filter_pending" />
+                <item android:id="@+id/participating_filter_all" android:title="@string/todo_action_all" />
+                <item android:id="@+id/participating_filter_issues" android:title="@string/participating_filter_issues" />
+                <item android:id="@+id/participating_filter_merge_requests" android:title="@string/participating_filter_merge_requests" />
+            </group>
+        </menu>
+    </item>
+    <!-- One setting for To-dos and Participating, per account (#287) -->
+    <item
+        android:id="@+id/group_by_project"
+        android:checkable="true"
+        android:title="@string/group_by_project"
+        app:showAsAction="never" />
+</menu>

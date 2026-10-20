@@ -509,6 +509,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
             "query($path: ID!, $iid: String!) { project(fullPath: $path) {"
             + " workItems(iid: $iid) { nodes { widgets {"
             + " ... on WorkItemWidgetDescription { lastEditedAt lastEditedBy { username name } }"
+            + " ... on WorkItemWidgetNotifications { subscribed }"
             + " } } } } }";
 
     /**
@@ -528,6 +529,8 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         Map<String, Object> body = new HashMap<>();
         body.put("query", DESCRIPTION_EDIT_QUERY);
         body.put("variables", variables);
+        // Whether you're subscribed comes in the same answer, for the screen's menu (#290)
+        Boolean[] subscribed = new Boolean[1];
         ServiceFactory.getGraphQL(com.gl4a.gitlab.service.GitLabGraphQLService.class)
                 .getDescriptionEdit(body)
                 .map(response -> {
@@ -544,6 +547,9 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
                         if (item == null || item.widgets == null) continue;
                         for (com.gl4a.gitlab.model.GitLabDescriptionEditResponse.Widget widget
                                 : item.widgets) {
+                            if (widget != null && widget.subscribed != null) {
+                                subscribed[0] = widget.subscribed;
+                            }
                             if (widget != null && widget.lastEditedBy != null) {
                                 GitLabUser editor = GitLabUser.create(
                                         widget.lastEditedBy.username, 0);
@@ -558,6 +564,11 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
                 .subscribe(edit -> {
                     if (isAdded()) {
                         com.gl4a.adapter.timeline.CommentViewHolder.bindEdited(view, edit);
+                        if (subscribed[0] != null
+                                && getActivity() instanceof com.gl4a.utils.Subscriptions.Host) {
+                            ((com.gl4a.utils.Subscriptions.Host) getActivity())
+                                    .onSubscriptionKnown(subscribed[0]);
+                        }
                     }
                 }, error -> android.util.Log.d(Gl4Application.LOG_TAG,
                         "Description edit details unavailable", error));

@@ -67,6 +67,7 @@
             app:tabMaxWidth="-1dp"
             app:tabMode="scrollable"
             app:tabSelectedTextColor="?android:attr/textColorPrimary"
+            app:tabTextAppearance="@style/TabText"
             app:tabTextColor="?android:attr/textColorSecondary" />
 
         <ImageView

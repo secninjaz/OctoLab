@@ -11,4 +11,5 @@
     app:tabMaxWidth="-1dp"
     app:tabMode="scrollable"
     app:tabSelectedTextColor="@color/tab_indicator_color"
+    app:tabTextAppearance="@style/TabText"
     app:tabTextColor="@color/tab_text_color" />

@@ -135,6 +135,14 @@ public interface GitLabProjectService {
             @Query("per_page") int perPage
     );
 
+    /** Branches most recently updated first, as GitLab web lists them (#298). */
+    @GET("projects/{id}/repository/branches?sort=updated_desc")
+    Single<Response<List<GitLabBranch>>> getBranchesNewestFirst(
+            @Path("id") long projectId,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
     // Branches — correct path includes /repository/
     @GET("projects/{id}/repository/branches")
     Single<Response<List<GitLabBranch>>> getBranches(

@@ -68,6 +68,9 @@
     <!-- Nav header: dark text/icons on light grey primary (16.5:1) -->
     <color name="nav_header_primary_text">#1F1E24</color>
     <color name="nav_header_secondary_text">#1F1E24</color><!-- same as primary — ensure max visibility on light nav -->
+    <!-- Unread count badges (#280), white text: 5.2:1 and 6.1:1 (WCAG AA), both themes -->
+    <color name="count_badge_active">#C2410C</color>
+    <color name="count_badge_other">#5F6368</color>
 
     <!-- Diff viewer: GitLab light theme's diff colours (#274) -->
     <color name="diff_add">#ecfdf0</color><!-- GitLab's added line (8.6:1 with diff text) -->
@@ -114,4 +117,7 @@
     <color name="timeline_dot">#FF8A8A8A</color>
     <color name="quote_bar">#FF6E7F91</color>
     <color name="quote_bg">#0F1068BF</color>
+    <!-- A project group's header bar, fading out at its bottom (#290): the tab bar's colour -->
+    <color name="feed_group_header">@color/primary</color>
+    <color name="feed_group_header_clear">#00F2F2E9</color>
 </resources>

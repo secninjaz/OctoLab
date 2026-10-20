@@ -47,6 +47,8 @@ public class GitLabMergeRequest implements Parcelable {
     @Json(name = "references") public GitLabIssue.GitLabReferences references;
     @Json(name = "head") public GitLabMRBranch head;
     @Json(name = "base") public GitLabMRBranch base;
+    /** Whether the user gets GitLab's notifications about it (#290); single MR answers only. */
+    @Json(name = "subscribed") public Boolean subscribed;
 
     // GitHub SDK compatible methods (PullRequest)
     public long id() { return id; }
@@ -139,6 +141,7 @@ public class GitLabMergeRequest implements Parcelable {
             diffRefs.headSha = in.readString();
             diffRefs.startSha = in.readString();
         }
+        subscribed = (Boolean) in.readValue(Boolean.class.getClassLoader());
     }
 
     @Override
@@ -197,6 +200,7 @@ public class GitLabMergeRequest implements Parcelable {
         } else {
             dest.writeInt(0);
         }
+        dest.writeValue(subscribed);
     }
 
     @Override

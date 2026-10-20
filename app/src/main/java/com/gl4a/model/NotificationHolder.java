@@ -14,6 +14,9 @@ public class NotificationHolder {
     public final GitLabProject repository;
 
     private boolean mLastRepositoryNotification;
+    /** A project header (#288): whether its group shows everything, and whether it can. */
+    public boolean expanded;
+    public boolean canExpand;
     private boolean mRead;
 
     public NotificationHolder(@NonNull GitLabProject repository) {

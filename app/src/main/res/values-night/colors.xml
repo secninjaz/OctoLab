@@ -86,4 +86,7 @@
     <color name="timeline_dot">#FF9A9A9A</color>
     <color name="quote_bar">#FF8FA0B2</color>
     <color name="quote_bg">#1A9DC7F1</color>
+    <!-- A project group's header bar, fading out at its bottom (#290): the tab bar's colour -->
+    <color name="feed_group_header">@color/primary</color>
+    <color name="feed_group_header_clear">#002B2838</color>
 </resources>

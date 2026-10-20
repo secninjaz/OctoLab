@@ -1,39 +1,40 @@
-OctoLab is a free and open-source GitLab client for Android. It works with gitlab.com as well as self-hosted GitLab instances (Community or Enterprise Edition).
+OctoLab is a free and open-source, unofficial GitLab client for Android. It works with gitlab.com and self-hosted GitLab instances (Community or Enterprise Edition).
 
 FEATURES
 
-Authentication
+Accounts
 * Personal Access Token (PAT) login
-* Multi-account support — add and switch between several GitLab accounts, self-hosted and gitlab.com side by side
+* Multi-account: self-hosted and gitlab.com side by side
 
-Issues
+Issues and merge requests
 * Browse, create, edit and comment on issues
 * Filter by label, assignee or milestone
+* View merge requests, comment and review diffs
+* Subscribe to or unsubscribe from issues and merge requests
 
-Merge Requests
-* View merge requests, comment, review diffs
-* Follow CI/CD pipeline status
-
-To-dos
-* View and filter your to-do list by action type (assigned, mentioned, review requested, etc.)
+To-dos and notifications
+* To-dos | Participating: your to-dos, and new comments on issues and merge requests you take part in
+* Group by project, filter, mark as done or read
+* Notifications for new to-dos and comments, with counts per account
 
 Activity
-* Your activity feed, plus your projects' and starred projects' activity
+* Your activity, your projects' and starred projects' activity
 
-Repository
+Projects
 * Browse files, README, branches, tags, commits and releases
+* Search a project's code
+* Images, videos and files open in the app
 
-Notifications
-* Push notifications for new to-do items
-
-Other
+Also
+* Bookmarks for projects, groups, issues, merge requests, commits and snippets
+* Snippets, groups, Explore and search
 * Dark and light theme
-* Markdown rendering — GFM tables, task lists, code blocks, images
+* Markdown rendering: GFM tables, task lists, code blocks, images
 
 No tracking, no analytics, no proprietary services.
 
 OctoLab requests the "install packages" permission solely to let you install release APKs you choose to download from a project's Releases page within the app — it is never used automatically or in the background.
 
-OctoLab began as a GitLab-focused fork of Octodroid (gh4a), an open-source GitHub client, and is maintained by SecNinjaz.
+OctoLab began as a GitLab-focused fork of OctoDroid (gh4a), an open-source GitHub client, and is maintained by SecNinjaz. OctoLab is not affiliated with or endorsed by GitLab Inc. GitLab is a trademark of GitLab Inc.
 
 Source code: https://github.com/secninjaz/OctoLab

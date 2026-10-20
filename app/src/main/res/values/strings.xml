@@ -54,9 +54,9 @@
     <string name="feedback_by_gl4a">By OctoLab</string>
     <string name="bookmarks">Bookmarks</string>
     <string name="bookmarks_and_stars">Bookmarks and Stars</string>
-    <string name="other_info">Other Information</string>
+    <string name="other_info">Other information</string>
     <string name="view">View</string>
-    <string name="readme">Readme</string>
+    <string name="readme">README</string>
     <string name="save">Save</string>
     <string name="delete">Delete</string>
     <string name="reply">Reply</string>
@@ -84,6 +84,7 @@
     <string name="load_failure_explanation">Loading the data from GitLab failed. Please verify you have a working network connection and try again.</string>
     <string name="load_failure_explanation_dmca">This repository was taken down for legal reasons.\nPlease see %1$s for details.</string>
     <string name="load_failure_explanation_parsing">There was an error while parsing GitLab\'s response. You can use the button below to report this issue to the app developers.</string>
+    <string name="load_failure_rate_limited">GitLab\'s limit on requests in a short time (e.g. searches) was reached. Try again in a minute.</string>
     <string name="load_failure_explanation_with_reason">Loading the data from GitLab failed. GitLab told us the following reason:\n%1$s</string>
     <string name="snackbar_network_error">%1$s. Please check your internet connection.</string>
     <string name="snackbar_application_error">%1$s. You can copy the error log to provide more details when reporting the issue to the app developers.</string>
@@ -145,6 +146,19 @@
     <string name="all">All</string>
     <string name="mentioned">Mentioned</string>
     <string name="participating">Participating</string>
+    <string name="participating_empty">No participating notifications yet. Comments by others on issues and merge requests you take part in appear here.</string>
+    <string name="participating_unread_badge">%d unread</string>
+    <string name="participating_filter_issues">Issues</string>
+    <string name="more_options">More options</string>
+    <string name="group_by_project">Group by project</string>
+    <string name="feed_group_expand">Show all in this project</string>
+    <string name="feed_group_collapse">Show fewer in this project</string>
+    <string name="participating_filter_merge_requests">Merge requests</string>
+    <string name="participating_empty_filtered">Nothing here for this filter.</string>
+    <string name="other_accounts_have_counts">Other accounts have to-dos or unread notifications</string>
+    <string name="todo_pending_badge">%d pending</string>
+    <string name="account_count_badge">%d to-dos and unread</string>
+    <string name="participating_open">Participating notifications</string>
     <string name="reviews">Reviews</string>
     <string name="my_repositories">Projects</string>
     <string name="my_issues">Work items</string>
@@ -163,7 +177,11 @@
     <string name="mark_all_as_read">Mark all as read</string>
     <string name="mark_as_read">Mark as read</string>
     <string name="unsubscribe">Unsubscribe</string>
-    <string name="unsubscribe_success">Unsubscribed from the conversation</string>
+    <string name="unsubscribe_success">Unsubscribed from %1$s</string>
+    <string name="unsubscribe_failed">Couldn\'t unsubscribe from %1$s</string>
+    <string name="subscribe_failed">Couldn\'t subscribe to %1$s</string>
+    <string name="subscribe">Subscribe</string>
+    <string name="subscribe_success">Subscribed to %1$s</string>
     <string name="mark_repository_as_read_question">Mark all notifications from %1$s as read?</string>
     <string name="mark_all_as_read_question">Mark all notifications as read?</string>
     <string name="unread">Unread</string>
@@ -300,7 +318,7 @@
     <string name="user_created_at">Member since %1$s</string>
     <string name="user_pub_repos">Repositories</string>
     <string name="user_news_feed">Your Activity</string>
-    <string name="user_public_activity">Public Activity</string>
+    <string name="user_public_activity">Public activity</string>
     <string name="user_organizations">Groups</string>
     <string name="user_follow_action">Follow</string>
     <string name="user_unfollow_action">Unfollow</string>
@@ -339,6 +357,8 @@
     <string name="repo_watch_action">Watch</string>
     <string name="repo_star_action">Star</string>
     <string name="repo_select_ref">Select branch</string>
+    <string name="branch_default">default</string>
+    <string name="branch_protected">protected</string>
     <string name="repo_select_ref_dialog_title">Select branch or tag</string>
     <string name="repo_unwatch_action">Unwatch</string>
     <string name="repo_unstar_action">Unstar</string>
@@ -415,10 +435,10 @@
     <string name="commit_title">Commit %1$s</string>
     <string name="commit">Commit</string>
     <string name="commits">Commits</string>
-    <string name="commit_changed">Files Changed</string>
-    <string name="commit_added">Files Added</string>
-    <string name="commit_renamed">Files Renamed</string>
-    <string name="commit_deleted">Files Deleted</string>
+    <string name="commit_changed">Files changed</string>
+    <string name="commit_added">Files added</string>
+    <string name="commit_renamed">Files renamed</string>
+    <string name="commit_deleted">Files deleted</string>
     <string name="commit_summary">%1$d changed files with %2$d additions and %3$d deletions.</string>
     <string name="commit_compare">Compare View</string>
     <string name="commit_comment_hint">Comment on this commit</string>
@@ -612,6 +632,8 @@
     <string name="search_hint_repo">Search for repositories</string>
     <string name="search_hint_user">Search for users</string>
     <string name="search_hint_code">Search for code</string>
+    <string name="search_hint_code_in_project">Search code in %1$s</string>
+    <string name="search_code_unavailable">Searching code across all projects needs advanced search on this GitLab server. Search code from a project\'s page instead.</string>
     <!-- Search everything, like GitLab web (#262) -->
     <string name="search_type_all">All</string>
     <string name="search_type_group">Group</string>
@@ -734,8 +756,8 @@
     <string name="todo_action_unmergeable">Unmergeable changes</string>
     <string name="todo_action_build_failed">Build failed</string>
 
-    <string name="activity_filter_your_activity">Your Activity</string>
-    <string name="activity_filter_your_projects">Your Projects</string>
+    <string name="activity_filter_your_activity">Your activity</string>
+    <string name="activity_filter_your_projects">Your projects</string>
     <string name="activity_filter_starred">Starred</string>
 
     <!-- Debug logging -->

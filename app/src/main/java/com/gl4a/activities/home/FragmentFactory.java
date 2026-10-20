@@ -20,6 +20,16 @@ public abstract class FragmentFactory {
     protected abstract int[] getTabTitleResIds();
     protected abstract Fragment makeFragment(int position);
 
+    /** A tab's title. */
+    protected CharSequence getTabTitle(int position) {
+        return mActivity.getString(getTabTitleResIds()[position]);
+    }
+
+    /** A tab's count, shown as a badge by its title (#280); 0 for none. */
+    protected int getTabBadgeCount(int position) {
+        return 0;
+    }
+
     protected void onFragmentInstantiated(Fragment f, int position) {
     }
 

@@ -81,9 +81,20 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
     private int mSelectedFactoryId;
     private boolean mDrawerInAccountMode;
     private Menu mLeftDrawerMenu;
-    private ImageView mNotificationsIndicator;
+    // To-dos' pending count at the drawer row's right end (#290)
+    private TextView mNotificationsIndicator;
+    private boolean mTodoIndicatorVisible;
     private MenuItem mNotificationsMenuItem;
-    private Drawable mNotificationsIndicatorIcon;
+    // To-dos | Participating (#280): GitLab's pending to-do count (-1 unknown), and the unread
+    // participating notifications per account, for the bell, the switcher and the tabs
+    private int mTodoCount = -1;
+    /** A screen switch is moving the pager: not a tab the user chose (#284). */
+    private boolean mSwitchingScreen;
+    private java.util.Map<String, Integer> mParticipatingUnread = new java.util.HashMap<>();
+    private TextView mParticipatingBadge;
+    private View mOtherAccountsDot;
+    private View mParticipatingBell;
+    private final Runnable mOnParticipatingChanged = this::refreshParticipatingCounts;
 
     private final ActivityResultLauncher<Void> mSettingsLauncher = registerForActivityResult(
             new ActivityResultHelpers.StartSettingsContract(),
@@ -156,8 +167,13 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
                     .subscribe(response -> { }, error -> android.util.Log.d(
                             Gl4Application.LOG_TAG, "Marking to-do done failed", error));
         } else if (todoId < -1) {
-            // A participating comment's notification (#267): not shown again once opened (#275)
+            // A participating comment's notification (#267): not shown again once opened (#275),
+            // and read in To-dos | Participating (#280)
             com.gl4a.worker.NotificationsWorker.handleParticipatingOpened(this, todoId);
+            String login = Gl4Application.get().getAuthLogin();
+            if (login != null) {
+                com.gl4a.utils.ParticipatingInbox.get(this).markRead(login, -todoId);
+            }
         }
         if (url != null && !url.trim().isEmpty()) {
             com.gl4a.utils.IntentUtils.openLinkInternallyOrExternally(this,
@@ -189,9 +205,6 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
             mSelectedFactoryId = determineInitialPage();
         }
         mFactory = getFactoryForItem(mSelectedFactoryId);
-
-        mNotificationsIndicatorIcon =
-                DrawableCompat.wrap(ContextCompat.getDrawable(this, R.drawable.circle).mutate());
 
         super.onCreate(savedInstanceState);
 
@@ -225,24 +238,41 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         return getString(mFactory.getTitleResId());
     }
 
-    private void updateNotificationIndicator(int checkedItemId) {
-        if (mNotificationsIndicator == null) {
-            return;
-        }
-
-        @AttrRes int colorResId = checkedItemId == R.id.notifications
-                ? androidx.appcompat.R.attr.colorAccent : android.R.attr.textColorPrimary;
-        @ColorInt int tint = UiUtils.resolveColor(this, colorResId);
-        DrawableCompat.setTint(mNotificationsIndicatorIcon, tint);
-        mNotificationsIndicator.setImageDrawable(mNotificationsIndicatorIcon);
-    }
-
     public void setNotificationsIndicatorVisible(boolean visible) {
+        mTodoIndicatorVisible = visible;
         if (mNotificationsIndicator != null) {
-            mNotificationsIndicator.setVisibility(visible ? View.VISIBLE : View.GONE);
             mNotificationsMenuItem.setIcon(visible
                     ? R.drawable.icon_notifications_unread
                     : R.drawable.icon_notifications);
+        }
+        updateTodoBadge();
+    }
+
+    /** To-dos' pending count where its dot was (#290); a dot while the count isn't known. */
+    private void updateTodoBadge() {
+        if (mNotificationsIndicator == null) return;
+        boolean show = mTodoIndicatorVisible && mTodoCount != 0;
+        mNotificationsIndicator.setVisibility(show ? View.VISIBLE : View.GONE);
+        mNotificationsIndicator.setText(mTodoCount > 0 ? formatCount(mTodoCount) : "");
+        mNotificationsIndicator.setContentDescription(mTodoCount > 0
+                ? getString(R.string.todo_pending_badge, mTodoCount) : null);
+    }
+
+    private static String formatCount(int count) {
+        return count > 999 ? "999+" : String.valueOf(count);
+    }
+
+    /**
+     * Gives each drawer item without its own view at the row's end an empty one: the drawer
+     * reuses rows, and a row keeps the previous item's view (e.g. an account's count on
+     * Groups) unless the new item brings one (#280, #290).
+     */
+    private void keepRowEndsApart(Menu menu) {
+        for (int i = 0; i < menu.size(); i++) {
+            MenuItem item = menu.getItem(i);
+            if (item.getActionView() == null) {
+                item.setActionView(new android.widget.Space(this));
+            }
         }
     }
 
@@ -278,9 +308,10 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         mNotificationsMenuItem = menu.findItem(R.id.notifications);
         if (mNotificationsMenuItem != null) {
             View actionView = mNotificationsMenuItem.getActionView();
-            mNotificationsIndicator = actionView.findViewById(R.id.notifications_indicator);
-            updateNotificationIndicator(mSelectedFactoryId);
+            mNotificationsIndicator = actionView.findViewById(R.id.count_badge);
+            updateTodoBadge();
         }
+        keepRowEndsApart(menu);
 
         return mSelectedFactoryId;
     }
@@ -316,6 +347,14 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
 
         mDrawerSwitcher.setOnClickListener(this);
 
+        // Participating notifications (#280): the bell and its count, the other accounts' count
+        mParticipatingBell = header.findViewById(R.id.participating_bell);
+        mParticipatingBadge = header.findViewById(R.id.participating_badge);
+        mOtherAccountsDot = header.findViewById(R.id.switcher_dot);
+        mParticipatingBell.setVisibility(View.VISIBLE);
+        mParticipatingBell.setOnClickListener(v -> openParticipating());
+        updateParticipatingBadges();
+
         View clickableBackground = header.findViewById(R.id.drawer_header);
         clickableBackground.setOnClickListener(this);
     }
@@ -324,7 +363,6 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
         super.onNavigationItemSelected(item);
 
-        updateNotificationIndicator(item.getItemId());
 
         if (mFactory != null && mFactory.onDrawerItemSelected(item)) {
             return true;
@@ -376,6 +414,10 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
     }
 
     private void switchActiveUser(String login) {
+        // Switching account stays on this screen and tab, which becomes the new account's last
+        // tab for the screen (#284)
+        getPrefs().edit().putInt(lastTabKey(login, mSelectedFactoryId),
+                getPager().getCurrentItem()).apply();
         Gl4Application.get().setActiveLogin(login);
         mUserLogin = login;
         onRefresh();
@@ -410,6 +452,145 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
                 return new TrendingFactory(this);
         }
         return null;
+    }
+
+    @Override
+    protected CharSequence getTabTitle(int position) {
+        return mFactory != null ? mFactory.getTabTitle(position) : super.getTabTitle(position);
+    }
+
+    @Override
+    protected int getTabBadgeCount(int position) {
+        return mFactory != null ? mFactory.getTabBadgeCount(position) : 0;
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        com.gl4a.utils.ParticipatingInbox.addListener(mOnParticipatingChanged);
+        refreshParticipatingCounts();
+    }
+
+    @Override
+    protected void onStop() {
+        com.gl4a.utils.ParticipatingInbox.removeListener(mOnParticipatingChanged);
+        super.onStop();
+    }
+
+    /** GitLab's count of pending to-dos; -1 if not known (yet). */
+    int getTodoCount() {
+        return mTodoCount;
+    }
+
+    /** The active account's unread participating notifications (#280). */
+    int getParticipatingUnread() {
+        Integer count = mUserLogin != null ? mParticipatingUnread.get(mUserLogin) : null;
+        return count != null ? count : 0;
+    }
+
+    /** An account's count in the accounts list: its pending to-dos and unread (#290). */
+    private int getAccountCount(String login) {
+        Integer unread = mParticipatingUnread.get(login);
+        int todos = com.gl4a.utils.TodoCounts.get(this, login);
+        return (unread != null ? unread : 0) + Math.max(todos, 0);
+    }
+
+    /** Whether another account has pending to-dos or unread notifications (#290). */
+    private boolean otherAccountsHaveCounts() {
+        LongSparseArray<String> accounts = Gl4Application.get().getAccounts();
+        for (int i = 0; i < accounts.size(); i++) {
+            String login = accounts.valueAt(i);
+            if (!ApiHelpers.loginEquals(mUserLogin, login) && getAccountCount(login) > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public void setTodoCount(int count) {
+        // Kept for when this account is one of the others in the accounts list (#290)
+        com.gl4a.utils.TodoCounts.set(this, mUserLogin, count);
+        if (count == mTodoCount) return;
+        mTodoCount = count;
+        updateTodoBadge();
+        if (mFactory instanceof NotificationListFactory) updateTabBadges();
+    }
+
+    @Override
+    public void onTodoDone() {
+        if (mTodoCount > 0) setTodoCount(mTodoCount - 1);
+    }
+
+    private void refreshParticipatingCounts() {
+        android.content.Context app = getApplicationContext();
+        io.reactivex.Single.fromCallable(
+                        () -> com.gl4a.utils.ParticipatingInbox.get(app).unreadCounts())
+                .compose(com.gl4a.utils.RxUtils::doInBackground)
+                .subscribe(counts -> {
+                    mParticipatingUnread = counts;
+                    updateParticipatingBadges();
+                    if (mFactory instanceof NotificationListFactory) updateTabBadges();
+                }, error -> android.util.Log.d(Gl4Application.LOG_TAG,
+                        "Participating counts unavailable", error));
+    }
+
+    /** The bell's count (this account) and the switcher's (the other accounts) (#280). */
+    private void updateParticipatingBadges() {
+        if (mParticipatingBadge != null) {
+            showBadge(mParticipatingBadge, getParticipatingUnread(),
+                    R.string.participating_unread_badge);
+        }
+        if (mOtherAccountsDot != null) {
+            // A dot on the switcher; the counts are in the accounts list (#290)
+            mOtherAccountsDot.setVisibility(otherAccountsHaveCounts()
+                    ? View.VISIBLE : View.GONE);
+        }
+        if (mDrawerInAccountMode) updateAccountBadges();
+    }
+
+    private void showBadge(TextView badge, int count, int descriptionResId) {
+        badge.setVisibility(count > 0 ? View.VISIBLE : View.GONE);
+        badge.setText(count > 999 ? "999+" : String.valueOf(count));
+        badge.setContentDescription(getString(descriptionResId, count));
+    }
+
+    /**
+     * Each other account's count at its row's right end, as To-dos' (#290): its own view on
+     * each account's item, so the drawer reusing a row can't leave it on another item (#280).
+     */
+    private void updateAccountBadges() {
+        if (mLeftDrawerMenu == null) return;
+        for (int i = 0; i < mOtherAccountLogins.size(); i++) {
+            MenuItem item = mLeftDrawerMenu.findItem(mOtherAccountLogins.keyAt(i));
+            if (item == null) continue;
+            String login = mOtherAccountLogins.valueAt(i);
+            int count = getAccountCount(login);
+            CharSequence label = ApiHelpers.formatAccountLine(
+                    Gl4Application.get().getNameForLogin(login), login);
+            item.setTitle(label);
+            if (!(item.getActionView() instanceof android.widget.FrameLayout)) {
+                item.setActionView(R.layout.drawer_count_badge);
+            }
+            TextView badge = item.getActionView().findViewById(R.id.count_badge);
+            badge.setBackgroundResource(R.drawable.count_badge_other);
+            showBadge(badge, count, R.string.account_count_badge);
+            androidx.core.view.MenuItemCompat.setContentDescription(item, count > 0
+                    ? label + ", " + getString(R.string.account_count_badge, count)
+                    : null);
+        }
+    }
+
+    /** The bell: To-dos, on its Participating tab (#280). */
+    private void openParticipating() {
+        closeDrawers();
+        if (mSelectedFactoryId != R.id.notifications) {
+            MenuItem todos = mLeftDrawerMenu != null
+                    ? mLeftDrawerMenu.findItem(R.id.notifications) : null;
+            if (todos != null) todos.setChecked(true);
+            switchTo(R.id.notifications, getFactoryForItem(R.id.notifications));
+        }
+        getPager().post(() -> getPager().setCurrentItem(NotificationListFactory.TAB_PARTICIPATING));
     }
 
     @Override
@@ -634,6 +815,7 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
                 id++;
                 AvatarHandler.assignAvatar(this, item, login, accounts.keyAt(i));
             }
+            updateAccountBadges();
         }
 
         mDrawerSwitcher.setImageResource(accountMode
@@ -660,7 +842,35 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         getSupportFragmentManager().popBackStackImmediate(null,
                 FragmentManager.POP_BACK_STACK_INCLUSIVE);
         invalidateTitle();
+        // The screen's own last tab for this account, not the previous screen's tab (#284)
+        mSwitchingScreen = true;
         invalidateTabs();
+        int count = getTabTitleResIds() != null ? getTabTitleResIds().length : 0;
+        int tab = getPrefs().getInt(lastTabKey(mUserLogin, itemId), 0);
+        getPager().setCurrentItem(count > 0 ? Math.min(Math.max(tab, 0), count - 1) : 0, false);
+        mSwitchingScreen = false;
+    }
+
+    /** Where a screen's last tab is kept, per account (#284). */
+    private String lastTabKey(String login, int itemId) {
+        String screen;
+        try {
+            screen = getResources().getResourceEntryName(itemId);
+        } catch (android.content.res.Resources.NotFoundException e) {
+            screen = String.valueOf(itemId);
+        }
+        return "last_tab_" + login + "_" + screen;
+    }
+
+    @Override
+    public void onPageSelected(int position) {
+        super.onPageSelected(position);
+        // Remembered as the screen's last tab for the account, also across restarts (#284);
+        // not while a screen switch moves the pager
+        if (!mSwitchingScreen && mUserLogin != null && mFactory != null) {
+            getPrefs().edit().putInt(lastTabKey(mUserLogin, mSelectedFactoryId), position)
+                    .apply();
+        }
     }
 
     private void loadUserInfo(boolean force) {
@@ -678,10 +888,17 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
     private void loadNotificationIndicator(boolean force) {
         // Use GitLabTodoService to check for pending todos (equivalent to unread notifications)
         GitLabTodoService service = ServiceFactory.get(GitLabTodoService.class, force, 1);
+        // The account asked for: its count isn't kept for another after a switch (#282, #290)
+        String login = mUserLogin;
+        // GitLab's own count of them comes with the answer, for the To-dos tab (#280)
         service.listTodosByState("pending", 1, 1)
-                .map(ApiHelpers::throwOnFailure)
-                .map(result -> !result.isEmpty())
+                .map(response -> com.gl4a.utils.TodoCounts.fromResponse(response,
+                        ApiHelpers.throwOnFailure(response)))
                 .compose(makeLoaderSingle(ID_LOADER_NOTIFICATIONS_INDICATOR, force))
-                .subscribe(this::setNotificationsIndicatorVisible, this::handleLoadFailure);
+                .subscribe(count -> {
+                    if (!ApiHelpers.loginEquals(login, mUserLogin)) return;
+                    setTodoCount(count);
+                    setNotificationsIndicatorVisible(count != 0);
+                }, this::handleLoadFailure);
     }
 }

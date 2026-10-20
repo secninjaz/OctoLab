@@ -247,4 +247,12 @@ public interface GitLabIssueService {
             @Query("page") int page,
             @Query("per_page") int perPage
     );
+
+    /** Stops notifications about the issue (#289); 304 when not subscribed. */
+    @POST("projects/{id}/issues/{iid}/unsubscribe")
+    Single<Response<Void>> unsubscribe(@Path("id") long projectId, @Path("iid") long iid);
+
+    /** Notifications about the issue again, e.g. undoing an unsubscribe (#289). */
+    @POST("projects/{id}/issues/{iid}/subscribe")
+    Single<Response<Void>> subscribe(@Path("id") long projectId, @Path("iid") long iid);
 }

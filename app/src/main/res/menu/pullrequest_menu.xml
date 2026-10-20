@@ -37,6 +37,13 @@
         android:title="@string/copy_number"
         app:showAsAction="never" />
 
+    <!-- Subscribe / Unsubscribe, once GitLab has said which (#290) -->
+    <item
+        android:id="@+id/subscription"
+        android:title="@string/unsubscribe"
+        android:visible="false"
+        app:showAsAction="never" />
+
     <item android:id="@+id/bookmark"
         android:title="@string/bookmark"
         app:showAsAction="never" />

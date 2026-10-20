@@ -61,6 +61,12 @@ public abstract class BaseFragmentPagerActivity extends BasePagerActivity implem
 
     protected abstract int[] getTabTitleResIds();
     protected abstract Fragment makeFragment(int position);
+
+    /** A tab's title: its title resource, unless e.g. a count goes with it (#280). */
+    protected CharSequence getTabTitle(int position) {
+        return getString(getTabTitleResIds()[position]);
+    }
+
     protected boolean fragmentNeedsRefresh(Fragment object) {
         return false;
     }
@@ -108,7 +114,7 @@ public abstract class BaseFragmentPagerActivity extends BasePagerActivity implem
 
         @Override
         public CharSequence getPageTitle(int position) {
-            return getString(getTabTitleResIds()[position]);
+            return getTabTitle(position);
         }
 
         @Override

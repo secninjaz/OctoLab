@@ -273,6 +273,8 @@ public class Gl4Application extends Application implements
         Set<String> logins = StringUtils.getEditableStringSetFromPrefs(getPrefs(), KEY_ALL_LOGINS);
         logins.remove(login);
         mTokenStore.removeToken(login);
+        // Its participating notifications go with it (#280)
+        com.gl4a.utils.ParticipatingInbox.get(this).deleteAccount(login);
         getPrefs().edit()
                 .putString(KEY_ACTIVE_LOGIN, logins.size() > 0 ? logins.iterator().next() : null)
                 .putStringSet(KEY_ALL_LOGINS, logins)

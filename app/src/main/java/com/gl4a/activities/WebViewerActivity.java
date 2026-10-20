@@ -292,6 +292,8 @@ public abstract class WebViewerActivity extends BaseActivity implements
                     repoOwner, repoName, actualRef, folderPath != null ? folderPath : ""));
         }
         content.append("document.getElementById('content').innerHTML = html;");
+        // Images tap open as in comments (#281)
+        content.append(com.gl4a.utils.MarkdownImages.LINK_SCRIPT);
         content.append("</script></body></html>");
         return content.toString();
     }
@@ -497,6 +499,8 @@ public abstract class WebViewerActivity extends BaseActivity implements
                     repoOwner, repoName, actualRef, folderPath));
         }
         content.append("document.getElementById('content').innerHTML = html;");
+        // Images tap open as in comments (#281)
+        content.append(com.gl4a.utils.MarkdownImages.LINK_SCRIPT);
         content.append("</script>");
 
         content.append("</body></html>");

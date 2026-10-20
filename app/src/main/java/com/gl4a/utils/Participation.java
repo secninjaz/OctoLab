@@ -107,13 +107,15 @@ public final class Participation {
         mGraphQL = graphQL;
     }
 
-    /** For the active account, e.g. its Participating tabs. */
+    /**
+     * For the active account, e.g. its Participating tabs: bound to it for the whole load, its
+     * server, token and login taken now (#282). The active account's own services pick the
+     * account when each request is sent, so a load still running when the account changed sent
+     * its later requests, for the old account's items, to the new account's server.
+     */
     public static Participation forActiveAccount(Context context, boolean bypassCache) {
-        return new Participation(context, com.gl4a.Gl4Application.get().getAuthLogin(),
-                ServiceFactory.get(GitLabUserService.class, bypassCache),
-                ServiceFactory.get(GitLabIssueService.class, bypassCache),
-                ServiceFactory.get(GitLabMergeRequestService.class, bypassCache),
-                ServiceFactory.getGraphQL(GitLabGraphQLService.class));
+        com.gl4a.Gl4Application app = com.gl4a.Gl4Application.get();
+        return forAccount(context, app.getAuthLogin(), app.getApiBaseUrl(), app.getAuthToken());
     }
 
     /** For any account, e.g. its notifications in the background check. */
@@ -182,6 +184,21 @@ public final class Participation {
         Collections.sort(items, (a, b) -> Long.compare(isoMillis(b.updatedAt),
                 isoMillis(a.updatedAt)));
         return items;
+    }
+
+    private static final String KEY_LISTS_VERSION = "lists_version";
+    /** Lists saved before this version may mix accounts' servers (#288). */
+    private static final int LISTS_VERSION = 2;
+
+    /**
+     * Before #282, switching account could save one account's commented-on items under
+     * another's name, so its lookups went to the wrong server (and could match an unrelated
+     * project there). Once: every account's list is dropped, and rebuilt from its own server
+     * on its next use (#288).
+     */
+    private static synchronized void resetMixedLists(SharedPreferences prefs) {
+        if (prefs.getInt(KEY_LISTS_VERSION, 0) >= LISTS_VERSION) return;
+        prefs.edit().clear().putInt(KEY_LISTS_VERSION, LISTS_VERSION).commit();
     }
 
     /** The issue ("issue:…") or merge request ("mr:…") refs' numbers, by project. */
@@ -292,6 +309,7 @@ public final class Participation {
             return mCommented;
         }
         SharedPreferences prefs = mContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        resetMixedLists(prefs);
         String refsKey = mLogin + ":commented";
         String lastKey = mLogin + ":last_event";
         boolean firstRead = rebuild || !prefs.contains(lastKey);
@@ -347,7 +365,10 @@ public final class Participation {
         if (updatedAfter.equals(mChangedAfter)) {
             return mChanged;
         }
-        Set<String> changed = listedChanged(updatedAfter);
+        // Those the user unsubscribed from on GitLab are left out: no notifications for them,
+        // as GitLab sends none (#290). GitLab says so in the same requests.
+        Set<String> unsubscribed = new HashSet<>();
+        Set<String> changed = listedChanged(updatedAfter, unsubscribed);
         if (changed == null) {
             mChangedAfter = updatedAfter;
             mChanged = null;
@@ -372,9 +393,9 @@ public final class Participation {
         String query = "query($ids: [ID!], $t: Time) { projects(ids: $ids, first: "
                 + PROJECTS_PER_QUERY + ") { nodes { id"
                 + " issues(updatedAfter: $t, first: " + CHANGED_PER_PROJECT + ")"
-                + " { pageInfo { hasNextPage } nodes { iid } }"
+                + " { pageInfo { hasNextPage } nodes { iid subscribed } }"
                 + " mergeRequests(updatedAfter: $t, first: " + CHANGED_PER_PROJECT + ")"
-                + " { pageInfo { hasNextPage } nodes { iid } } } } }";
+                + " { pageInfo { hasNextPage } nodes { iid subscribed } } } } }";
         List<Long> projectIds = new ArrayList<>(refsByProject.keySet());
         for (int i = 0; i < projectIds.size(); i += PROJECTS_PER_QUERY) {
             List<Long> batch = projectIds.subList(i,
@@ -411,11 +432,13 @@ public final class Participation {
                     if (!(itemNodes instanceof List)) continue;
                     for (Object item : (List<?>) itemNodes) {
                         String ref = kind + ":" + projectId + ":" + get(item, "iid");
+                        if (Boolean.FALSE.equals(get(item, "subscribed"))) unsubscribed.add(ref);
                         if (commented.contains(ref)) changed.add(ref);
                     }
                 }
             }
         }
+        changed.removeAll(unsubscribed);
         mChangedAfter = updatedAfter;
         mChanged = changed;
         return changed;
@@ -426,15 +449,15 @@ public final class Participation {
      * one GraphQL request; null if it can't answer or there are more than it asks for.
      */
     @Nullable
-    private Set<String> listedChanged(String updatedAfter) {
+    private Set<String> listedChanged(String updatedAfter, Set<String> unsubscribed) {
         if (mLogin == null) return null;
         String page = "(updatedAfter: $t, first: " + LIST_SIZE + ")"
-                + " { pageInfo { hasNextPage } nodes { iid projectId } }";
+                + " { pageInfo { hasNextPage } nodes { iid projectId subscribed } }";
         String query = "query($u: String!, $us: [String!], $t: Time) {"
                 + " created: issues(authorUsername: $u, updatedAfter: $t, first: " + LIST_SIZE
-                + ") { pageInfo { hasNextPage } nodes { iid projectId } }"
+                + ") { pageInfo { hasNextPage } nodes { iid projectId subscribed } }"
                 + " assigned: issues(assigneeUsernames: $us, updatedAfter: $t, first: " + LIST_SIZE
-                + ") { pageInfo { hasNextPage } nodes { iid projectId } }"
+                + ") { pageInfo { hasNextPage } nodes { iid projectId subscribed } }"
                 + " currentUser { authoredMergeRequests" + page + " assignedMergeRequests" + page
                 + " reviewRequestedMergeRequests" + page + " } }";
         Map<String, Object> variables = new HashMap<>();
@@ -459,8 +482,10 @@ public final class Participation {
             for (Object item : (List<?>) nodes) {
                 Object projectId = get(item, "projectId");
                 if (projectId instanceof Number) {
-                    refs.add(list[0] + ":" + ((Number) projectId).longValue() + ":"
-                            + get(item, "iid"));
+                    String ref = list[0] + ":" + ((Number) projectId).longValue() + ":"
+                            + get(item, "iid");
+                    refs.add(ref);
+                    if (Boolean.FALSE.equals(get(item, "subscribed"))) unsubscribed.add(ref);
                 }
             }
         }

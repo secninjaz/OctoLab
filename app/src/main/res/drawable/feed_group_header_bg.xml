@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A project group's header bar (#290): its colour at the top, fading to nothing at
+     the bottom, so the bar merges into the list -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:startColor="@color/feed_group_header"
+        android:endColor="@color/feed_group_header_clear" />
+</shape>

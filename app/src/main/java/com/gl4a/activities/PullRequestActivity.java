@@ -193,6 +193,9 @@ public static Intent makeIntent(Context context, String repoOwner, String repoNa
         // GitLab has no pending-review concept in the same form; remove review menu item
         menu.removeItem(R.id.pull_review);
         com.gl4a.utils.BookmarkActions.prepareMenu(this, menu, bookmarkTarget());
+        // From the MR as loaded: GitLab says whether you're subscribed (#290)
+        com.gl4a.utils.Subscriptions.prepareMenu(menu, mMergeRequest != null && authorized
+                ? mMergeRequest.subscribed : null);
 
         return super.onCreateOptionsMenu(menu);
     }
@@ -203,9 +206,8 @@ public static Intent makeIntent(Context context, String repoOwner, String repoNa
         if (mMergeRequest == null || mMergeRequest.htmlUrl() == null) return null;
         String project = mRepoOwner != null && mRepoName != null
                 ? mRepoOwner + "/" + mRepoName : "";
-        return new com.gl4a.utils.BookmarkActions.Target(com.gl4a.db.BookmarksProvider.Columns.TYPE_MERGE_REQUEST,
-                mMergeRequest.htmlUrl(), mMergeRequest.title(),
-                project + "!" + mMergeRequest.number());
+        return com.gl4a.utils.BookmarkActions.Target.mergeRequest(mMergeRequest.htmlUrl(),
+                mMergeRequest.title(), project, mMergeRequest.number());
     }
 
     @Override
@@ -217,6 +219,17 @@ public static Intent makeIntent(Context context, String repoOwner, String repoNa
     public boolean onOptionsItemSelected(MenuItem item) {
         if (com.gl4a.utils.BookmarkActions.onMenuItemSelected(this, item, bookmarkTarget())) {
             return true;
+        }
+        if (mMergeRequest != null) {
+            GitLabMergeRequest mergeRequest = mMergeRequest;
+            if (com.gl4a.utils.Subscriptions.onMenuItemSelected(this, item,
+                    mergeRequest.projectId, mergeRequest.number(), true, mergeRequest.subscribed,
+                    "MR #" + mergeRequest.number(), subscribed -> {
+                        mergeRequest.subscribed = subscribed;
+                        supportInvalidateOptionsMenu();
+                    })) {
+                return true;
+            }
         }
         switch (item.getItemId()) {
             case R.id.pull_merge:

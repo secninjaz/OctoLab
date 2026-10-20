@@ -342,9 +342,13 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
                 IntentUtils.launchBrowser(this, url);
                 return true;
             case R.id.search:
-                String initialSearch = "repo:" + mRepoOwner + "/" + mRepoName + " ";
-                startActivity(SearchActivity.makeIntent(this, initialSearch,
-                        SearchActivity.SEARCH_TYPE_CODE, false));
+                // This project's code on the branch shown, GitLab's in-project search: GitHub's
+                // "repo:" in an app-wide search needed advanced search and searched everywhere
+                // (#295)
+                if (mRepository != null) {
+                    startActivity(SearchActivity.makeProjectCodeIntent(this, mRepository.id,
+                            mRepository.displayName(), getCurrentRef()));
+                }
                 return true;
             case R.id.bookmark:
                 return com.gl4a.utils.BookmarkActions.onMenuItemSelected(this, item,
@@ -430,8 +434,21 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
             long projectId = mRepository.id();
 
             // Every page: a project can have more than 100 branches or tags (#269)
+            // As GitLab web lists them: the default branch, then the newest first (#298)
+            String defaultBranch = mRepository.defaultBranch();
             Single<List<GitLabBranch>> branchSingle = ApiHelpers.<GitLabBranch>allPages(
-                            page -> projectService.getBranches(projectId, page, 100))
+                            page -> projectService.getBranchesNewestFirst(projectId, page, 100))
+                    .map(branches -> {
+                        List<GitLabBranch> ordered = new ArrayList<>(branches);
+                        for (int i = 0; i < ordered.size(); i++) {
+                            if (ordered.get(i).name != null
+                                    && ordered.get(i).name.equals(defaultBranch)) {
+                                ordered.add(0, ordered.remove(i));
+                                break;
+                            }
+                        }
+                        return ordered;
+                    })
                     .subscribeOn(Schedulers.io());
             // GitLab tags use GitLabTag, convert to GitLabBranch-compatible wrapper list
             Single<List<GitLabBranch>> tagSingle = ApiHelpers.<GitLabTag>allPages(
@@ -470,6 +487,10 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
             for (GitLabBranch t : tags) tagNames.add(t.name());
             args.putStringArrayList("branches", branchNames);
             args.putStringArrayList("tags", tagNames);
+            // The protected ones, badged as on GitLab web (#298)
+            ArrayList<String> protectedNames = new ArrayList<>();
+            for (GitLabBranch b : branches) if (b.isProtected) protectedNames.add(b.name());
+            args.putStringArrayList("protected", protectedNames);
             args.putString("selectedRef", selectedRef);
             args.putString("defaultBranch", defaultBranch);
 
@@ -488,7 +509,7 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
             String defaultBranch = args.getString("defaultBranch");
 
             final BranchAndTagAdapter adapter = new BranchAndTagAdapter(getContext(),
-                    branches, tags);
+                    branches, tags, defaultBranch, args.getStringArrayList("protected"));
             int current = -1, master = -1, count = adapter.getCount();
 
             for (int i = 0; i < count; i++) {
@@ -522,7 +543,14 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
         private final LayoutInflater mInflater;
         private final int mFirstTagIndex;
 
-        public BranchAndTagAdapter(Context context, List<String> branches, List<String> tags) {
+        @androidx.annotation.Nullable private final String mDefaultBranch;
+        private final java.util.Set<String> mProtected = new java.util.HashSet<>();
+
+        public BranchAndTagAdapter(Context context, List<String> branches, List<String> tags,
+                @androidx.annotation.Nullable String defaultBranch,
+                @androidx.annotation.Nullable List<String> protectedBranches) {
+            mDefaultBranch = defaultBranch;
+            if (protectedBranches != null) mProtected.addAll(protectedBranches);
             mItems = new ArrayList<>();
             mItems.addAll(branches);
             mItems.addAll(tags);
@@ -554,7 +582,13 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
             TextView title = convertView.findViewById(R.id.title);
 
             icon.setImageResource(position >= mFirstTagIndex ? R.drawable.tag : R.drawable.branch);
-            title.setText(mItems.get(position));
+            String name = mItems.get(position);
+            title.setText(name);
+            boolean branch = position < mFirstTagIndex;
+            convertView.findViewById(R.id.tv_default).setVisibility(
+                    branch && name.equals(mDefaultBranch) ? View.VISIBLE : View.GONE);
+            convertView.findViewById(R.id.tv_protected).setVisibility(
+                    branch && mProtected.contains(name) ? View.VISIBLE : View.GONE);
 
             return convertView;
         }

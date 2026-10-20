@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The issue icon on the feed's type badge (#288): GitLab's icon is drawn edge to edge, the
+     others have a margin of their own; this gives it the same, so its corners stay inside. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/issue"
+    android:inset="2dp" />

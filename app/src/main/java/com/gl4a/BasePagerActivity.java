@@ -75,6 +75,56 @@ public abstract class BasePagerActivity extends BaseActivity implements
         tryUpdatePagerColor();
     }
 
+    /** A tab's count, shown as a badge by its title (e.g. unread, #280); 0 for none. */
+    protected int getTabBadgeCount(int position) {
+        return 0;
+    }
+
+    /**
+     * Shows the tabs' counts, only the number highlighted, without rebuilding the pages (which
+     * would reload them). Also run whenever the tabs are rebuilt, which drops their badges.
+     */
+    protected void updateTabBadges() {
+        if (mTabs == null || mAdapter == null) return;
+        for (int i = 0; i < mTabs.getTabCount() && i < mAdapter.getCount(); i++) {
+            TabLayout.Tab tab = mTabs.getTabAt(i);
+            if (tab == null) continue;
+            int count = getTabBadgeCount(i);
+            if (count > 0) {
+                com.google.android.material.badge.BadgeDrawable badge = tab.getOrCreateBadge();
+                badge.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this,
+                        R.color.count_badge_active));
+                badge.setBadgeTextColor(0xFFFFFFFF);
+                badge.setMaxCharacterCount(4);
+                badge.setNumber(count);
+                badge.setVisible(true);
+            } else {
+                tab.removeBadge();
+            }
+        }
+    }
+
+    /**
+     * THE width of every screen's tabs: they share the width equally. Applied whenever the tabs
+     * are laid out, since rebuilding them (e.g. on switching account, #280) gives each tab its
+     * own text's width again, so they huddled at the left.
+     */
+    private boolean applyTabWidths() {
+        LinearLayout tabStrip = (LinearLayout) mTabs.getChildAt(0);
+        boolean changed = false;
+        for (int i = 0; i < tabStrip.getChildCount(); i++) {
+            View tab = tabStrip.getChildAt(i);
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) tab.getLayoutParams();
+            if (lp.width != LinearLayout.LayoutParams.WRAP_CONTENT || lp.weight != 1) {
+                lp.width = LinearLayout.LayoutParams.WRAP_CONTENT;
+                lp.weight = 1;
+                tab.setLayoutParams(lp);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
     protected ViewPager getPager() {
         return mPager;
     }
@@ -112,6 +162,24 @@ public abstract class BasePagerActivity extends BaseActivity implements
 
         mTabs = (TabLayout) getLayoutInflater().inflate(R.layout.tab_bar, null);
         mTabs.setupWithViewPager(pager);
+        // Rebuilt tabs (new tab views) get the shared width and their counts again (#280)
+        ((ViewGroup) mTabs.getChildAt(0)).setOnHierarchyChangeListener(
+                new ViewGroup.OnHierarchyChangeListener() {
+                    @Override
+                    public void onChildViewAdded(View parent, View child) {
+                        parent.post(() -> {
+                            applyTabWidths();
+                            updateTabBadges();
+                        });
+                    }
+
+                    @Override
+                    public void onChildViewRemoved(View parent, View child) {
+                    }
+                });
+        mTabs.getChildAt(0).addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            if (applyTabWidths()) v.post(v::requestLayout);
+        });
 
         if (hasTabsInToolbar()) {
             Toolbar toolbar = findViewById(R.id.toolbar);
@@ -143,14 +211,8 @@ public abstract class BasePagerActivity extends BaseActivity implements
         mTabs.setVisibility(count > 1 && !mErrorViewVisible ? View.VISIBLE : View.GONE);
         updateToolbarScrollableState();
 
-        LinearLayout tabStrip = (LinearLayout) mTabs.getChildAt(0);
-        for (int i = 0; i < tabStrip.getChildCount(); i++) {
-            View tab = tabStrip.getChildAt(i);
-            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) tab.getLayoutParams();
-            lp.width = LinearLayout.LayoutParams.WRAP_CONTENT;
-            lp.weight = 1;
-            tab.setLayoutParams(lp);
-        }
+        applyTabWidths();
+        updateTabBadges();
     }
 
     @Override

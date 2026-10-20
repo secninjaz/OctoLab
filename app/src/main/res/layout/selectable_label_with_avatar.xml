@@ -11,13 +11,13 @@
     android:paddingRight="@dimen/content_padding"
     android:paddingTop="8dp">
 
-    <com.gl4a.widget.FixedSizeImageView
+    <com.gl4a.widget.LogoImageView
         android:id="@+id/iv_gravatar"
         android:layout_width="24dp"
         android:layout_height="24dp"
         android:layout_gravity="center_vertical"
         android:layout_marginRight="16dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
+        android:foreground="?attr/selectableItemBackgroundBorderless"
         tools:src="@drawable/default_avatar" />
 
     <TextView

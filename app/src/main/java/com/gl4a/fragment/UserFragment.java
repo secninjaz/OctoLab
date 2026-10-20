@@ -249,7 +249,8 @@ public class UserFragment extends LoadingFragmentBase implements
         View btnMore = getView().findViewById(R.id.btn_repos);
         if (topRepos != null && !topRepos.isEmpty()) {
             btnMore.setOnClickListener(this);
-            btnMore.setVisibility(View.VISIBLE);
+            btnMore.setVisibility(hasMore(mRepoTotal, topRepos.size())
+                    ? View.VISIBLE : View.GONE);
         } else {
             TextView hintView = (TextView) inflater.inflate(R.layout.hint_view, ll, false);
             hintView.setText(R.string.user_no_personal_projects);
@@ -297,8 +298,8 @@ public class UserFragment extends LoadingFragmentBase implements
 
             ImageView avatar = rowView.findViewById(R.id.iv_gravatar);
             // The one shared group logo, not a user avatar (#176).
+            // On the shared logo frame: the row's view is a LogoImageView (#286)
             AvatarHandler.assignGroupLogo(avatar, group);
-            avatar.setBackground(AvatarHandler.newLogoFrame());
 
             TextView nameView = rowView.findViewById(R.id.tv_title);
             nameView.setText(group.name);
@@ -408,9 +409,20 @@ public class UserFragment extends LoadingFragmentBase implements
             ll.addView(hintView);
         }
         more.setOnClickListener(this);
-        more.setVisibility(rows.isEmpty() ? View.GONE : View.VISIBLE);
+        more.setVisibility(hasMore(total, rows.size()) ? View.VISIBLE : View.GONE);
         ll.setVisibility(View.VISIBLE);
         progress.setVisibility(View.GONE);
+    }
+
+    /** A section's preview size: up to this many rows, "View more" for the rest. */
+    private static final int PREVIEW_SIZE = 5;
+
+    /**
+     * Whether a section has more than its preview shows (#291): GitLab's total says so, or,
+     * when it doesn't send one, a full preview may have more.
+     */
+    private static boolean hasMore(int total, int shown) {
+        return total >= 0 ? total > shown : shown >= PREVIEW_SIZE;
     }
 
     private void loadContributedProjects(boolean force) {
@@ -485,7 +497,9 @@ public class UserFragment extends LoadingFragmentBase implements
         ll.setVisibility(roots.isEmpty() ? View.VISIBLE : View.GONE);
         View more = mContentView.findViewById(R.id.btn_member_of);
         more.setOnClickListener(this);
-        more.setVisibility(roots.isEmpty() ? View.GONE : View.VISIBLE);
+        // Its groups are all in the tree: more only when there are more other projects (#291)
+        more.setVisibility(memberOf.otherProjects.size() > MEMBER_OF_PREVIEW_PROJECTS
+                ? View.VISIBLE : View.GONE);
     }
 
     private void loadGroupsIfUser(boolean force) {

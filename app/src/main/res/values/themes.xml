@@ -8,6 +8,9 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="windowActionModeOverlay">true</item>
+        <!-- Action mode bars (find in page) in the toolbar's colour: the default stayed white in
+             the dark theme, under its light text and icons (#296) -->
+        <item name="actionModeBackground">@color/primary</item>
 
         <item name="preferenceTheme">@style/PreferenceTheme</item>
         <item name="actionMenuTextAppearance">@style/TextAppearance.Widget.ActionBar.Menu</item>

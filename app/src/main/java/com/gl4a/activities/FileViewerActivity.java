@@ -433,8 +433,11 @@ public class FileViewerActivity extends WebViewerActivity
             if (!url.startsWith("http") && !url.startsWith("data:") && !url.startsWith("#")) {
                 String dataUri = fetchDataUri(buildApiUrl(url, ref), tok);
                 if (dataUri != null) {
+                    // Keeping its file's address, to open it on tap (#281)
                     m.appendReplacement(sb, Matcher.quoteReplacement(
-                            "![" + alt + "](" + dataUri + ")"));
+                            com.gl4a.utils.MarkdownImages.embeddedImage(dataUri, alt,
+                                    com.gl4a.utils.MarkdownImages.fileUrl(
+                                            mRepoOwner, mRepoName, ref, url))));
                     continue;
                 }
             }
@@ -458,7 +461,11 @@ public class FileViewerActivity extends WebViewerActivity
                 String dataUri = fetchDataUri(buildApiUrl(url, ref), tok);
                 if (dataUri != null) {
                     m2.appendReplacement(sb2, Matcher.quoteReplacement(
-                            before + "\"" + dataUri + "\"" + after));
+                            before + "\"" + dataUri + "\""
+                                    + com.gl4a.utils.MarkdownImages.originalAttribute(
+                                            com.gl4a.utils.MarkdownImages.fileUrl(
+                                                    mRepoOwner, mRepoName, ref, url))
+                                    + after));
                     continue;
                 }
             }

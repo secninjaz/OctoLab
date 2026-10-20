@@ -66,9 +66,21 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
     private ParentCallback mCallback;
     // Guard: ensure the initial network load fires only once per fragment lifetime.
     private boolean mInitialLoadDone;
+    // The to-dos last loaded, and whether they were shown grouped by project (#287)
+    private List<GitLabTodo> mLastTodos;
+    private boolean mGrouped = true;
+    // Project groups shown in full (#288), and the list, to go back to a collapsed group's header
+    private final java.util.Set<Long> mExpanded = new java.util.HashSet<>();
+    private RecyclerView mList;
 
     public interface ParentCallback {
         void setNotificationsIndicatorVisible(boolean visible);
+
+        /** GitLab's count of pending to-dos, for the To-dos tab (#280). */
+        void setTodoCount(int count);
+
+        /** One to-do was marked done. */
+        void onTodoDone();
     }
 
     @Override
@@ -123,7 +135,28 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
         mAdapter = new NotificationAdapter(getActivity(), this);
         mAdapter.setOnItemClickListener(this);
         view.setAdapter(mAdapter);
+        mList = view;
+        // The current project's header stays at the top (#288)
+        com.gl4a.widget.StickyHeaders.attach(view, mAdapter::isHeaderAt, R.id.header_bar);
+        // The feed's timeline line, not through project headers (#287)
+        view.addItemDecoration(com.gl4a.widget.TimelineLineDecoration.forFeed(
+                view.getContext(), mAdapter::isHeaderAt));
         updateEmptyState();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // "Group by project" may have been changed on the Participating tab (#287)
+        if (mLastTodos != null && mGrouped != isGrouped()) {
+            showTodos(mLastTodos);
+        }
+    }
+
+    /** From the app, not this tab: a load's result may come after the tab is gone (#288). */
+    private boolean isGrouped() {
+        return com.gl4a.utils.FeedGrouping.isGrouped(com.gl4a.Gl4Application.get(),
+                com.gl4a.Gl4Application.get().getAuthLogin());
     }
 
     @Override
@@ -133,7 +166,7 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
 
     @Override
     protected boolean hasCards() {
-        return true;
+        return false;
     }
 
     @Override
@@ -207,6 +240,7 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
         inflater.inflate(R.menu.notification_list_menu, menu);
+        menu.findItem(R.id.group_by_project).setChecked(isGrouped());
         mMarkAllAsReadMenuItem = menu.findItem(R.id.mark_all_as_read);
         updateMenuItemVisibility();
 
@@ -217,6 +251,12 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
     public boolean onOptionsItemSelected(MenuItem item) {
         int itemId = item.getItemId();
         switch (itemId) {
+            case R.id.group_by_project:
+                com.gl4a.utils.FeedGrouping.setGrouped(requireContext(),
+                        com.gl4a.Gl4Application.get().getAuthLogin(), !item.isChecked());
+                item.setChecked(!item.isChecked());
+                if (mLastTodos != null) showTodos(mLastTodos);
+                return true;
             case R.id.mark_all_as_read:
                 ConfirmationDialogFragment.show(this, R.string.mark_all_as_read_question,
                         R.string.mark_all_as_read, null, "markallreadconfirm");
@@ -234,24 +274,19 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
     }
 
     @Override
-    public void markAsRead(NotificationHolder notificationHolder) {
-        if (notificationHolder.notification != null) {
-            markTodoAsDone(notificationHolder.notification);
+    public void toggleGroup(NotificationHolder header) {
+        boolean collapsed = com.gl4a.utils.FeedGroups.toggle(mExpanded, header);
+        if (mLastTodos != null) showTodos(mLastTodos);
+        if (collapsed && mList != null) {
+            com.gl4a.utils.FeedGroups.scrollToHeader(mList, mAdapter, header.repository);
         }
     }
 
     @Override
-    public void unsubscribe(NotificationHolder notificationHolder) {
-        if (notificationHolder.notification == null) return;
-        GitLabTodo todo = notificationHolder.notification;
-        GitLabTodoService service = ServiceFactory.get(GitLabTodoService.class, false);
-        service.deleteTodo(todo.id())
-                .map(ApiHelpers::mapToBooleanOrThrowOnFailure)
-                .compose(RxUtils::doInBackground)
-                .subscribe(
-                        result -> Toast.makeText(getContext(),
-                                R.string.unsubscribe_success, Toast.LENGTH_SHORT).show(),
-                        error -> handleActionFailure("Deleting todo failed", error));
+    public void markAsRead(NotificationHolder notificationHolder) {
+        if (notificationHolder.notification != null) {
+            markTodoAsDone(notificationHolder.notification);
+        }
     }
 
     @Override
@@ -277,7 +312,9 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
                 .map(ApiHelpers::throwOnFailure)
                 .compose(RxUtils::doInBackground)
                 .subscribe(result -> {
+                    todo.state = "done"; // so regrouping (#287) keeps it read
                     mAdapter.markAsRead(null, todo);
+                    mCallback.onTodoDone();
                     updateMenuItemVisibility();
                     if (mFilterMode == MODE_UNREAD) {
                         mCallback.setNotificationsIndicatorVisible(mAdapter.hasUnreadNotifications());
@@ -291,7 +328,11 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
                 .map(ApiHelpers::mapToBooleanOrThrowOnFailure)
                 .compose(RxUtils::doInBackground)
                 .subscribe(result -> {
+                    if (mLastTodos != null) {
+                        for (GitLabTodo t : mLastTodos) t.state = "done";
+                    }
                     mAdapter.markAsRead(null, null);
+                    mCallback.setTodoCount(0);
                     updateMenuItemVisibility();
                     if (mFilterMode == MODE_UNREAD) {
                         mCallback.setNotificationsIndicatorVisible(false);
@@ -344,54 +385,39 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
         todosSingle
                 .compose(RxUtils::doInBackground)
                 .subscribe(todos -> {
-                    if (mAdapter == null) return;
-                    List<NotificationHolder> holders = buildHolders(todos);
-                    mAdapter.clear();
-                    mAdapter.addAll(holders);
-                    mAdapter.notifyDataSetChanged();
+                    // The tab may be gone by now (switched screens): nothing to show it in (#288)
+                    if (mAdapter == null || !isAdded()) return;
+                    showTodos(todos);
                     setContentShown(true);
                     updateEmptyState();
                     updateMenuItemVisibility();
                     if (mFilterMode == MODE_UNREAD) {
                         mCallback.setNotificationsIndicatorVisible(
                                 todos.stream().anyMatch(GitLabTodo::isUnread));
+                        // All of them when fewer than a page: the exact count
+                        if (todos.size() < 100) mCallback.setTodoCount(todos.size());
                     }
                 }, this::handleLoadFailure);
     }
 
-    /**
-     * Groups todos by project and creates NotificationHolder rows matching
-     * the existing adapter's expected structure.
-     */
-    private List<NotificationHolder> buildHolders(List<GitLabTodo> todos) {
-        // The Todos API returns items sorted by created_at, not by project.
-        // Inserting a header only on first-seen caused todos from Project A that
-        // appeared after Project B's header to render under Project B visually.
-        // Fix: collect all todos per project first, preserving the order of each
-        // project's first appearance, then emit header + all todos per project.
-        java.util.LinkedHashMap<Long, GitLabProject> projectOrder = new java.util.LinkedHashMap<>();
-        java.util.LinkedHashMap<Long, List<GitLabTodo>> todosByProject = new java.util.LinkedHashMap<>();
-
-        for (GitLabTodo todo : todos) {
-            GitLabProject project = todo.repository();
-            long key = project != null && project.id() > 0 ? project.id() : 0L;
-            if (!projectOrder.containsKey(key)) {
-                projectOrder.put(key, project);
-                todosByProject.put(key, new ArrayList<>());
-            }
-            todosByProject.get(key).add(todo);
-        }
-
-        List<NotificationHolder> result = new ArrayList<>();
-        for (Map.Entry<Long, GitLabProject> entry : projectOrder.entrySet()) {
-            GitLabProject project = entry.getValue();
-            if (project != null) {
-                result.add(new NotificationHolder(project));
-            }
-            for (GitLabTodo todo : todosByProject.get(entry.getKey())) {
-                result.add(new NotificationHolder(todo));
+    /** Shows the to-dos grouped by project or as one timeline, as set (#287). */
+    private void showTodos(List<GitLabTodo> todos) {
+        mLastTodos = todos;
+        mGrouped = isGrouped();
+        List<NotificationHolder> holders;
+        if (mGrouped) {
+            holders = com.gl4a.utils.FeedGroups.build(todos, mExpanded);
+        } else {
+            holders = new ArrayList<>();
+            for (GitLabTodo todo : todos) {
+                holders.add(new NotificationHolder(todo));
             }
         }
-        return result;
+        mAdapter.setShowProject(!mGrouped);
+        mAdapter.clear();
+        mAdapter.addAll(holders);
+        mAdapter.notifyDataSetChanged();
+        updateEmptyState();
     }
+
 }

@@ -51,7 +51,8 @@ public class EventAdapter extends RootAdapter<GitLabEvent, EventAdapter.EventVie
     @Override
     public EventViewHolder onCreateViewHolder(LayoutInflater inflater, ViewGroup parent,
             int viewType) {
-        View v = inflater.inflate(R.layout.row_event, parent, false);
+        // THE feed row, as To-dos and Participating use it (#287)
+        View v = inflater.inflate(R.layout.row_feed_item, parent, false);
         EventViewHolder holder = new EventViewHolder(v);
         holder.ivGravatar.setOnClickListener(this);
         // Links in the title (#140); the rest of the title still taps through to the item
@@ -79,9 +80,17 @@ public class EventAdapter extends RootAdapter<GitLabEvent, EventAdapter.EventVie
         holder.tvCreatedAt.setText(StringUtils.formatRelativeTime(
                 mContext, event.createdAt(), false));
 
+        // What it's about, on the feed's type badge, as on To-dos (#288)
+        int iconResId = com.gl4a.utils.FeedTypeIcons.forEvent(event);
+        if (iconResId != 0) {
+            holder.ivIcon.setImageResource(iconResId);
+        }
+        holder.ivIcon.setVisibility(iconResId != 0 ? View.VISIBLE : View.GONE);
+
         CharSequence content = formatDescription(event);
         holder.tvDesc.setText(content);
         holder.tvDesc.setVisibility(content != null ? View.VISIBLE : View.GONE);
+        holder.tvTitle.setVisibility(title.length() > 0 ? View.VISIBLE : View.GONE);
     }
 
     @Override
@@ -97,9 +106,15 @@ public class EventAdapter extends RootAdapter<GitLabEvent, EventAdapter.EventVie
         }
     }
 
+    /** Rows on the timeline line (#287), not cards with dividers. */
     @Override
     public boolean isCardStyle() {
-        return true;
+        return false;
+    }
+
+    @Override
+    public boolean hasDividers() {
+        return false;
     }
 
     /**
@@ -229,6 +244,7 @@ public class EventAdapter extends RootAdapter<GitLabEvent, EventAdapter.EventVie
             tvTitle = view.findViewById(R.id.tv_title);
             tvDesc = view.findViewById(R.id.tv_desc);
             tvCreatedAt = view.findViewById(R.id.tv_created_at);
+            ivIcon = view.findViewById(R.id.iv_type_icon);
         }
 
         private final ImageView ivGravatar;
@@ -236,5 +252,6 @@ public class EventAdapter extends RootAdapter<GitLabEvent, EventAdapter.EventVie
         private final TextView tvTitle;
         private final TextView tvDesc;
         private final TextView tvCreatedAt;
+        private final ImageView ivIcon;
     }
 }

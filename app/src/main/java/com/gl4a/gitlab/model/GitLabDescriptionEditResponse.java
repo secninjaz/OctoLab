@@ -6,7 +6,8 @@ import java.util.List;
 
 /**
  * Response of the GraphQL query for who last edited an issue's description and when (#151):
- * the work item's description widget. Other widgets come back as empty objects.
+ * the work item's description widget; and, from its notifications widget, whether the user is
+ * subscribed (#290). Other widgets come back as empty objects.
  */
 public class GitLabDescriptionEditResponse {
     @Json(name = "data") public Data data;
@@ -31,5 +32,7 @@ public class GitLabDescriptionEditResponse {
     public static class Widget {
         @Json(name = "lastEditedAt") public String lastEditedAt;
         @Json(name = "lastEditedBy") public GitLabNoteReactionsResponse.User lastEditedBy;
+        /** The notifications widget: whether the user is subscribed (#290). */
+        @Json(name = "subscribed") public Boolean subscribed;
     }
 }

@@ -58,16 +58,68 @@
 
             </LinearLayout>
 
-            <ImageView
-                android:id="@+id/switcher"
+            <!-- Participating notifications (#280): the bell, with this account's unread count -->
+            <FrameLayout
+                android:id="@+id/participating_bell"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:layout_gravity="center_vertical"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:scaleType="center"
-                android:src="@drawable/drop_down_arrow_white"
+                android:contentDescription="@string/participating_open"
                 android:visibility="gone"
-                tools:visibility="visible" />
+                tools:visibility="visible">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/icon_participating_bell" />
+
+                <TextView
+                    android:id="@+id/participating_badge"
+                    style="@style/CountBadge"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginEnd="2dp"
+                    android:background="@drawable/count_badge_active"
+                    android:visibility="gone"
+                    tools:text="5"
+                    tools:visibility="visible" />
+
+            </FrameLayout>
+
+            <!-- The account switcher, with a dot for the other accounts' counts (#280, #290) -->
+            <FrameLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical">
+
+                <ImageView
+                    android:id="@+id/switcher"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:scaleType="center"
+                    android:src="@drawable/drop_down_arrow_white"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+
+                <!-- Other accounts have to-dos or unread notifications: a dot, their counts
+                     are in the accounts list (#290) -->
+                <View
+                    android:id="@+id/switcher_dot"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/switcher_dot"
+                    android:contentDescription="@string/other_accounts_have_counts"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+
+            </FrameLayout>
 
         </LinearLayout>
 

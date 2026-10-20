@@ -61,6 +61,14 @@ public abstract class EventListFragment extends PagedDataBaseFragment<GitLabEven
     }
 
     @Override
+    protected void onRecyclerViewInflated(RecyclerView view, LayoutInflater inflater) {
+        super.onRecyclerViewInflated(view, inflater);
+        // The feed's timeline line (#287)
+        view.addItemDecoration(com.gl4a.widget.TimelineLineDecoration.forFeed(
+                view.getContext(), null));
+    }
+
+    @Override
     protected int getEmptyTextResId() {
         return R.string.no_events_found;
     }

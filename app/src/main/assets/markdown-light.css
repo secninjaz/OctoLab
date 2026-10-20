@@ -196,8 +196,15 @@ table tr td :last-child,table tr th :last-child {
 }
 
 img, video {
-    height: auto;
     max-width: 100%;
+    /* A small gap below each, as on GitLab web (#297) */
+    margin-bottom: 8px;
+}
+
+/* Shrunk to fit keeping its shape, except an image with only a set height (e.g. a badge's
+   height="75"), which keeps it (#297) */
+img:not([height]), video:not([height]), img[width], video[width] {
+    height: auto;
 }
 
 .wp-video {  /* Prevents videos from overflowing in GitHub blog articles */

@@ -59,8 +59,4 @@ public interface GitLabTodoService {
     // Mark all pending todos as done — POST /todos/mark_as_done
     @POST("todos/mark_as_done")
     Single<Response<Void>> markAllAsDone();
-
-    // Delete a todo — DELETE /todos/:id
-    @DELETE("todos/{id}")
-    Single<Response<Void>> deleteTodo(@Path("id") long todoId);
 }

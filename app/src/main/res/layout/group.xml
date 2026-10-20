@@ -3,6 +3,7 @@
      subgroups and projects that expands in place (#172). -->
 <androidx.core.widget.NestedScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/root"
     android:layout_width="match_parent"
@@ -63,23 +64,23 @@
             android:textAppearance="?android:attr/textAppearanceSmall"
             android:visibility="gone" />
 
-        <TextView
+        <!-- The shared row, with its > as on a project's About tab (#299) -->
+        <com.gl4a.widget.OverviewRow
             android:id="@+id/tv_projects"
-            style="@style/SelectableItem"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="@dimen/content_padding"
-            android:text="@string/group_projects"
-            android:textAppearance="@style/TextAppearance.ItemTitle" />
+            android:paddingTop="@dimen/content_padding"
+            android:paddingBottom="@dimen/content_padding"
+            app:rowText="@string/group_projects" />
 
-        <TextView
+        <!-- The shared row, with its > as on a project's About tab (#299) -->
+        <com.gl4a.widget.OverviewRow
             android:id="@+id/tv_members"
-            style="@style/SelectableItem"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="@dimen/content_padding"
-            android:text="@string/group_members"
-            android:textAppearance="@style/TextAppearance.ItemTitle" />
+            android:paddingTop="@dimen/content_padding"
+            android:paddingBottom="@dimen/content_padding"
+            app:rowText="@string/group_members" />
 
         <TextView
             android:id="@+id/tv_subgroups_header"

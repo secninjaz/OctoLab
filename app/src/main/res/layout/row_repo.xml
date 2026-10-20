@@ -41,17 +41,7 @@
             <!-- The role badge, as in the Groups tree (#233) -->
             <TextView
                 android:id="@+id/tv_role"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="8dp"
-                android:background="@drawable/role_badge_background"
-                android:paddingLeft="8dp"
-                android:paddingRight="8dp"
-                android:paddingTop="1dp"
-                android:paddingBottom="1dp"
-                android:textAppearance="?android:attr/textAppearanceSmall"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="12sp"
+                style="@style/OutlinedBadge"
                 android:visibility="gone"
                 tools:text="Maintainer"
                 tools:visibility="visible" />

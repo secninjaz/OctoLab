@@ -67,7 +67,8 @@ import java.util.List;
 import java.util.Locale;
 
 public class IssueActivity extends BaseActivity implements
-        View.OnClickListener, ConfirmationDialogFragment.Callback {
+        View.OnClickListener, ConfirmationDialogFragment.Callback,
+        com.gl4a.utils.Subscriptions.Host {
     public static Intent makeIntent(Context context, GitLabIssue issue, long projectId) {
         return makeIntent(context, null, null, projectId, issue.number(), null);
     }
@@ -109,6 +110,8 @@ public class IssueActivity extends BaseActivity implements
     private IntentUtils.InitialCommentMarker mInitialComment;
     private ViewGroup mHeader;
     private Boolean mIsCollaborator;
+    // Whether you're subscribed, once the issue's page has asked GitLab (#290)
+    private Boolean mSubscribed;
     private IssueStateTrackingFloatingActionButton mEditFab;
     private final Handler mHandler = new Handler();
     private IssueFragment mFragment;
@@ -231,6 +234,8 @@ public class IssueActivity extends BaseActivity implements
             menu.removeItem(R.id.copy_number);
         }
         com.gl4a.utils.BookmarkActions.prepareMenu(this, menu, bookmarkTarget());
+        com.gl4a.utils.Subscriptions.prepareMenu(menu,
+                mIssue != null && authorized ? mSubscribed : null);
 
         return super.onCreateOptionsMenu(menu);
     }
@@ -241,8 +246,14 @@ public class IssueActivity extends BaseActivity implements
         if (mIssue == null || mIssue.htmlUrl() == null) return null;
         String project = mRepoOwner != null && mRepoName != null
                 ? mRepoOwner + "/" + mRepoName : "";
-        return new com.gl4a.utils.BookmarkActions.Target(com.gl4a.db.BookmarksProvider.Columns.TYPE_ISSUE, mIssue.htmlUrl(),
-                mIssue.title(), project + "#" + mIssueNumber);
+        return com.gl4a.utils.BookmarkActions.Target.issue(mIssue.htmlUrl(), mIssue.title(),
+                project, mIssueNumber);
+    }
+
+    @Override
+    public void onSubscriptionKnown(boolean subscribed) {
+        mSubscribed = subscribed;
+        invalidateOptionsMenu();
     }
 
     @Override
@@ -261,6 +272,13 @@ public class IssueActivity extends BaseActivity implements
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (com.gl4a.utils.BookmarkActions.onMenuItemSelected(this, item, bookmarkTarget())) {
+            return true;
+        }
+        if (com.gl4a.utils.Subscriptions.onMenuItemSelected(this, item, mProjectId, mIssueNumber,
+                false, mSubscribed, "Issue #" + mIssueNumber, subscribed -> {
+                    mSubscribed = subscribed;
+                    invalidateOptionsMenu();
+                })) {
             return true;
         }
         int itemId = item.getItemId();
@@ -295,6 +313,7 @@ public class IssueActivity extends BaseActivity implements
     public void onRefresh() {
         mIssue = null;
         mIsCollaborator = null;
+        mSubscribed = null;
         setContentShown(false);
 
         transitionHeaderToColor(androidx.appcompat.R.attr.colorPrimary, androidx.appcompat.R.attr.colorPrimaryDark);

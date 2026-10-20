@@ -13,7 +13,7 @@
             android:id="@+id/notifications"
             android:icon="@drawable/icon_notifications"
             android:title="@string/notifications"
-            app:actionLayout="@layout/notifications_indicator" />
+            app:actionLayout="@layout/drawer_count_badge" />
         <item
             android:id="@+id/my_repos"
             android:title="@string/my_repositories"

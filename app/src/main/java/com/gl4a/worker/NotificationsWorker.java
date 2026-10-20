@@ -315,6 +315,16 @@ public class NotificationsWorker extends Worker {
         }
     }
 
+    /**
+     * A participating comment read or deleted in the app (#280): its notification, if still
+     * showing, goes, and isn't shown again.
+     */
+    public static void cancelParticipating(Context context, String login, long todoId) {
+        int id = todoNotificationId(login, todoId);
+        forgetParticipating(context, id);
+        NotificationManagerCompat.from(context).cancel(id);
+    }
+
     /** Drops a participating comment's notification from those shown again if lost (#275). */
     private static void forgetParticipating(Context context, int id) {
         SharedPreferences prefs = getPrefs(context);
@@ -349,7 +359,11 @@ public class NotificationsWorker extends Worker {
             Map<String, android.graphics.Bitmap> icons) {
         Set<String> shown = StringUtils.getEditableStringSetFromPrefs(
                 prefs, keyParticipatingShown(login));
-        if (shown == null || shown.isEmpty()) return;
+        com.gl4a.utils.DebugLogger log = com.gl4a.utils.DebugLogger.get();
+        if (shown == null || shown.isEmpty()) {
+            log.log("Worker", "Comments [" + login + "]: none kept to show again");
+            return;
+        }
         Set<Integer> active = new HashSet<>();
         NotificationManager manager = (NotificationManager) getApplicationContext()
                 .getSystemService(Context.NOTIFICATION_SERVICE);
@@ -368,6 +382,8 @@ public class NotificationsWorker extends Worker {
         com.squareup.moshi.JsonAdapter<GitLabTodo> adapter =
                 ServiceFactory.moshi().adapter(GitLabTodo.class);
         List<Integer> opened = new ArrayList<>();
+        int restored = 0;
+        int showing = 0;
         for (String entry : shown) {
             // "id|created|shown|json"; builds before this had no "shown"
             String[] parts = entry.split("\\|", 4);
@@ -375,7 +391,10 @@ public class NotificationsWorker extends Worker {
             boolean withShown = parts.length == 4 && !parts[2].startsWith("{");
             try {
                 int nid = Integer.parseInt(parts[0]);
-                if (active.contains(nid)) continue;
+                if (active.contains(nid)) {
+                    showing++;
+                    continue;
+                }
                 long shownAt = withShown ? Long.parseLong(parts[2]) : 0;
                 if (shownAt >= bootTime && shownAt >= updateTime) {
                     opened.add(nid);
@@ -387,10 +406,15 @@ public class NotificationsWorker extends Worker {
                 showTodoNotification(nm, comment, nid, false, login, "participating:" + login,
                         logos, icons);
                 rememberParticipating(prefs, login, nid, comment);
+                restored++;
             } catch (Exception e) {
                 Log.d(TAG, "Couldn't show a participating comment again", e);
+                log.error("Worker", "Comments [" + login + "]: couldn't show one again", e);
             }
         }
+        // What happened to the kept ones, for the debug log (#280)
+        log.log("Worker", "Comments [" + login + "]: restored " + restored + ", still showing "
+                + showing + ", dropped " + opened.size() + " (opened or dismissed)");
         for (int nid : opened) {
             forgetParticipating(getApplicationContext(), nid);
         }
@@ -500,9 +524,12 @@ public class NotificationsWorker extends Worker {
                 Log.d(TAG, "Fetching todos for " + login + " at " + apiBase);
                 GitLabTodoService service =
                         ServiceFactory.getForAccount(GitLabTodoService.class, apiBase, token);
-                allTodos = service.listTodosByState("pending", 1, 100)
-                        .map(ApiHelpers::throwOnFailure)
-                        .blockingGet();
+                retrofit2.Response<List<GitLabTodo>> response =
+                        service.listTodosByState("pending", 1, 100).blockingGet();
+                allTodos = ApiHelpers.throwOnFailure(response);
+                // Its count, for the drawer's accounts list (#290)
+                com.gl4a.utils.TodoCounts.set(getApplicationContext(), login,
+                        com.gl4a.utils.TodoCounts.fromResponse(response, allTodos));
             } catch (Exception e) {
                 Log.d(TAG, "Failed fetching todos for " + login, e);
                 com.gl4a.utils.DebugLogger.get().error("Worker",
@@ -724,6 +751,8 @@ public class NotificationsWorker extends Worker {
                 showTodoNotification(nm, comment, nid, true, login, "participating:" + login,
                         logos, icons);
                 rememberParticipating(prefs, login, nid, comment);
+                // Kept to be seen again in To-dos | Participating, unread (#280)
+                com.gl4a.utils.ParticipatingInbox.get(context).add(login, comment);
                 posted++;
             }
         }
@@ -822,6 +851,13 @@ public class NotificationsWorker extends Worker {
         if (todo.id > 0) {
             builder.addAction(R.drawable.icon_notifications,
                     context.getString(R.string.mark_todo_done), doneIntent);
+        } else {
+            // Read without opening it, in the app's Participating list (#280)
+            builder.addAction(R.drawable.icon_notifications,
+                    context.getString(R.string.mark_as_read), PendingIntent.getService(context,
+                            id, NotificationHandlingService.makeMarkParticipatingReadIntent(
+                                    context, id, accountLogin, -todo.id),
+                            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
         }
         if (!isNew) builder.setOnlyAlertOnce(true);
 
