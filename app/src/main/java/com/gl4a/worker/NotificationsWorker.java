@@ -233,6 +233,11 @@ public class NotificationsWorker extends Worker {
         return KEY_LAST_SHOWN_PROJECT_IDS + "_" + login;
     }
 
+    /** The to-dos whose notifications were swiped away: never posted again (#301). */
+    private static String keyDismissedIds(String login) {
+        return KEY_LAST_SHOWN_PROJECT_IDS + "_dismissed_" + login;
+    }
+
     private static String keyShownSummaries(String login) {
         return KEY_SHOWN_SUMMARY_IDS + "_" + login;
     }
@@ -250,6 +255,13 @@ public class NotificationsWorker extends Worker {
                 if (shown == null) continue;
                 if (shown.remove(idString)) {
                     editor.putStringSet(keyShownIds(login), shown);
+                    // Remembered, or the next check posts it again while it's newer than
+                    // when the app was last opened (#301)
+                    Set<String> dismissed = StringUtils.getEditableStringSetFromPrefs(
+                            prefs, keyDismissedIds(login));
+                    if (dismissed == null) dismissed = new HashSet<>();
+                    dismissed.add(idString);
+                    editor.putStringSet(keyDismissedIds(login), dismissed);
                 }
             }
             editor.apply();
@@ -565,6 +577,15 @@ public class NotificationsWorker extends Worker {
                 Set<String> lastShown = StringUtils.getEditableStringSetFromPrefs(
                         prefs, keyShownIds(login));
                 Set<String> newShown = new HashSet<>();
+                // Swiped away: not posted again; kept only while the to-do is pending (#301)
+                Set<String> dismissed = StringUtils.getEditableStringSetFromPrefs(
+                        prefs, keyDismissedIds(login));
+                if (dismissed == null) dismissed = new HashSet<>();
+                Set<String> pendingIds = new HashSet<>();
+                for (GitLabTodo todo : allTodos) {
+                    pendingIds.add(String.valueOf(todoNotificationId(login, todo.id)));
+                }
+                dismissed.retainAll(pendingIds);
                 boolean hasUnseen, hasNew = false;
                 for (GitLabTodo todo : allTodos) {
                     hasNew |= parseIso8601Ms(todo.createdAt) > lastCheck;
@@ -591,6 +612,7 @@ public class NotificationsWorker extends Worker {
                     String nidStr = String.valueOf(nid);
                     long ts = parseIso8601Ms(todo.createdAt);
                     boolean showing = lastShown != null && lastShown.contains(nidStr);
+                    if (dismissed.contains(nidStr)) continue;
                     if (ts <= lastSeen && !showing) continue;
                     long pid = todo.project != null ? todo.project.id : 0L;
                     showTodoNotification(nm, todo, nid, ts > lastCheck, login,
@@ -638,6 +660,7 @@ public class NotificationsWorker extends Worker {
                 prefs.edit()
                         .putStringSet(keyShownIds(login), newShown)
                         .putStringSet(keyShownSummaries(login), newSummaries)
+                        .putStringSet(keyDismissedIds(login), dismissed)
                         .apply();
 
                 if (!hasUnseen) continue;

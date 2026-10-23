@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-10-23
+
+### Fixed
+- A to-do's notification swiped away came back at the next check, until the app was opened (#301)
+
 ## [1.5.0] - 2026-10-20
 
 ### Added
