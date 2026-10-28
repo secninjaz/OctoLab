@@ -9,7 +9,7 @@
     <application>
         <activity android:name=".resolver.BrowseFilter">
             <!-- Verified App Links (#302): opened in the app by default, without the user
-                 enabling it, once dev.taskmiles.com/.well-known/assetlinks.json names this app -->
+                 enabling it, once the instance's /.well-known/assetlinks.json names this app -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
