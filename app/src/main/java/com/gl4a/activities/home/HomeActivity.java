@@ -469,6 +469,8 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         super.onStart();
         com.gl4a.utils.ParticipatingInbox.addListener(mOnParticipatingChanged);
         refreshParticipatingCounts();
+        // Once: offer to open GitLab links in the app, if Android doesn't yet (#303)
+        com.gl4a.utils.LinkHandling.promptOnce(this);
     }
 
     @Override

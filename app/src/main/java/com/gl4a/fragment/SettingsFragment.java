@@ -52,6 +52,8 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
     /** Notify new comments on issues and MRs the user participates in (#267). */
     public static final String KEY_NOTIFY_PARTICIPATING = "notify_participating";
     private static final String KEY_ABOUT = "about";
+    private static final String KEY_LINK_HANDLING = "link_handling";
+    private Preference mLinkHandlingPref;
     private static final String KEY_OPEN_SOURCE_COMPONENTS = "open_source_components";
     private static final String KEY_DEBUG_LOGGING = DebugLogger.PREF_KEY_ENABLED;
     private static final String KEY_DEBUG_SHARE = "debug_share_logs";
@@ -93,6 +95,13 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         mThemePref = findPreference(KEY_THEME);
         mThemePref.setOnPreferenceChangeListener(this);
 
+        mLinkHandlingPref = findPreference(KEY_LINK_HANDLING);
+        if (com.gl4a.utils.LinkHandling.applies()) {
+            mLinkHandlingPref.setOnPreferenceClickListener(this);
+        } else {
+            mLinkHandlingPref.setVisible(false);
+        }
+
         mAboutPref = findPreference(KEY_ABOUT);
         mAboutPref.setOnPreferenceClickListener(this);
         mAboutPref.setSummary(getAppName());
@@ -127,6 +136,11 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
     public void onResume() {
         super.onResume();
         refreshWorkerStatus();
+        // On or off, as Android has it now (it may have changed in its settings) (#303)
+        if (mLinkHandlingPref != null && getContext() != null) {
+            mLinkHandlingPref.setSummary(com.gl4a.utils.LinkHandling.isEnabled(getContext())
+                    ? R.string.link_handling_on : R.string.link_handling_off);
+        }
     }
 
     private void refreshWorkerStatus() {
@@ -214,6 +228,10 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
 
     @Override
     public boolean onPreferenceClick(Preference pref) {
+        if (pref == mLinkHandlingPref) {
+            com.gl4a.utils.LinkHandling.openSettings(requireContext());
+            return true;
+        }
         if (pref == mWorkerSyncNowPref) {
             NotificationsWorker.runNow(requireContext());
             Toast.makeText(getContext(), R.string.worker_sync_now_toast, Toast.LENGTH_SHORT).show();

@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-10-28
+
+### Added
+- "Open GitLab links in OctoLab": on Android 12+, a one-time prompt and a Settings entry take you straight to Android's "Open by default" page, so links to your GitLab sites open in the app (#303)
+
 ## [1.5.1] - 2026-10-23
 
 ### Fixed

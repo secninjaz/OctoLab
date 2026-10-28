@@ -38,6 +38,12 @@
         android:summary="%s"
         android:title="@string/menu_gif_load_mode" />
 
+    <!-- Whether GitLab links open in the app, with Android's setting one tap away (#303) -->
+    <Preference
+        app:iconSpaceReserved="false"
+        android:key="link_handling"
+        android:title="@string/link_handling_setting" />
+
     <SwitchPreference
         app:iconSpaceReserved="false"
         android:defaultValue="true"

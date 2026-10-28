@@ -851,4 +851,12 @@
     <string name="todo_nothing_to_open">This to-do has nothing to open</string>
     <!-- Action on a to-do's notification (#178) -->
     <string name="mark_todo_done">Mark as done</string>
+    <!-- Opening GitLab links in the app (#303) -->
+    <string name="link_handling_setting">Open GitLab links in OctoLab</string>
+    <string name="link_handling_on">On: GitLab links open in OctoLab</string>
+    <string name="link_handling_off">Off: tap to turn on in Android\'s settings (Open by default)</string>
+    <string name="link_handling_prompt_title">Open GitLab links in OctoLab?</string>
+    <string name="link_handling_prompt_message">Android opens GitLab links in the browser until you allow OctoLab to open them. In the next screen, turn on \"Open supported links\" and make sure your GitLab sites are selected. You can change it later in Settings.</string>
+    <string name="link_handling_open_settings">Open settings</string>
+    <string name="link_handling_not_now">Not now</string>
 </resources>

@@ -8,7 +8,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
         <activity android:name=".resolver.BrowseFilter">
-            <intent-filter>
+            <!-- Verified App Links (#302): opened in the app by default, without the user
+                 enabling it, once dev.taskmiles.com/.well-known/assetlinks.json names this app -->
+            <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
