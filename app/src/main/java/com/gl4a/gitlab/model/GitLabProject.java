@@ -34,6 +34,12 @@ public class GitLabProject implements Parcelable {
     @Json(name = "avatar_url") public String avatarUrl;
     @Json(name = "mirror") public boolean mirror;
     @Json(name = "ssh_url_to_repo") public String sshUrl;
+    // Each feature's setting ("enabled", "private" = members only, "disabled"), as GitLab
+    // sends it with the project; with the user's role, what the app shows (#304)
+    @Json(name = "repository_access_level") public String repositoryAccessLevel;
+    @Json(name = "merge_requests_access_level") public String mergeRequestsAccessLevel;
+    @Json(name = "issues_access_level") public String issuesAccessLevel;
+    @Json(name = "wiki_access_level") public String wikiAccessLevel;
 
     // GitHub SDK compatible methods
     public long id() { return id; }
@@ -109,9 +115,13 @@ public class GitLabProject implements Parcelable {
         @Json(name = "group_access") public GitLabAccess groupAccess;
 
         public boolean canPush() {
-            int level = projectAccess != null ? projectAccess.accessLevel :
-                    (groupAccess != null ? groupAccess.accessLevel : 0);
-            return level >= 30; // Developer+
+            return accessLevel() >= 30; // Developer+
+        }
+
+        /** The user's role here, the higher of their project and group roles; 0 if none. */
+        public int accessLevel() {
+            return Math.max(projectAccess != null ? projectAccess.accessLevel : 0,
+                    groupAccess != null ? groupAccess.accessLevel : 0);
         }
     }
 
@@ -143,6 +153,25 @@ public class GitLabProject implements Parcelable {
         readmeUrl = in.readString();
         avatarUrl = in.readString();
         sshUrl = in.readString();
+        // The role and features travel with the project to its tabs (#304): without them the
+        // About tab never knew the user's role
+        int projectLevel = in.readInt();
+        int groupLevel = in.readInt();
+        if (projectLevel >= 0 || groupLevel >= 0) {
+            permissions = new GitLabProjectPermissions();
+            if (projectLevel >= 0) {
+                permissions.projectAccess = new GitLabAccess();
+                permissions.projectAccess.accessLevel = projectLevel;
+            }
+            if (groupLevel >= 0) {
+                permissions.groupAccess = new GitLabAccess();
+                permissions.groupAccess.accessLevel = groupLevel;
+            }
+        }
+        repositoryAccessLevel = in.readString();
+        mergeRequestsAccessLevel = in.readString();
+        issuesAccessLevel = in.readString();
+        wikiAccessLevel = in.readString();
     }
 
     @Override
@@ -168,6 +197,14 @@ public class GitLabProject implements Parcelable {
         dest.writeString(readmeUrl);
         dest.writeString(avatarUrl);
         dest.writeString(sshUrl);
+        dest.writeInt(permissions != null && permissions.projectAccess != null
+                ? permissions.projectAccess.accessLevel : -1);
+        dest.writeInt(permissions != null && permissions.groupAccess != null
+                ? permissions.groupAccess.accessLevel : -1);
+        dest.writeString(repositoryAccessLevel);
+        dest.writeString(mergeRequestsAccessLevel);
+        dest.writeString(issuesAccessLevel);
+        dest.writeString(wikiAccessLevel);
     }
 
     @Override

@@ -3,18 +3,19 @@
     <item android:title="@string/repo_filter">
         <menu>
             <group android:checkableBehavior="single">
-                <item
-                    android:id="@+id/filter_type_all"
-                    android:title="@string/repo_type_all" />
-                <item
-                    android:id="@+id/filter_type_owner"
-                    android:title="@string/repo_type_owner" />
+                <!-- Your projects by GitLab's scopes (#308); everyone else's are in Explore -->
                 <item
                     android:id="@+id/filter_type_member"
                     android:title="@string/repo_type_member" />
                 <item
+                    android:id="@+id/filter_type_owner"
+                    android:title="@string/repo_type_owner" />
+                <item
                     android:id="@+id/filter_type_public"
                     android:title="@string/repo_type_public" />
+                <item
+                    android:id="@+id/filter_type_internal"
+                    android:title="@string/repo_type_internal" />
                 <item
                     android:id="@+id/filter_type_private"
                     android:title="@string/repo_type_private" />
@@ -24,9 +25,6 @@
                 <item
                     android:id="@+id/filter_type_forks"
                     android:title="@string/repo_type_forks" />
-                <item
-                    android:id="@+id/filter_type_watched"
-                    android:title="@string/repo_type_watched" />
             </group>
         </menu>
     </item>

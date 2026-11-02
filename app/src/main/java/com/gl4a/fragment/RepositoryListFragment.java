@@ -84,9 +84,45 @@ public class RepositoryListFragment extends PagedDataBaseFragment<GitLabProject>
         return adapter;
     }
 
+    /**
+     * Your projects by GitLab's scopes (#308), for the list and its search (#309): member
+     * (also the default "all"), owned, or by visibility among yours; everyone else's are in
+     * Explore. Sources and forks are member lists sorted out on the phone.
+     */
+    public static java.util.Map<String, String> scopeParams(String type) {
+        java.util.Map<String, String> params = new java.util.HashMap<>();
+        switch (type != null ? type : "all") {
+            case "owner":
+                params.put("owned", "true");
+                break;
+            case "public":
+            case "internal":
+            case "private":
+                params.put("membership", "true");
+                params.put("visibility", type);
+                break;
+            default:
+                params.put("membership", "true");
+        }
+        return params;
+    }
+
     @Override
     protected int getEmptyTextResId() {
         return R.string.no_repos_found;
+    }
+
+    /** Your own projects list, empty: says where everyone else's are (#308). */
+    @Override
+    protected void updateEmptyState() {
+        super.updateEmptyState();
+        android.view.View view = getView();
+        if (view == null || !ApiHelpers.loginEquals(mLogin, Gl4Application.get().getAuthLogin())
+                || !("member".equals(mRepoType) || "all".equals(mRepoType))) {
+            return;
+        }
+        android.widget.TextView empty = view.findViewById(android.R.id.empty);
+        if (empty != null) empty.setText(R.string.projects_none_member);
     }
 
     @Override
@@ -124,8 +160,10 @@ public class RepositoryListFragment extends PagedDataBaseFragment<GitLabProject>
                 // Starred projects for the authenticated user
                 raw = service.getStarredProjects(true, page, 25);
             } else {
-                // Your Projects — all projects the user is a member of
-                raw = service.listProjects(true, page, 25, sortOrder, sortDir, null, false);
+                java.util.Map<String, String> params = scopeParams(mRepoType);
+                params.put("order_by", sortOrder);
+                params.put("sort", sortDir);
+                raw = service.listProjectsWithParams(params, page, 25);
             }
         } else if (mIsOrg) {
             // Group namespace: /users/:group/projects has nothing for a group (#103). List

@@ -111,12 +111,39 @@ public class GroupListFragment extends Fragment implements BaseActivity.Refresha
         if (view == null) return;
         view.findViewById(R.id.progress).setVisibility(View.VISIBLE);
         view.findViewById(R.id.tv_empty).setVisibility(View.GONE);
+        // Not the previous list under a loading or error message (#308)
+        view.findViewById(R.id.ll_tree).setVisibility(View.GONE);
         if (mLoad != null) mLoad.dispose();
         final boolean byActivity = GroupTree.isSortByActivity(requireContext());
-        mLoad = Single.fromCallable(() -> loadAllGroups(force, byActivity))
+        final String scope = scope(requireContext());
+        final String query = mQuery;
+        // Remembered while the app is open: back to Groups is instant; refresh reloads (#308)
+        final String key = com.gl4a.Gl4Application.get().getAuthLogin() + "|" + scope + "|"
+                + byActivity;
+        Data cached = query == null && !force ? sCache.get(key) : null;
+        if (cached != null) {
+            show(cached);
+            return;
+        }
+        final boolean withProjectGroups = query == null && SCOPE_MINE.equals(scope);
+        mLoad = Single.fromCallable(() -> query != null ? searchGroups(force, scope, query)
+                        : loadAllGroups(force, byActivity, scope))
                 .zipWith(force ? MembershipRoles.load() : MembershipRoles.loadCached(), Data::new)
                 .compose(RxUtils::doInBackground)
-                .subscribe(this::show, error -> {
+                .flatMap(data -> {
+                    // Your groups first, at once; your projects' groups a moment later (#308)
+                    if (!withProjectGroups) return Single.just(data);
+                    // (an empty first part isn't "no groups" yet: keep the spinner)
+                    if (!data.groups.isEmpty()) show(data);
+                    return Single.fromCallable(() -> new Data(
+                                    withGroupsOfMyProjects(data.groups, force, byActivity),
+                                    data.roles))
+                            .compose(RxUtils::doInBackground);
+                })
+                .subscribe(data -> {
+                    if (query == null) sCache.put(key, data);
+                    show(data);
+                }, error -> {
                     View v = getView();
                     if (v == null) return;
                     v.findViewById(R.id.progress).setVisibility(View.GONE);
@@ -132,12 +159,84 @@ public class GroupListFragment extends Fragment implements BaseActivity.Refresha
         load(false);
     }
 
-    private static List<GitLabGroup> loadAllGroups(boolean force, boolean byActivity) {
+    /**
+     * Which groups (#308): "mine" (default) = the groups you're a member of, plus the groups
+     * your projects are in (a Guest on one project of a group sees that group); "owner" = the
+     * groups you own. Public groups you have nothing to do with are in Explore, as on GitLab
+     * web. Remembered per account.
+     */
+    public static final String SCOPE_MINE = "mine";
+    public static final String SCOPE_OWNER = "owner";
+
+    private static String scopeKey() {
+        return "group_list_scope_" + com.gl4a.Gl4Application.get().getAuthLogin();
+    }
+
+    public static String scope(android.content.Context context) {
+        String scope = context.getSharedPreferences(com.gl4a.fragment.SettingsFragment.PREF_NAME,
+                android.content.Context.MODE_PRIVATE).getString(scopeKey(), SCOPE_MINE);
+        return SCOPE_OWNER.equals(scope) ? SCOPE_OWNER : SCOPE_MINE;
+    }
+
+    public static void setScope(android.content.Context context, String scope) {
+        context.getSharedPreferences(com.gl4a.fragment.SettingsFragment.PREF_NAME,
+                android.content.Context.MODE_PRIVATE).edit().putString(scopeKey(), scope).apply();
+    }
+
+    // The search, as Projects has it (#309): null when not searching
+    @Nullable private String mQuery;
+
+    /** Searches your groups at any depth (null: back to the list) (#309). */
+    public void search(@Nullable String query) {
+        mQuery = query == null || query.trim().isEmpty() ? null : query.trim();
+        if (mState != null) mState.clear();
+        load(false);
+    }
+
+    /** Reloads after the filter was changed (#308). */
+    public void onScopeChanged() {
+        if (mState != null) mState.clear();
+        load(false);
+    }
+
+    /**
+     * Your groups at any depth whose name or path has {@code query}, and, for "yours", your
+     * projects' groups that match: one request, plus your projects (#309).
+     */
+    private static List<GitLabGroup> searchGroups(boolean force, String scope, String query)
+            throws Exception {
         GitLabGroupService service = ServiceFactory.get(GitLabGroupService.class, force);
+        java.util.Map<String, String> params = new java.util.HashMap<>();
+        params.put(SCOPE_OWNER.equals(scope) ? "owned" : "min_access_level",
+                SCOPE_OWNER.equals(scope) ? "true" : "10");
+        params.put("search", query);
+        List<GitLabGroup> groups = new ArrayList<>();
+        List<GitLabGroup> batch = ApiHelpers.throwOnFailure(
+                service.listGroupsAnyDepth(params, 1, PAGE_SIZE).blockingGet());
+        if (batch != null) groups.addAll(batch);
+        if (SCOPE_MINE.equals(scope)) {
+            List<GitLabGroup> mine = withGroupsOfMyProjects(groups, force, false);
+            String q = query.toLowerCase(java.util.Locale.ROOT);
+            for (GitLabGroup g : mine) {
+                if (groups.contains(g)) continue;
+                String name = g.name != null ? g.name.toLowerCase(java.util.Locale.ROOT) : "";
+                String path = g.fullPath != null ? g.fullPath.toLowerCase(java.util.Locale.ROOT) : "";
+                if (name.contains(q) || path.contains(q)) groups.add(g);
+            }
+        }
+        return groups;
+    }
+
+    private static List<GitLabGroup> loadAllGroups(boolean force, boolean byActivity,
+            String scope) {
+        GitLabGroupService service = ServiceFactory.get(GitLabGroupService.class, force);
+        java.util.Map<String, String> params = new java.util.HashMap<>();
+        params.put(SCOPE_OWNER.equals(scope) ? "owned" : "min_access_level",
+                SCOPE_OWNER.equals(scope) ? "true" : "10");
         List<GitLabGroup> groups = new ArrayList<>();
         for (int page = 1; page <= MAX_PAGES; page++) {
             List<GitLabGroup> batch = ApiHelpers.throwOnFailure(
-                    service.listMemberGroups(page, PAGE_SIZE).blockingGet());
+                    service.listGroupsWithParams(params, page, PAGE_SIZE).blockingGet());
             if (batch == null || batch.isEmpty()) break;
             groups.addAll(batch);
             if (batch.size() < PAGE_SIZE) break;
@@ -146,13 +245,97 @@ public class GroupListFragment extends Fragment implements BaseActivity.Refresha
         return byActivity ? GroupTree.sortByActivity(groups, force).blockingGet() : groups;
     }
 
+    /** Groups shown per account, filter and sort, while the app is open (#308). */
+    private static final androidx.collection.LruCache<String, Data> sCache =
+            new androidx.collection.LruCache<>(8);
+
+    /**
+     * {@code groups} plus the top-level groups of the projects you're a member of that aren't
+     * already listed, e.g. testG for a Guest on testG/testp (#308). Your projects' pages and the
+     * missing groups are asked for in parallel; name order, or appended when sorted by activity.
+     */
+    private static List<GitLabGroup> withGroupsOfMyProjects(List<GitLabGroup> groups,
+            boolean force, boolean byActivity) throws Exception {
+        java.util.Set<String> listed = new java.util.HashSet<>();
+        for (GitLabGroup g : groups) {
+            listed.add((g.fullPath != null ? g.fullPath : g.path).toLowerCase(java.util.Locale.ROOT));
+        }
+        java.util.Map<String, String> params = new java.util.HashMap<>();
+        params.put("membership", "true");
+        params.put("simple", "true");
+        com.gl4a.gitlab.service.GitLabProjectService projects =
+                ServiceFactory.get(com.gl4a.gitlab.service.GitLabProjectService.class, force);
+        java.util.concurrent.ExecutorService pool =
+                java.util.concurrent.Executors.newFixedThreadPool(4);
+        try {
+            // The first page says how many there are; the rest at once
+            retrofit2.Response<List<com.gl4a.gitlab.model.GitLabProject>> first =
+                    projects.listProjectsWithParams(params, 1, PAGE_SIZE).blockingGet();
+            List<com.gl4a.gitlab.model.GitLabProject> all =
+                    new ArrayList<>(ApiHelpers.throwOnFailure(first));
+            int pages = 1;
+            try {
+                String total = first.headers().get("X-Total-Pages");
+                if (total != null) pages = Math.min(Integer.parseInt(total.trim()), MAX_PAGES);
+            } catch (NumberFormatException ignored) {
+            }
+            List<java.util.concurrent.Future<List<com.gl4a.gitlab.model.GitLabProject>>> rest =
+                    new ArrayList<>();
+            for (int page = 2; page <= pages; page++) {
+                final int p = page;
+                rest.add(pool.submit(() -> ApiHelpers.throwOnFailure(
+                        projects.listProjectsWithParams(params, p, PAGE_SIZE).blockingGet())));
+            }
+            for (java.util.concurrent.Future<List<com.gl4a.gitlab.model.GitLabProject>> f : rest) {
+                all.addAll(f.get());
+            }
+            java.util.Set<String> missing = new java.util.LinkedHashSet<>();
+            for (com.gl4a.gitlab.model.GitLabProject p : all) {
+                if (p.namespace == null || !"group".equals(p.namespace.kind)) continue;
+                String full = p.namespace.fullPath != null ? p.namespace.fullPath : p.namespace.path;
+                if (full == null) continue;
+                String top = full.split("/")[0];
+                if (!listed.contains(top.toLowerCase(java.util.Locale.ROOT))) missing.add(top);
+            }
+            GitLabGroupService service = ServiceFactory.get(GitLabGroupService.class, force);
+            List<java.util.concurrent.Future<GitLabGroup>> lookups = new ArrayList<>();
+            for (String path : missing) {
+                lookups.add(pool.submit(() -> {
+                    try {
+                        return ApiHelpers.throwOnFailure(service.getGroupByPath(
+                                android.net.Uri.encode(path)).blockingGet());
+                    } catch (Exception e) {
+                        return null; // not visible to you after all: left out
+                    }
+                }));
+            }
+            List<GitLabGroup> result = new ArrayList<>(groups);
+            List<GitLabGroup> extra = new ArrayList<>();
+            for (java.util.concurrent.Future<GitLabGroup> f : lookups) {
+                GitLabGroup g = f.get();
+                if (g != null) extra.add(g);
+            }
+            if (extra.isEmpty()) return groups;
+            result.addAll(extra);
+            if (!byActivity) {
+                java.util.Collections.sort(result, (a, b) -> String.CASE_INSENSITIVE_ORDER.compare(
+                        a.name != null ? a.name : "", b.name != null ? b.name : ""));
+            }
+            return result;
+        } finally {
+            pool.shutdown();
+        }
+    }
+
     private void show(Data data) {
         View view = getView();
         if (view == null || mTree == null) return;
         view.findViewById(R.id.progress).setVisibility(View.GONE);
         TextView empty = view.findViewById(R.id.tv_empty);
-        empty.setText(R.string.no_groups_found);
+        empty.setText(mQuery != null ? R.string.no_search_groups_found
+                : R.string.groups_none_mine);
         empty.setVisibility(data.groups.isEmpty() ? View.VISIBLE : View.GONE);
+        view.findViewById(R.id.ll_tree).setVisibility(View.VISIBLE);
         mTree.setRoots(data.groups, data.roles);
     }
 }

@@ -57,12 +57,16 @@ public abstract class UrlLoadTask extends AsyncTask<Void, Void, Optional<Intent>
         mProgressDialog.show(mActivity.getSupportFragmentManager(), "progress");
     }
 
+    // GitLab refused what the link needs for the user's role (#304): said so, no browser
+    private Throwable mRefusal;
+
     @Override
     protected Optional<Intent> doInBackground(Void... params) {
         try {
             return getSingle().blockingGet();
         } catch (Exception e) {
             Log.e(Gl4Application.LOG_TAG, "Failure during intent resolving", e);
+            if (com.gl4a.utils.ProjectAccess.isRefused(e)) mRefusal = e;
             return Optional.empty();
         }
     }
@@ -75,6 +79,10 @@ public abstract class UrlLoadTask extends AsyncTask<Void, Void, Optional<Intent>
 
         if (result.isPresent()) {
             mActivity.startActivity(result.get().setFlags(mIntentFlags));
+        } else if (mRefusal != null) {
+            // The browser can't show it either: say why instead (#304)
+            android.widget.Toast.makeText(mActivity, com.gl4a.utils.ProjectAccess.refusedMessage(
+                    mActivity, mRefusal), android.widget.Toast.LENGTH_LONG).show();
         } else if (mUseCustomTabForUnresolvedUri) {
             IntentUtils.openInCustomTabOrBrowser(mActivity, mUrlToResolve, mCustomTabHeaderColor);
         } else {

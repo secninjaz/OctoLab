@@ -255,8 +255,9 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- README section -->
+        <!-- README section; hidden without code access for the role (#304) -->
         <androidx.cardview.widget.CardView
+            android:id="@+id/readme_card"
             style="?attr/cardViewTheme"
             android:layout_width="match_parent"
             android:layout_height="wrap_content">

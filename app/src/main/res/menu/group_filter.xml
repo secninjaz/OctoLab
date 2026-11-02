@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Which groups the Groups list shows (#308); remembered per account -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+      xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/group_filter"
+        android:title="@string/repo_filter"
+        app:showAsAction="never">
+        <menu>
+            <group android:checkableBehavior="single">
+                <!-- Yours: groups you're in, and the groups of your projects -->
+                <item
+                    android:id="@+id/group_filter_mine"
+                    android:title="@string/group_filter_mine" />
+                <item
+                    android:id="@+id/group_filter_owner"
+                    android:title="@string/group_filter_owner" />
+            </group>
+        </menu>
+    </item>
+</menu>

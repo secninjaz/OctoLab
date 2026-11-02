@@ -114,6 +114,27 @@ public abstract class LoadingListFragmentBase extends LoadingFragmentBase implem
         return getView() != null && UiUtils.canViewScrollUp(mRecyclerView);
     }
 
+    /**
+     * A list GitLab refuses for the user's role (403/404) says so in its own place, e.g. a
+     * tab, instead of replacing the whole screen with an error (#304).
+     */
+    @Override
+    protected void handleLoadFailure(Throwable error) {
+        if (!com.gl4a.utils.ProjectAccess.isRefused(error) || mRecyclerView == null
+                || getView() == null) {
+            super.handleLoadFailure(error);
+            return;
+        }
+        TextView emptyView = getView().findViewById(android.R.id.empty);
+        if (emptyView != null) {
+            emptyView.setText(com.gl4a.utils.ProjectAccess.refusedMessage(requireContext(),
+                    error));
+        }
+        setContentShown(true);
+        mRecyclerView.setVisibility(View.GONE);
+        mEmptyViewContainer.setVisibility(View.VISIBLE);
+    }
+
     protected void updateEmptyState() {
         if (mRecyclerView == null) {
             return;

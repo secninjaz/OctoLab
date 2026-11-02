@@ -40,6 +40,11 @@ public abstract class FragmentFactory {
         return null;
     }
 
+    /** The title bar's second line, e.g. a list's current filter (#308); none by default. */
+    protected CharSequence getSubtitle() {
+        return null;
+    }
+
     protected int[] getToolDrawerMenuResIds() {
         return null;
     }

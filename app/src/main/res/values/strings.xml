@@ -209,6 +209,11 @@
     <string name="reaction_eyes">Eyes</string>
 
     <string name="repo_type_all">All</string>
+    <string name="projects_none_member">You\'re not in any project yet. Public projects are in Explore.</string>
+    <string name="groups_none_mine">You\'re not in any group yet. Public groups are in Explore.</string>
+    <string name="group_filter">Show</string>
+    <string name="group_filter_mine">Yours and your projects\'</string>
+    <string name="group_filter_owner">Owner</string>
     <string name="repo_type_owner">Owner</string>
     <string name="repo_type_member">Member</string>
     <string name="repo_type_public">Public</string>
@@ -859,4 +864,7 @@
     <string name="link_handling_prompt_message">Android opens GitLab links in the browser until you allow OctoLab to open them. In the next screen, turn on \"Open supported links\" and make sure your GitLab sites are selected. You can change it later in Settings.</string>
     <string name="link_handling_open_settings">Open settings</string>
     <string name="link_handling_not_now">Not now</string>
+    <!-- What GitLab refuses for the user's role (#304) -->
+    <string name="access_refused">Your role on this project doesn\'t allow this.</string>
+    <string name="access_not_found_or_refused">This doesn\'t exist on GitLab, or your role on this project doesn\'t allow it.</string>
 </resources>

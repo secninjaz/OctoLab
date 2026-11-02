@@ -177,22 +177,25 @@ public class UserActivity extends BaseFragmentPagerActivity {
 
     /**
      * Namespaces are opened here from many places (owner taps, Back from a project, links)
-     * without knowing whether they are a user or a group. If no user has this name, open the
-     * group with that path instead (#103, #111); fail as before if there is none.
+     * without knowing whether they are a user or a group (#103, #111). If no user has this
+     * name, the shared resolver finds what the path is (a group, a subgroup, or a project) and
+     * opens that instead (#307); fail as before if it's nothing.
      */
     private io.reactivex.Single<GitLabUser> openAsGroupOrFail() {
-        return ServiceFactory.get(com.gl4a.gitlab.service.GitLabGroupService.class, false)
-                .getGroupByPath(android.net.Uri.encode(mUserLogin))
-                .map(ApiHelpers::throwOnFailure)
+        return com.gl4a.utils.PathResolver.resolve(mUserLogin,
+                        com.gl4a.utils.PathResolver.Kind.USER)
                 .observeOn(io.reactivex.android.schedulers.AndroidSchedulers.mainThread())
-                .flatMap(group -> {
-                    startActivity(GroupActivity.makeIntent(this,
-                            group.fullPath != null ? group.fullPath : mUserLogin));
+                .flatMap(kind -> {
+                    Intent intent = com.gl4a.utils.PathResolver.intentFor(this, kind, mUserLogin);
+                    if (intent == null) {
+                        // A plain exception crashed the app on purpose (programming errors)
+                        return io.reactivex.Single.<GitLabUser>error(
+                                new com.gl4a.utils.PathResolver.NotFoundException(mUserLogin));
+                    }
+                    startActivity(intent);
                     finish();
                     return io.reactivex.Single.<GitLabUser>never();
-                })
-                .onErrorResumeNext(err -> io.reactivex.Single.error(
-                        new RuntimeException("User not found: " + mUserLogin)));
+                });
     }
 
     private void loadUser(boolean force) {

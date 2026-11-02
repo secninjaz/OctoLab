@@ -117,6 +117,29 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
         R.string.about, R.string.repo_files, R.string.commits, R.string.repo_activity
     };
 
+    /**
+     * The pages shown, as PAGE_ ids: without code access for the user's role (e.g. a Guest
+     * on a private project) Files and Commits aren't shown, as on GitLab web (#304).
+     */
+    private int[] pages() {
+        return com.gl4a.utils.ProjectAccess.canReadCode(mRepository)
+                ? new int[] { PAGE_REPO_OVERVIEW, PAGE_FILES, PAGE_COMMITS, PAGE_ACTIVITY }
+                : new int[] { PAGE_REPO_OVERVIEW, PAGE_ACTIVITY };
+    }
+
+    /** The page id at a tab position. */
+    private int pageAt(int position) {
+        int[] pages = pages();
+        return position >= 0 && position < pages.length ? pages[position] : -1;
+    }
+
+    /** The tab position of a page id, or -1 if it isn't shown. */
+    private int positionOf(int page) {
+        int[] pages = pages();
+        for (int i = 0; i < pages.length; i++) if (pages[i] == page) return i;
+        return -1;
+    }
+
     private String mRepoOwner;
     private String mRepoName;
     private ActionBar mActionBar;
@@ -184,7 +207,9 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
         // the title matches the current name of the repository
         mActionBar.setTitle(mRepository.displayName());
 
-        mActionBar.setSubtitle(getCurrentRef());
+        // No branch for a role without code access, as on GitLab web (#304)
+        mActionBar.setSubtitle(com.gl4a.utils.ProjectAccess.canReadCode(mRepository)
+                ? getCurrentRef() : null);
         invalidateFragments();
     }
 
@@ -212,22 +237,26 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
 
     @Override
     protected int[] getTabTitleResIds() {
-        return mRepository != null ? TITLES : null;
+        if (mRepository == null) return null;
+        int[] pages = pages();
+        int[] titles = new int[pages.length];
+        for (int i = 0; i < pages.length; i++) titles[i] = TITLES[pages[i]];
+        return titles;
     }
 
     @Override
     protected Fragment makeFragment(int position) {
-        switch (position) {
-            case 0:
+        switch (pageAt(position)) {
+            case PAGE_REPO_OVERVIEW:
                 return RepositoryFragment.newInstance(mRepository, mSelectedRef);
-            case 1:
+            case PAGE_FILES:
                 Fragment f = ContentListContainerFragment.newInstance(mRepository,
                         mSelectedRef, mInitialPath);
                 mInitialPath = null;
                 return f;
-            case 2:
+            case PAGE_COMMITS:
                 return CommitListFragment.newInstance(mRepository, mSelectedRef);
-            case 3:
+            case PAGE_ACTIVITY:
                 return RepositoryEventListFragment.newInstance(mRepository);
         }
         return null;
@@ -235,11 +264,11 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
 
     @Override
     protected void onFragmentInstantiated(Fragment f, int position) {
-        switch (position) {
-            case 0: mRepositoryFragment = (RepositoryFragment) f; break;
-            case 1: mContentListFragment = (ContentListContainerFragment) f; break;
-            case 2: mCommitListFragment = (CommitListFragment) f; break;
-            case 3: mActivityFragment = (RepositoryEventListFragment) f; break;
+        switch (pageAt(position)) {
+            case PAGE_REPO_OVERVIEW: mRepositoryFragment = (RepositoryFragment) f; break;
+            case PAGE_FILES: mContentListFragment = (ContentListContainerFragment) f; break;
+            case PAGE_COMMITS: mCommitListFragment = (CommitListFragment) f; break;
+            case PAGE_ACTIVITY: mActivityFragment = (RepositoryEventListFragment) f; break;
         }
     }
 
@@ -289,7 +318,8 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
     @Override
     public void onBackPressed() {
         if (mContentListFragment != null) {
-            if (getPager().getCurrentItem() == 1 && mContentListFragment.handleBackPress()) {
+            if (getPager().getCurrentItem() == positionOf(PAGE_FILES)
+                    && mContentListFragment.handleBackPress()) {
                 return;
             }
         }
@@ -310,6 +340,12 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
             menu.removeItem(R.id.bookmark);
             menu.removeItem(R.id.zip_download);
         } else {
+            if (!com.gl4a.utils.ProjectAccess.canReadCode(mRepository)) {
+                // No code for the user's role: no branches, code search or download (#304)
+                menu.removeItem(R.id.ref);
+                menu.removeItem(R.id.search);
+                menu.removeItem(R.id.zip_download);
+            }
             com.gl4a.utils.BookmarkActions.prepareMenu(this, menu, new com.gl4a.utils.BookmarkActions.Target(
                     BookmarksProvider.Columns.TYPE_REPO, getBookmarkUrl(),
                     bookmarkName(), getCurrentRef(), mRepository.id, mRepository.avatarUrl));
@@ -416,13 +452,45 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
                     updateTitle();
                     invalidateTabs();
                     // Apply initial page selection first time the repo is loaded
+                    // A page the role doesn't show (e.g. Files from a link) opens on About
                     if (mInitialPage >= PAGE_REPO_OVERVIEW && mInitialPage <= PAGE_ACTIVITY) {
-                        getPager().setCurrentItem(mInitialPage);
+                        getPager().setCurrentItem(Math.max(positionOf(mInitialPage), 0));
                         mInitialPage = -1;
                     }
                     setContentShown(true);
                     supportInvalidateOptionsMenu();
-                }, this::handleLoadFailure);
+                }, this::openGroupOrFail);
+    }
+
+    /**
+     * A link to a subgroup (/group/subgroup) looks like one to a project: when GitLab has no
+     * such project, the shared resolver finds what the path is and opens that (#306, #307).
+     */
+    private void openGroupOrFail(Throwable error) {
+        boolean notFound = false;
+        for (Throwable t = error; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            if (t instanceof com.gl4a.ApiRequestException) {
+                notFound = ((com.gl4a.ApiRequestException) t).getStatus() == 404;
+                break;
+            }
+        }
+        if (!notFound) {
+            handleLoadFailure(error);
+            return;
+        }
+        String path = mRepoOwner + "/" + mRepoName;
+        registerTemporarySubscription(com.gl4a.utils.PathResolver.resolve(path,
+                        com.gl4a.utils.PathResolver.Kind.PROJECT)
+                .compose(RxUtils::doInBackground)
+                .subscribe(kind -> {
+                    Intent intent = com.gl4a.utils.PathResolver.intentFor(this, kind, path);
+                    if (intent != null) {
+                        startActivity(intent);
+                        finish();
+                    } else {
+                        handleLoadFailure(error);
+                    }
+                }, resolveError -> handleLoadFailure(error)));
     }
 
     private void loadOrShowRefSelection() {
@@ -472,7 +540,16 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
                         mBranches = result.first;
                         mTags = result.second;
                         showRefSelectionDialog();
-                    }, this::handleLoadFailure));
+                    }, error -> {
+                        // Branches GitLab refuses for the role: said so, the screen stays (#304)
+                        if (com.gl4a.utils.ProjectAccess.isRefused(error)) {
+                            android.widget.Toast.makeText(this, com.gl4a.utils.ProjectAccess
+                                    .refusedMessage(this, error), android.widget.Toast.LENGTH_LONG)
+                                    .show();
+                        } else {
+                            handleLoadFailure(error);
+                        }
+                    }));
         }
     }
 

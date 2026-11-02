@@ -180,14 +180,21 @@ public class RepositoryFragment extends LoadingFragmentBase implements
             mIsReadmeLoaded = savedInstanceState.getBoolean(STATE_KEY_IS_README_LOADED, false);
         }
 
-        if (mIsReadmeExpanded || mIsReadmeLoaded) {
+        // Only what GitLab lets the user's role see, as on GitLab web (#304): without code
+        // access, no README, languages, licence, last commit or file shortcuts
+        boolean code = com.gl4a.utils.ProjectAccess.canReadCode(mRepository);
+        if (code && (mIsReadmeExpanded || mIsReadmeLoaded)) {
             loadReadme(false);
         }
-        loadMergeRequestCount(false);
+        if (com.gl4a.utils.ProjectAccess.canSeeMergeRequests(mRepository)) {
+            loadMergeRequestCount(false);
+        }
         loadStarringState(false);
-        loadLanguages(false);
-        loadLicense(false);
-        loadBranchDetails(false);
+        if (code) {
+            loadLanguages(false);
+            loadLicense(false);
+            loadBranchDetails(false);
+        }
 
         updateReadmeVisibility();
     }
@@ -299,13 +306,22 @@ public class RepositoryFragment extends LoadingFragmentBase implements
                 .setVisibility(showOverviewRowDivider ? View.VISIBLE : View.GONE);
 
         OverviewRow issuesRow = mContentView.findViewById(R.id.issues_row);
-        issuesRow.setVisibility(mRepository.hasIssues() ? View.VISIBLE : View.GONE);
+        issuesRow.setVisibility(com.gl4a.utils.ProjectAccess.canSeeIssues(mRepository)
+                ? View.VISIBLE : View.GONE);
         issuesRow.setClickIntent(IssueListActivity.makeIntent(
                 getActivity(), owner, name, mRepository.id()));
+        // The count comes with the project: shown even when merge requests aren't (#304)
+        issuesRow.setText(getResources().getQuantityString(R.plurals.issue,
+                mRepository.openIssuesCount, mRepository.openIssuesCount));
 
         OverviewRow pullsRow = mContentView.findViewById(R.id.pulls_row);
+        pullsRow.setVisibility(com.gl4a.utils.ProjectAccess.canSeeMergeRequests(mRepository)
+                ? View.VISIBLE : View.GONE);
         pullsRow.setClickIntent(IssueListActivity.makeIntent(
                 getActivity(), owner, name, mRepository.id(), true));
+
+        mContentView.findViewById(R.id.readme_card).setVisibility(
+                com.gl4a.utils.ProjectAccess.canReadCode(mRepository) ? View.VISIBLE : View.GONE);
 
         OverviewRow forksRow = mContentView.findViewById(R.id.forks_row);
         forksRow.setText(getResources().getQuantityString(R.plurals.fork,
@@ -337,11 +353,14 @@ public class RepositoryFragment extends LoadingFragmentBase implements
 
         mReadmeTitleView.setOnClickListener(view -> toggleReadmeExpanded());
         mContentView.findViewById(R.id.tv_contributors_label).setOnClickListener(this::onOtherInfoLabelClick);
+        // Contributors come from the repository (#304)
+        mContentView.findViewById(R.id.tv_contributors_label).setVisibility(
+                com.gl4a.utils.ProjectAccess.canReadCode(mRepository) ? View.VISIBLE : View.GONE);
         mContentView.findViewById(R.id.tv_releases_label).setOnClickListener(this::onOtherInfoLabelClick);
 
         GitLabProject.GitLabProjectPermissions permissions = mRepository.permissions;
         updateClickableLabel(R.id.tv_collaborators_label, permissions != null && permissions.canPush());
-        updateClickableLabel(R.id.tv_wiki_label, mRepository.hasWiki());
+        updateClickableLabel(R.id.tv_wiki_label, com.gl4a.utils.ProjectAccess.canSeeWiki(mRepository));
         // GitLab does not expose a "discussions" flag on the project model
         updateClickableLabel(R.id.tv_discussions_label, false);
     }
@@ -523,7 +542,16 @@ public class RepositoryFragment extends LoadingFragmentBase implements
                     OverviewRow pullsRow = mContentView.findViewById(R.id.pulls_row);
                     pullsRow.setText(getResources().getQuantityString(
                             R.plurals.pull_request, count, count));
-                }, this::handleLoadFailure);
+                }, error -> {
+                    // Merge requests GitLab refuses for the role: no row, not an error (#304)
+                    if (com.gl4a.utils.ProjectAccess.isRefused(error)) {
+                        if (mContentView != null) {
+                            mContentView.findViewById(R.id.pulls_row).setVisibility(View.GONE);
+                        }
+                    } else {
+                        handleLoadFailure(error);
+                    }
+                });
     }
 
     // The licence name GitLab detected, for its shortcut (#271)

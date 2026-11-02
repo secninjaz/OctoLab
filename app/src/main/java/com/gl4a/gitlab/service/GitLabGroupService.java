@@ -5,6 +5,7 @@ import com.gl4a.gitlab.model.GitLabMember;
 import com.gl4a.gitlab.model.GitLabProject;
 
 import java.util.List;
+import java.util.Map;
 
 import io.reactivex.Single;
 import retrofit2.Response;
@@ -29,6 +30,22 @@ public interface GitLabGroupService {
     @GET("groups")
     Single<Response<List<GitLabGroup>>> listGroups(
             @Query("owned") boolean owned,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
+    /** Top-level groups by GitLab's scopes (all_available, owned, min_access_level) (#308). */
+    @GET("groups?top_level_only=true&order_by=name&sort=asc")
+    Single<Response<List<GitLabGroup>>> listGroupsWithParams(
+            @retrofit2.http.QueryMap Map<String, String> params,
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
+    /** Groups at any depth by GitLab's scopes, e.g. to search yours (#309). */
+    @GET("groups?order_by=name&sort=asc")
+    Single<Response<List<GitLabGroup>>> listGroupsAnyDepth(
+            @retrofit2.http.QueryMap Map<String, String> params,
             @Query("page") int page,
             @Query("per_page") int perPage
     );

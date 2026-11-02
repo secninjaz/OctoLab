@@ -205,7 +205,24 @@ public abstract class BaseActivity extends AppCompatActivity implements
 
     public void handleLoadFailure(Throwable e) {
         handleFailure("Loading data failed", e);
+        if (com.gl4a.utils.ProjectAccess.isRefused(e) && closesOnRefusal()) {
+            // As links that can't open: a short message, back where you were, the same
+            // everywhere (#308)
+            android.widget.Toast.makeText(this,
+                    com.gl4a.utils.ProjectAccess.refusedMessage(this, e),
+                    android.widget.Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
         setErrorViewVisibility(true, e);
+    }
+
+    /**
+     * Whether a screen GitLab refuses for the user's role, or says doesn't exist, closes with a
+     * message (#308). Screens that are themselves lists (home) keep the message in place.
+     */
+    protected boolean closesOnRefusal() {
+        return true;
     }
 
     public void handleActionFailure(String text, Throwable e) {
@@ -223,7 +240,9 @@ public abstract class BaseActivity extends AppCompatActivity implements
             return;
         }
 
-        boolean exceptionMustBeHandled = e instanceof ApiRequestException || e instanceof JsonDataException;
+        boolean exceptionMustBeHandled = e instanceof ApiRequestException || e instanceof JsonDataException
+                // Not found or refused for the role: a message, not a crash (#304, #307)
+                || com.gl4a.utils.ProjectAccess.isRefused(e);
         if (!exceptionMustBeHandled && e instanceof RuntimeException) {
             // If this happens, it means Rx catched a programming error of us. Crash the app
             // in that case, as that's what would have happened without Rx as well.
@@ -693,7 +712,12 @@ public abstract class BaseActivity extends AppCompatActivity implements
 
             ApiRequestException re = e instanceof ApiRequestException ? (ApiRequestException) e : null;
 
-            if (re != null && re.isRateLimited()) {
+            if (com.gl4a.utils.ProjectAccess.isRefused(e)) {
+                // Not an error to retry: GitLab doesn't allow this for the user's role, or
+                // there's nothing there for them (#304)
+                messageView.setText(com.gl4a.utils.ProjectAccess.refusedMessage(this, e));
+                retryButton.setVisibility(View.GONE);
+            } else if (re != null && re.isRateLimited()) {
                 // GitLab limits how many requests (e.g. searches) come in a short time (#294)
                 messageView.setText(R.string.load_failure_rate_limited);
                 retryButton.setVisibility(View.VISIBLE);

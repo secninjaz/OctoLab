@@ -242,8 +242,8 @@ public class RepositoryListContainerFragment extends Fragment implements
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
         getActivity().getMenuInflater().inflate(R.menu.repo_list_menu, menu);
 
-        // We can only properly search the 'all repos' list
-        if ("all".equals(mFilterType)) {
+        // We can only properly search the 'all repos' list (also the member one, #308)
+        if ("all".equals(mFilterType) || "member".equals(mFilterType)) {
             MenuItem searchItem = menu.findItem(R.id.search);
             searchItem.setOnActionExpandListener(this);
 
@@ -303,7 +303,7 @@ public class RepositoryListContainerFragment extends Fragment implements
     @Override
     public boolean onQueryTextSubmit(String query) {
         if (mSearchFragment != null) {
-            mSearchFragment.setQuery(query);
+            mSearchFragment.setQuery(query, mFilterType);
         }
         return false;
     }
@@ -336,24 +336,11 @@ public class RepositoryListContainerFragment extends Fragment implements
         return true;
     }
 
-    private static void setMenuItemChecked(MenuItem item, int selected, SparseArray<?> relevant) {
-        if (relevant.indexOfKey(item.getItemId()) >= 0) {
-            item.setChecked(item.getItemId() == selected);
-        }
-    }
-
+    /** Each section's choice shown alike: the shared panel style (#308). */
     private static void setMenuItemChecked(Menu menu, int selected, SparseArray<?> relevant) {
-        for (int i = 0; i < menu.size(); i++) {
-            MenuItem item = menu.getItem(i);
-            if (item.hasSubMenu()) {
-                SubMenu sm = item.getSubMenu();
-                for (int j = 0; j < sm.size(); j++) {
-                    setMenuItemChecked(sm.getItem(j), selected, relevant);
-                }
-            } else {
-                setMenuItemChecked(item, selected, relevant);
-            }
-        }
+        java.util.List<Integer> ids = new java.util.ArrayList<>();
+        for (int i = 0; i < relevant.size(); i++) ids.add(relevant.keyAt(i));
+        com.gl4a.utils.ChoiceMenus.mark(menu, ids, selected);
     }
 
     public static class FilterDrawerHelper {
@@ -362,6 +349,7 @@ public class RepositoryListContainerFragment extends Fragment implements
         private static final SparseArray<String> FILTER_LOOKUP = new SparseArray<>();
         static {
             FILTER_LOOKUP.put(R.id.filter_type_all, "all");
+            FILTER_LOOKUP.put(R.id.filter_type_internal, "internal"); // #308
             FILTER_LOOKUP.put(R.id.filter_type_owner, "owner");
             FILTER_LOOKUP.put(R.id.filter_type_member, "member");
             FILTER_LOOKUP.put(R.id.filter_type_public, "public");
@@ -443,7 +431,7 @@ public class RepositoryListContainerFragment extends Fragment implements
                 if (value[0].equals(order) && value[1].equals(direction)) {
                     selectedId = SORT_LOOKUP.keyAt(i);
                     if (updateSingleItem) {
-                        menu.findItem(selectedId).setChecked(true);
+                        setMenuItemChecked(menu, selectedId, SORT_LOOKUP);
                         return;
                     }
                     break;

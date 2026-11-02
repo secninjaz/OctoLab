@@ -29,6 +29,12 @@ public class RepositorySearchFragment extends PagedDataBaseFragment<GitLabProjec
         return f;
     }
 
+    /** Searched within your projects of this filter (#309). */
+    public void setQuery(String query, String filterType) {
+        getArguments().putString("filter_type", filterType);
+        setQuery(query);
+    }
+
     public void setQuery(String query) {
         getArguments().putString("query", query);
         if (isAdded()) {
@@ -43,6 +49,23 @@ public class RepositorySearchFragment extends PagedDataBaseFragment<GitLabProjec
 
         if (TextUtils.isEmpty(query)) {
             return Single.just(Response.success(new ApiHelpers.DummyPage<>()));
+        }
+
+        if (com.gl4a.utils.ApiHelpers.loginEquals(login,
+                com.gl4a.Gl4Application.get().getAuthLogin())) {
+            // Your own projects: within them, by the current filter, with GitLab's project list
+            // (not the site-wide, rate-limited search; everyone else's are in Search, #309)
+            java.util.Map<String, String> params =
+                    RepositoryListFragment.scopeParams(getArguments().getString("filter_type"));
+            params.put("search", query);
+            params.put("order_by", "last_activity_at");
+            return ServiceFactory.get(com.gl4a.gitlab.service.GitLabProjectService.class,
+                            bypassCache)
+                    .listProjectsWithParams(params, page, 25)
+                    .map(response -> response.isSuccessful() && response.body() != null
+                            ? ApiHelpers.toPage(response)
+                            : new ApiHelpers.DummyPage<GitLabProject>())
+                    .map(pageResult -> Response.<GitLabPage<GitLabProject>>success(pageResult));
         }
 
         GitLabSearchService service = ServiceFactory.get(GitLabSearchService.class, bypassCache);

@@ -35,8 +35,8 @@ android {
     defaultConfig {
         minSdkVersion 23
         targetSdkVersion 33
-        versionCode 222
-        versionName "1.5.2"
+        versionCode 223
+        versionName "1.5.3"
         applicationId "com.secninjaz.octolab"
         resourceConfigurations += ['en']
 
@@ -54,11 +54,19 @@ android {
         community {
             dimension "distribution"
         }
-        // Internal builds — GitLab CI. Adds dev.taskmiles.com intent filter via
-        // src/internal/AndroidManifest.xml so deep links work during development.
+        // Internal builds — GitLab CI. Adds the internal instance's link filter via
+        // src/internal/AndroidManifest.xml. The host is the GitLab instance running the CI
+        // pipeline (GitLab's own CI_SERVER_HOST), or -PinternalGitlabHost=… / INTERNAL_GITLAB_HOST
+        // to override, so it isn't in the repository (#305); elsewhere, a placeholder that
+        // matches no real site.
         internal {
             dimension "distribution"
             applicationIdSuffix ".internal"
+            manifestPlaceholders = [internalGitlabHost:
+                    (project.findProperty("internalGitlabHost")
+                            ?: System.getenv("INTERNAL_GITLAB_HOST")
+                            ?: System.getenv("CI_SERVER_HOST")
+                            ?: "internal-gitlab.invalid")]
         }
     }
 

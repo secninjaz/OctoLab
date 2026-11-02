@@ -479,6 +479,12 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         super.onStop();
     }
 
+    /** Screens here are lists: GitLab refusing one says so in place, never closes it (#304). */
+    @Override
+    protected boolean closesOnRefusal() {
+        return false;
+    }
+
     /** GitLab's count of pending to-dos; -1 if not known (yet). */
     int getTodoCount() {
         return mTodoCount;
@@ -729,6 +735,8 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
 
     public void invalidateTitle() {
         getSupportActionBar().setTitle(mFactory.getTitleResId());
+        // e.g. the current filter of Projects or Groups (#308)
+        getSupportActionBar().setSubtitle(mFactory.getSubtitle());
     }
 
     private int determineInitialPage() {

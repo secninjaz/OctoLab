@@ -66,14 +66,32 @@ public class RepositoryFactory extends FragmentFactory {
         }
     }
 
+    /** The current filter, under the title (#308). */
+    @Override
+    protected CharSequence getSubtitle() {
+        String type = mFragment != null ? mFragment.getFilterType() : null;
+        if (type == null || "all".equals(type)) type = "member";
+        switch (type) {
+            case "owner": return mActivity.getString(R.string.repo_type_owner);
+            case "public": return mActivity.getString(R.string.repo_type_public);
+            case "internal": return mActivity.getString(R.string.repo_type_internal);
+            case "private": return mActivity.getString(R.string.repo_type_private);
+            case "sources": return mActivity.getString(R.string.repo_type_sources);
+            case "forks": return mActivity.getString(R.string.repo_type_forks);
+            case "starred": return mActivity.getString(R.string.repo_type_starred);
+            default: return mActivity.getString(R.string.repo_type_member);
+        }
+    }
+
     @Override
     protected boolean onDrawerItemSelected(MenuItem item) {
         String type = mFilterDrawerHelper.handleSelectionAndGetFilterType(item);
         if (type != null) {
             mFragment.setFilterType(type);
             mSortDrawerHelper.setFilterType(type);
-            mPrefs.edit().putString(PREF_KEY_FILTER, type).apply();
+            mPrefs.edit().putString(filterKey(), type).apply();
             mActivity.doInvalidateOptionsMenuAndToolDrawer();
+            mActivity.invalidateTitle();
             return true;
         }
         String[] sortOrderAndDirection = mSortDrawerHelper.handleSelectionAndGetSortOrder(item);
@@ -135,8 +153,13 @@ public class RepositoryFactory extends FragmentFactory {
         }
     }
 
+    private String filterKey() {
+        return PREF_KEY_FILTER + "_" + mUserLogin;
+    }
+
     private void restorePreviouslySelectedFilterAndSort() {
-        String lastType = mPrefs.getString(PREF_KEY_FILTER, null);
+        // Per account, "Member" until changed, on every server (#308)
+        String lastType = mPrefs.getString(filterKey(), "member");
         String lastOrder = mPrefs.getString(PREF_KEY_SORT_ORDER, null);
         String lastDir = mPrefs.getString(PREF_KEY_SORT_DIR, null);
         if (lastType != null) {
@@ -147,5 +170,6 @@ public class RepositoryFactory extends FragmentFactory {
             mFragment.setSortOrder(lastOrder, lastDir);
         }
         mActivity.doInvalidateOptionsMenuAndToolDrawer();
+        mActivity.invalidateTitle();
     }
 }

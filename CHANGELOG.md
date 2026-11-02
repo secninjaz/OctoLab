@@ -5,10 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [1.5.2] - 2026-10-28
+## [1.5.3] - 2026-11-02
 
 ### Added
-- "Open GitLab links in OctoLab": on Android 12+, a one-time prompt and a Settings entry take you straight to Android's "Open by default" page, so links to your GitLab sites open in the app (#303)
+- "Open GitLab links in OctoLab": on Android 12+, a one-time prompt and a Settings entry take you straight to Android's "Open by default" page (#303)
+- Search on Projects and Groups searches within your list; Groups gets the same toolbar as Projects (#309)
+- Groups has sort and filter in the side panel like Projects: "Yours and your projects'" or "Owner" (#308)
+
+### Changed
+- Projects lists only your projects, with filters that work (Member, Owner, Public, Internal, Private, Sources, Forks), remembered per account; everyone else's are in Explore (#308)
+- Groups shows the groups you're in plus your projects' groups, loads faster and is kept while the app is open (#308)
+- The side panel shows both the sort and the filter choice; the current filter shows under the title (#308)
+- A project shows only what your role allows, as on GitLab web, e.g. no code or merge requests for Guests on private projects (#304)
+- Something GitLab refuses or says doesn't exist shows a short message and you stay where you were, also for links from other apps (#304, #308)
+
+### Fixed
+- A project failed to open for roles without access to its merge requests or code (#304)
+- Links to a subgroup showed "project not found" (#306)
+- Opening a path that is neither a user nor a group crashed the app (#307)
+- File links you can't open went to the browser (#304)
+- Searching Projects searched the whole server (#309)
+- The Collaborators link never showed (#304)
 
 ## [1.5.1] - 2026-10-23
 
