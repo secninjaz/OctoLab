@@ -137,6 +137,7 @@
     <string name="download_now_button">Download now</string>
     <string name="download_wifi_button">Download over Wi-Fi</string>
     <string name="download_permission_rationale">Permission to write to USB storage or SD card is required in order to download files.</string>
+    <string name="load_auth_failure_notice_account">The token for %1$s on %2$s isn\'t valid anymore. Log in again to replace it.</string>
     <string name="load_auth_failure_notice">Your authentication credentials aren\'t valid anymore, please log in again.</string>
     <string name="unset">Unset</string>
     <string name="copyright_notice">\u00a9 2026 SECNINJAZ TECHNOLOGIES</string>

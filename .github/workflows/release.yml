@@ -85,6 +85,8 @@ jobs:
           fi
 
           [ -z "$CHANGELOG" ] && CHANGELOG="See CHANGELOG.md for details."
+          # The one Obtainium link form, as everywhere (#310)
+          OBTAINIUM_LINK=$(python3 scripts/obtainium_link.py public)
           # Write to a file — avoids backtick/glob interpretation when passing inline to gh
           printf '%s\n' \
             "## OctoLab ${VERSION}" \
@@ -94,7 +96,7 @@ jobs:
             "${CHANGELOG}" \
             "" \
             "### Install" \
-            "Download \`OctoLab-${VERSION}-release.apk\` below, or use [Obtainium](https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/secninjaz/OctoLab) for automatic updates." \
+            "Download \`OctoLab-${VERSION}-release.apk\` below, or use [Obtainium](${OBTAINIUM_LINK}) for automatic updates." \
             "" \
             "> Requires Android 6.0 (API 23) or higher" \
             "" \

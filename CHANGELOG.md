@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.4] - 2026-11-03
+
+### Fixed
+- The "Get it on Obtainium" link in the README and the release notes showed "Invalid URL" (#310)
+- With an expired token, "Log in" returned to the same screen and message; it now asks for a new token for that account and replaces it, keeping the account and its settings (#311)
+
 ## [1.5.3] - 2026-11-02
 
 ### Added

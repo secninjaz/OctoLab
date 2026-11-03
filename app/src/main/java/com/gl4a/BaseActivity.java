@@ -233,8 +233,20 @@ public abstract class BaseActivity extends AppCompatActivity implements
         ApiRequestException are = e instanceof ApiRequestException ? (ApiRequestException) e : null;
         boolean isAuthError = are != null && are.getStatus() == HttpURLConnection.HTTP_UNAUTHORIZED;
         if (isAuthError) {
-            Snackbar.make(mCoordinatorLayout, R.string.load_auth_failure_notice, Snackbar.LENGTH_INDEFINITE)
-                    .setAction(R.string.login, v -> goToToplevelActivity())
+            // Names the account, and "Log in" asks for a new token for it: going back to the
+            // start only showed the same screen and message again (#311)
+            String login = Gl4Application.get().getAuthLogin();
+            Snackbar.make(mCoordinatorLayout, login != null
+                            ? getString(R.string.load_auth_failure_notice_account,
+                                    com.gl4a.utils.ApiHelpers.formatUsername(login),
+                                    android.net.Uri.parse(Gl4Application.get().getInstanceUrl())
+                                            .getHost())
+                            : getString(R.string.load_auth_failure_notice),
+                    Snackbar.LENGTH_INDEFINITE)
+                    .setAction(R.string.login, v -> startActivity(
+                            login != null
+                                    ? com.gl4a.activities.home.HomeActivity.makeReloginIntent(this)
+                                    : getToplevelActivityIntent()))
                     .show();
             Log.d(Gl4Application.LOG_TAG, text, e);
             return;

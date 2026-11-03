@@ -55,6 +55,26 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
     /** From a to-do's notification (#178): marked done when opened, as in the To-dos list. */
     public static final String EXTRA_TODO_ID = "todo_id";
 
+    private static final String EXTRA_RELOGIN = "relogin";
+
+    /**
+     * The active account's token was refused: the login, for that account's server, so a new
+     * token replaces the old one (the same user keeps their account and settings) (#311).
+     */
+    public static Intent makeReloginIntent(Context context) {
+        return new Intent(context, HomeActivity.class)
+                .putExtra(EXTRA_RELOGIN, true)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+    }
+
+    private void handleRelogin(@Nullable Intent intent) {
+        if (intent == null || !intent.getBooleanExtra(EXTRA_RELOGIN, false)) return;
+        intent.removeExtra(EXTRA_RELOGIN);
+        if (getSupportFragmentManager().findFragmentByTag("loginmode") == null) {
+            LoginModeChooserFragment.newInstance().show(getSupportFragmentManager(), "loginmode");
+        }
+    }
+
     public static Intent makeIntent(Context context, @IdRes int initialPageId) {
         String initialPage = START_PAGE_MAPPING.get(initialPageId);
         Intent intent = new Intent(context, HomeActivity.class);
@@ -133,6 +153,7 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         super.onNewIntent(intent);
         setIntent(intent);
         handleNotificationAccountSwitch(intent);
+        handleRelogin(intent);
     }
 
     private void handleNotificationAccountSwitch(android.content.Intent intent) {
@@ -219,6 +240,7 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         // Opened from a to-do's notification: go to its target (#178)
         if (savedInstanceState == null && getIntent() != null) {
             openTodoTarget(getIntent());
+            handleRelogin(getIntent());
         }
 
         // Request POST_NOTIFICATIONS permission on first launch (Android 13+).

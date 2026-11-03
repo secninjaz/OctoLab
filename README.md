@@ -65,7 +65,7 @@ No tracking, no analytics, no proprietary services.
 OctoLab is available in the main [F-Droid](https://f-droid.org/packages/com.secninjaz.octolab/) repository. F-Droid builds it from source and checks that the build matches our release (a reproducible build), then ships our signed APK. Updates arrive through the F-Droid client, usually a few days after a release.
 
 ### Obtainium
-[<img src="https://raw.githubusercontent.com/deckerst/common/main/assets/obtainium-badge-english.png" alt="Get it on Obtainium" height="75">](https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/secninjaz/OctoLab)
+[<img src="https://raw.githubusercontent.com/deckerst/common/main/assets/obtainium-badge-english.png" alt="Get it on Obtainium" height="75">](https://apps.obtainium.imranr.dev/redirect?r=obtainium%3A%2F%2Fadd%2Fhttps%3A%2F%2Fgithub.com%2Fsecninjaz%2FOctoLab)
 
 Fetches APKs directly from GitHub Releases and keeps the app updated automatically, as soon as a release is published.
 
