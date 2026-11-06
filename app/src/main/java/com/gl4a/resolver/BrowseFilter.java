@@ -90,7 +90,7 @@ public class BrowseFilter extends AppCompatActivity {
                 String login = logins[position];
                 Gl4Application app = Gl4Application.get();
                 CharSequence label = com.gl4a.utils.ApiHelpers.formatAccountLabel(
-                        app.getNameForLogin(login), login);
+                        app.getNameForLogin(login), com.gl4a.utils.Accounts.of(login).label());
                 android.text.SpannableStringBuilder bold =
                         new android.text.SpannableStringBuilder(label);
                 int nameEnd = label.toString().indexOf('\n');

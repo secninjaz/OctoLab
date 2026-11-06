@@ -60,6 +60,11 @@ public interface GitLabGraphQLService {
     Single<Response<GitLabDescriptionHtmlResponse>> getDescriptionHtml(
             @Body Map<String, Object> body);
 
+    /** What REST leaves out of an epic: labels' colours, assignees, parent, counts (#312). */
+    @POST("graphql")
+    Single<Response<com.gl4a.gitlab.model.GitLabEpicDetailsResponse>> getEpicDetails(
+            @Body Map<String, Object> body);
+
     @POST("graphql")
     Single<Response<GitLabDescriptionEditResponse>> getDescriptionEdit(
             @Body Map<String, Object> body);

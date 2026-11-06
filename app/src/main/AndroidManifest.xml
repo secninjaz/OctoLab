@@ -61,9 +61,11 @@
                 <category
                     android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- gitlab.com's answer to "Sign in with gitlab.com": <application id>://oauth, one
+                 address per variant, each registered on gitlab.com (#70) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
-                <data android:scheme="gl4a" android:host="oauth" />
+                <data android:scheme="${applicationId}" android:host="oauth" />
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
             </intent-filter>
@@ -105,6 +107,11 @@
             android:theme="@style/BottomSheetTheme"
             android:windowSoftInputMode="stateHidden" />
         <activity
+            android:name=".activities.EditEpicCommentActivity"
+            android:exported="false"
+            android:theme="@style/BottomSheetTheme"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
             android:name=".activities.EditPullRequestCommentActivity"
             android:exported="false"
             android:theme="@style/BottomSheetTheme"
@@ -134,6 +141,8 @@
         <activity android:name=".activities.GistViewerActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize" />
+        <activity android:name=".activities.EpicActivity" android:exported="false" />
+        <activity android:name=".activities.EpicListActivity" android:exported="false" />
         <activity android:name=".activities.IssueActivity" android:exported="false" />
         <activity android:name=".activities.IssueEditActivity" android:exported="false" />
         <activity android:name=".activities.IssueLabelListActivity" android:exported="false" />

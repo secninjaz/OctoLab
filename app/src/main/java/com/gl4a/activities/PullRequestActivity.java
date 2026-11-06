@@ -166,7 +166,7 @@ public static Intent makeIntent(Context context, String repoOwner, String repoNa
         boolean authorized = app.isAuthorized();
 
         boolean isCreator = mMergeRequest != null
-                && ApiHelpers.loginEquals(mMergeRequest.user(), app.getAuthLogin());
+                && com.gl4a.utils.Accounts.isMe(mMergeRequest.user());
         boolean isClosed = mMergeRequest != null
                 && ("closed".equals(mMergeRequest.state()) || "merged".equals(mMergeRequest.state()));
         boolean isMerged = mMergeRequest != null && mMergeRequest.isMerged();

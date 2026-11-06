@@ -214,7 +214,7 @@ public class NotificationAdapter extends
         holder.tvTimestamp.setText(StringUtils.formatRelativeTime(mContext,
                 todo.createdAt, true));
 
-        int iconResId = com.gl4a.utils.FeedTypeIcons.forTarget(todo.type());
+        int iconResId = com.gl4a.utils.FeedTypeIcons.forTodo(todo);
         if (iconResId > 0) {
             holder.ivIcon.setImageResource(iconResId);
             holder.ivIcon.setVisibility(View.VISIBLE);
@@ -286,13 +286,13 @@ public class NotificationAdapter extends
 
     /** "Issue #243", "MR #12", or a commit's short SHA, as the action line names the target. */
     private static String referenceText(GitLabTodo todo) {
-        String typeLabel = typeLabel(todo.targetType);
+        String typeLabel = todo.isEpic() ? "Epic" : typeLabel(todo.targetType);
         if (todo.isCommit() && todo.commitSha != null) {
             return typeLabel + " " + todo.commitSha.substring(0, Math.min(8,
                     todo.commitSha.length()));
         }
         return typeLabel.isEmpty() || todo.target == null || todo.target.iid <= 0 ? ""
-                : typeLabel + " #" + todo.target.iid;
+                : typeLabel + " " + todo.reference();
     }
 
     private static String typeLabel(String targetType) {
@@ -317,9 +317,12 @@ public class NotificationAdapter extends
         else if ("MergeRequest".equals(targetType)) typeLabel = "MR";
         else if ("Commit".equals(targetType)) typeLabel = "Commit";
         else if ("Epic".equals(targetType)) typeLabel = "Epic";
+        // An epic as a group's work item reads as one too (#312)
+        if (todo.isEpic()) typeLabel = "Epic";
 
+        // As GitLab writes it: "#12", "!3", "&5" (#312)
         String iidPart = (todo.target != null && todo.target.iid > 0)
-                ? " #" + todo.target.iid : "";
+                ? " " + todo.reference() : "";
         if (todo.isCommit() && todo.commitSha != null) {
             iidPart = " " + todo.commitSha.substring(0, Math.min(8, todo.commitSha.length()));
         }

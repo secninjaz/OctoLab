@@ -49,7 +49,7 @@ public class CommitAdapter extends RootAdapter<GitLabCommit, CommitAdapter.ViewH
 
     @Override
     public void onBindViewHolder(ViewHolder holder, GitLabCommit commit) {
-        AvatarHandler.assignAvatar(holder.ivGravatar, commit.author());
+        AvatarHandler.assignCommitAuthorAvatar(holder.ivGravatar, commit);
         holder.ivGravatar.setTag(commit);
 
         String message = commit.commit().message();

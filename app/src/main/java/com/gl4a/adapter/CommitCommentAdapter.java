@@ -233,7 +233,7 @@ public class CommitCommentAdapter extends RootAdapter<GitLabComment, RecyclerVie
         // A details-cache entry is newer (set after add/remove), so it overrides the loaded state.
         holder.reactions.refreshViewerStateFromCache();
 
-        String ourLogin = Gl4Application.get().getAuthLogin();
+        String ourLogin = com.gl4a.utils.Accounts.myUsername();
         MenuItem editMenuItem = holder.mPopupMenu.getMenu().findItem(R.id.edit);
         MenuItem deleteMenuItem = holder.mPopupMenu.getMenu().findItem(R.id.delete);
         MenuItem reactMenuItem = holder.mPopupMenu.getMenu().findItem(R.id.react);

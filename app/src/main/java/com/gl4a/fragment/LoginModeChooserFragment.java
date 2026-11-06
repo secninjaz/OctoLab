@@ -38,7 +38,8 @@ public class LoginModeChooserFragment extends DialogFragment implements
         RadioGroup.OnCheckedChangeListener, View.OnClickListener {
 
     public interface ParentCallback {
-        void onLoginStartOauth();
+        /** Signing in with OAuth on {@code instanceUrl}, one OctoLab is registered on (#70). */
+        void onLoginStartOauth(String instanceUrl);
         void onLoginFinished(String token, GitLabUser user);
         void onLoginFailed(Throwable error);
         void onLoginCanceled();
@@ -112,6 +113,7 @@ public class LoginModeChooserFragment extends DialogFragment implements
             public void afterTextChanged(Editable s) {
                 super.afterTextChanged(s);
                 updateCreateTokenLink();
+                updateOauthAvailability();
             }
         };
         mCreateTokenLink = view.findViewById(R.id.create_token_link);
@@ -128,6 +130,7 @@ public class LoginModeChooserFragment extends DialogFragment implements
         updateCreateTokenLink();
 
         mModeGroup.check(R.id.token_button);
+        updateOauthAvailability();
 
         return new AlertDialog.Builder(getActivity())
                 .setView(view)
@@ -159,8 +162,33 @@ public class LoginModeChooserFragment extends DialogFragment implements
         mCallback.onLoginCanceled();
     }
 
+    /**
+     * Signing in with OAuth is offered where OctoLab is registered: gitlab.com, and in
+     * internal builds the internal instance (#70); other servers keep token login.
+     */
+    private void updateOauthAvailability() {
+        if (mModeGroup == null) return;
+        android.widget.RadioButton oauth = mModeGroup.findViewById(R.id.oauth_button);
+        String typed = mInstanceUrl != null ? mInstanceUrl.getText() : null;
+        boolean available = com.gl4a.utils.OAuthLogin.isAvailableFor(typed);
+        oauth.setEnabled(available);
+        String host = com.gl4a.utils.OAuthLogin.hostOf(typed);
+        oauth.setText(available ? getString(R.string.login_oauth, host)
+                : getString(R.string.login_oauth_unavailable));
+        if (!available && oauth.isChecked()) {
+            mModeGroup.check(R.id.token_button);
+        }
+    }
+
     @Override
     public void onClick(View v) {
+        if (mModeGroup.getCheckedRadioButtonId() == R.id.oauth_button) {
+            // gitlab.com is named at sign-in; the server setting isn't changed meanwhile (#70)
+            updateContainerVisibility(true);
+            mCallback.onLoginStartOauth(enteredInstanceUrl());
+            dismissAllowingStateLoss();
+            return;
+        }
         // Save instance URL — if the field is cleared, reset to the default (gitlab.com).
         // Remember the current one: the global instance URL is also what the active account's
         // requests use, so it must go back if this login fails (#168).
@@ -179,14 +207,9 @@ public class LoginModeChooserFragment extends DialogFragment implements
             }
         }
         updateContainerVisibility(true);
-        if (mModeGroup.getCheckedRadioButtonId() == R.id.oauth_button) {
-            mCallback.onLoginStartOauth();
-            dismissAllowingStateLoss();
-        } else {
-            // Deferred so a malformed instance URL (Retrofit rejects the base URL) is reported
-            // like any other login error instead of crashing (#168).
-            handleTokenCheck(Single.defer(() -> makeTokenCheckSingle(mToken.getText())));
-        }
+        // Deferred so a malformed instance URL (Retrofit rejects the base URL) is reported
+        // like any other login error instead of crashing (#168).
+        handleTokenCheck(Single.defer(() -> makeTokenCheckSingle(mToken.getText())));
     }
 
     private void handleTokenCheck(Single<Pair<String, GitLabUser>> checkSingle) {

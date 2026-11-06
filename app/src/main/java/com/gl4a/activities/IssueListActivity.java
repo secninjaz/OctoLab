@@ -159,7 +159,7 @@ public class IssueListActivity extends BaseFragmentPagerActivity implements
         }
 
         super.onCreate(savedInstanceState);
-        mUserLogin = Gl4Application.get().getAuthLogin();
+        mUserLogin = com.gl4a.utils.Accounts.myUsername();
 
         if (!mIsPullRequest && Gl4Application.get().isAuthorized()) {
             CoordinatorLayout rootLayout = getRootLayout();

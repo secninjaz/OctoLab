@@ -97,10 +97,24 @@ public class AvatarHandler {
     private static final LongSparseArray<Request> sRequests = new LongSparseArray<>();
     private static int sMaxImageSizePx = -1;
 
-    // Resolved GitLab users keyed by commit author email — populated by fetchUserAvatarByEmail
-    // so avatar clicks can open the correct profile without re-fetching.
-    private static final java.util.Map<String, GitLabUser> sEmailUserCache =
-            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * A commit's author: the account GitLab links the commit to (#244), else the git author by
+     * email. The one way to show a commit's author: lists, the About tab, a commit (#319).
+     */
+    public static void assignCommitAuthorAvatar(ImageView view,
+            com.gl4a.gitlab.model.GitLabCommit commit) {
+        if (commit.authorUser != null) {
+            assignAvatar(view, commit.authorUser);
+        } else {
+            assignGitAuthorAvatar(view, commit.authorName, commit.authorEmail);
+        }
+    }
+
+    /** Remembers the account GitLab linked an email's commit to, for every git author (#319). */
+    public static void rememberGitAuthor(@Nullable String email, @Nullable GitLabUser user) {
+        GitAuthorLinks.put(email, user);
+    }
 
     /** Returns the resolved GitLabUser for a commit author email, or null if not yet loaded. */
     /**
@@ -108,6 +122,12 @@ public class AvatarHandler {
      * email, else Gravatar, else initials. The one way to show a git author (#239).
      */
     public static void assignGitAuthorAvatar(ImageView view, String name, String email) {
+        // The account GitLab linked this email to, once any commit of it was linked (#319)
+        GitLabUser linked = getCachedUserForEmail(email);
+        if (linked != null) {
+            assignAvatar(view, linked);
+            return;
+        }
         GitLabUser author = new GitLabUser();
         author.name = name;
         author.username = email;
@@ -135,10 +155,7 @@ public class AvatarHandler {
                 .subscribeOn(io.reactivex.schedulers.Schedulers.io())
                 .observeOn(io.reactivex.android.schedulers.AndroidSchedulers.mainThread())
                 .subscribe(found -> {
-                    if (email != null) {
-                        sEmailUserCache.put(email.toLowerCase(java.util.Locale.ROOT).trim(),
-                                found);
-                    }
+                    GitAuthorLinks.put(email, found);
                     openProfile(context, found);
                 }, error -> android.widget.Toast.makeText(context,
                         com.gl4a.R.string.git_author_no_account,
@@ -163,25 +180,25 @@ public class AvatarHandler {
     }
 
     /** Blocking. Throws if GitLab links the author to no account the viewer can see. */
-    private static GitLabUser resolveGitAuthor(String email, @Nullable String projectPath,
+    static GitLabUser resolveGitAuthor(String email, @Nullable String projectPath,
             long projectId, @Nullable String sha) throws Exception {
         com.gl4a.gitlab.service.GitLabUserService users = com.gl4a.ServiceFactory.get(
                 com.gl4a.gitlab.service.GitLabUserService.class, false);
         String username = null;
         if (projectPath == null && projectId > 0) {
             // The project's real path from GitLab, as GraphQL needs it
-            com.gl4a.gitlab.model.GitLabProject project = com.gl4a.ServiceFactory
+            com.gl4a.gitlab.model.GitLabProject project = bodyOf(com.gl4a.ServiceFactory
                     .get(com.gl4a.gitlab.service.GitLabProjectService.class, false)
-                    .getProject(projectId).blockingGet().body();
+                    .getProject(projectId).blockingGet());
             if (project != null) projectPath = project.pathWithNamespace;
         }
         // 1. GitLab's own link from the commit to an account, as on GitLab web
         if (projectPath != null) {
             String commit = sha;
             if (commit == null && email != null) {
-                java.util.List<com.gl4a.gitlab.model.GitLabCommit> commits = users
+                java.util.List<com.gl4a.gitlab.model.GitLabCommit> commits = bodyOf(users
                         .getCommitsByAuthor(android.net.Uri.encode(projectPath), email, 1)
-                        .blockingGet().body();
+                        .blockingGet());
                 if (commits != null && !commits.isEmpty()) commit = commits.get(0).id;
             }
             if (commit != null) {
@@ -192,30 +209,58 @@ public class AvatarHandler {
                 body.put("query", "query($path: ID!, $ref: String!) { project(fullPath: $path)"
                         + " { repository { commit(ref: $ref) { author { username } } } } }");
                 body.put("variables", variables);
-                com.gl4a.gitlab.model.GitLabCommitAuthorResponse response = com.gl4a.ServiceFactory
+                com.gl4a.gitlab.model.GitLabCommitAuthorResponse response = bodyOf(com.gl4a.ServiceFactory
                         .getGraphQL(com.gl4a.gitlab.service.GitLabGraphQLService.class)
-                        .getCommitAuthor(body).blockingGet().body();
+                        .getCommitAuthor(body).blockingGet());
                 if (response != null) username = response.username();
             }
         }
         // 2. The email itself (public emails only, unless the viewer is an admin)
         if (username == null && email != null) {
-            java.util.List<GitLabUser> found = users.searchUsersByTerm(email, 1)
-                    .blockingGet().body();
+            java.util.List<GitLabUser> found = bodyOf(users.searchUsersByTerm(email, 1)
+                    .blockingGet());
             if (found != null && !found.isEmpty()) return found.get(0);
         }
         if (username == null) throw new IllegalStateException("No account for " + email);
         // 3. The account itself, by username
-        java.util.List<GitLabUser> byName = users.searchUsers(username, 1, 1).blockingGet().body();
+        java.util.List<GitLabUser> byName = bodyOf(users.searchUsers(username, 1, 1).blockingGet());
         if (byName == null || byName.isEmpty()) {
             throw new IllegalStateException("No account " + username);
         }
         return byName.get(0);
     }
 
+    /** GitLab said too many requests: lookups wait rather than add to it (#322). */
+    public static class RateLimitedException extends RuntimeException {
+        /** How long GitLab asks to wait, in milliseconds. */
+        public final long retryAfterMs;
+
+        RateLimitedException(long retryAfterMs) {
+            super("GitLab's limit on requests was reached");
+            this.retryAfterMs = retryAfterMs;
+        }
+    }
+
+    /** GitLab's Retry-After on a 429, in milliseconds; a minute when it gives none (#322). */
+    static long retryAfterMs(retrofit2.Response<?> response) {
+        String header = response.headers().get("Retry-After");
+        try {
+            if (header != null) return Math.max(1, Long.parseLong(header.trim())) * 1000L;
+        } catch (NumberFormatException ignored) {
+        }
+        return 60 * 1000L;
+    }
+
+    /** A response's body; throws {@link RateLimitedException} on 429 (#322). */
+    static <T> T bodyOf(retrofit2.Response<T> response) {
+        if (response.code() == 429) throw new RateLimitedException(retryAfterMs(response));
+        return response.body();
+    }
+
     public static GitLabUser getCachedUserForEmail(String email) {
         if (email == null || email.isEmpty()) return null;
-        return sEmailUserCache.get(email.toLowerCase(java.util.Locale.ROOT).trim());
+        // Kept per account until it's logged out (#322)
+        return GitAuthorLinks.get(email);
     }
 
     private static final int MSG_LOAD       = 1;
@@ -332,11 +377,17 @@ public class AvatarHandler {
         // Persist the avatar URL and display name so both are available when this account
         // is shown as an inactive MenuItem in the drawer (which has no GitLabUser object).
         String avatarUrl = user.avatarUrl();
-        if (user.login() != null && avatarUrl != null) {
-            com.gl4a.Gl4Application.get().updateStoredAvatarUrl(user.login(), avatarUrl);
-        }
-        if (user.login() != null && user.name() != null) {
-            com.gl4a.Gl4Application.get().updateStoredName(user.login(), user.name());
+        // Only the active account's own user, kept under the account's key: any user shown
+        // was kept under their username, so a namesake on another server overwrote an
+        // account's picture and name (#318)
+        Accounts.Account me = Accounts.active();
+        if (Accounts.isAccount(me, user)) {
+            if (avatarUrl != null) {
+                com.gl4a.Gl4Application.get().updateStoredAvatarUrl(me.key, avatarUrl);
+            }
+            if (user.name() != null) {
+                com.gl4a.Gl4Application.get().updateStoredName(me.key, user.name());
+            }
         }
         // Pass email so we can fall back to Gravatar if the instance avatar fails.
         assignAvatarInternal(new ImageViewDelegate(view), user.login(), user.id(),
@@ -495,7 +546,7 @@ public class AvatarHandler {
         if (project.namespace != null && "group".equals(project.namespace.kind)
                 && project.namespace.avatarUrl != null && !project.namespace.avatarUrl.isEmpty()
                 && project.namespace.id > 0) {
-            return apiBase + "groups/" + project.namespace.id + "/avatar";
+            return groupAvatarUrl(apiBase, project.namespace.id);
         }
         return null;
     }
@@ -524,12 +575,21 @@ public class AvatarHandler {
      */
     public static void assignGroupLogo(ImageView view, com.gl4a.gitlab.model.GitLabGroup group) {
         if (group.avatarUrl != null && !group.avatarUrl.isEmpty() && group.id > 0) {
-            String groupAvatarUrl = com.gl4a.Gl4Application.get().getApiBaseUrl()
-                    + "groups/" + group.id + "/avatar";
+            String groupAvatarUrl = groupAvatarUrl(
+                    com.gl4a.Gl4Application.get().getApiBaseUrl(), group.id);
             assignAvatarLogo(view, group.name, groupLogoKey(group.id), groupAvatarUrl);
         } else {
             view.setImageDrawable(new DefaultAvatarDrawable(group.name, null, true));
         }
+    }
+
+    /**
+     * THE address of a group's logo: the API's avatar endpoint, which the app's token may read.
+     * GitLab refuses a group's /uploads/ address without a browser session, so that one showed
+     * the letter instead (#313).
+     */
+    private static String groupAvatarUrl(String apiBase, long groupId) {
+        return apiBase + "groups/" + groupId + "/avatar";
     }
 
     /** Async GET /projects/:id + ancestor walk for {@link #assignProjectLogo}; cached per project. */
@@ -898,11 +958,16 @@ public class AvatarHandler {
             org.json.JSONObject ns = project.optJSONObject("namespace");
             if (ns == null) return null;
 
+            boolean isGroup = "group".equals(ns.optString("kind", ""));
             avatarUrl = jsonAvatarUrl(ns);
-            if (avatarUrl != null) return avatarUrl;
+            if (avatarUrl != null) {
+                // A group's logo by its API address, as everywhere else (#313)
+                return isGroup && ns.optLong("id", 0) > 0
+                        ? groupAvatarUrl(apiBase, ns.optLong("id")) : avatarUrl;
+            }
 
             // User namespaces are always root — nothing further to walk.
-            if (!"group".equals(ns.optString("kind", ""))) return null;
+            if (!isGroup) return null;
 
             // Levels 3+: walk up ancestor groups via parent_id (bounded to 5 levels)
             long parentId = ns.optLong("parent_id", 0);
@@ -911,8 +976,7 @@ public class AvatarHandler {
                         apiBase + "groups/" + parentId);
                 if (groupJson == null) break;
                 org.json.JSONObject group = new org.json.JSONObject(groupJson);
-                avatarUrl = jsonAvatarUrl(group);
-                if (avatarUrl != null) return avatarUrl;
+                if (jsonAvatarUrl(group) != null) return groupAvatarUrl(apiBase, parentId);
                 parentId = group.optLong("parent_id", 0);
             }
         } catch (org.json.JSONException e) {
@@ -1037,7 +1101,7 @@ public class AvatarHandler {
                 resolved.id = userId;
                 resolved.username = username;
                 resolved.avatarUrl = avatarUrl;
-                sEmailUserCache.put(email.toLowerCase(java.util.Locale.ROOT).trim(), resolved);
+                GitAuthorLinks.put(email, resolved);
             }
 
             return avatarUrl.contains("gravatar.com") ? null : avatarUrl;

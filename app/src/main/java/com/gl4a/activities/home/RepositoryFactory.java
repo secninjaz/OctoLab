@@ -154,7 +154,8 @@ public class RepositoryFactory extends FragmentFactory {
     }
 
     private String filterKey() {
-        return PREF_KEY_FILTER + "_" + mUserLogin;
+        // Per account: its key, which tells same-named accounts on two servers apart (#318)
+        return PREF_KEY_FILTER + "_" + com.gl4a.Gl4Application.get().getAuthLogin();
     }
 
     private void restorePreviouslySelectedFilterAndSort() {

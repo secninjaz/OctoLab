@@ -222,7 +222,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
 
         mListHeaderView = inflater.inflate(R.layout.issue_comment_list_header, view, false);
         mAdapter.setHeaderView(mListHeaderView);
-        View loadingView = inflater.inflate(R.layout.list_loading_view, view, false);
+        View loadingView = com.gl4a.utils.InlineLoading.create(view);
         showLoadingIndicator(loadingView);
     }
 
@@ -472,28 +472,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
             milestoneGroup.setVisibility(View.GONE);
         }
 
-        View assigneeGroup = mListHeaderView.findViewById(R.id.assignee_container);
-        List<GitLabUser> assignees = mIssue.assignees();
-        if (assignees != null && !assignees.isEmpty()) {
-            ViewGroup assigneeContainer = mListHeaderView.findViewById(R.id.assignee_list);
-            LayoutInflater inflater = getLayoutInflater();
-            assigneeContainer.removeAllViews();
-            for (GitLabUser assignee : assignees) {
-                View row = inflater.inflate(R.layout.row_assignee, assigneeContainer, false);
-                TextView tvAssignee = row.findViewById(R.id.tv_assignee);
-                tvAssignee.setText(ApiHelpers.getUserDisplayName(getActivity(), assignee));
-
-                ImageView ivAssignee = row.findViewById(R.id.iv_assignee);
-                AvatarHandler.assignAvatar(ivAssignee, assignee);
-                ivAssignee.setTag(assignee);
-                ivAssignee.setOnClickListener(this);
-
-                assigneeContainer.addView(row);
-            }
-            assigneeGroup.setVisibility(View.VISIBLE);
-        } else {
-            assigneeGroup.setVisibility(View.GONE);
-        }
+        bindAssignees(mIssue.assignees());
 
         ReactionBar reactions = mListHeaderView.findViewById(R.id.reactions);
         reactions.setCallback(this, this);
@@ -505,8 +484,9 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         bindSpecialViews(mListHeaderView);
     }
 
+    // %s: the work item's container, "project", or "group" for epics (#312), read as project
     private static final String DESCRIPTION_EDIT_QUERY =
-            "query($path: ID!, $iid: String!) { project(fullPath: $path) {"
+            "query($path: ID!, $iid: String!) { project: %s(fullPath: $path) {"
             + " workItems(iid: $iid) { nodes { widgets {"
             + " ... on WorkItemWidgetDescription { lastEditedAt lastEditedBy { username name } }"
             + " ... on WorkItemWidgetNotifications { subscribed }"
@@ -520,14 +500,15 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
      */
     private void loadDescriptionEdited(TextView view) {
         view.setVisibility(View.GONE);
-        if (isMergeRequestView() || mRepoOwner == null || mRepoName == null) {
+        String path = getWorkItemContainerPath();
+        if (isMergeRequestView() || path == null) {
             return;
         }
         Map<String, Object> variables = new HashMap<>();
-        variables.put("path", mRepoOwner + "/" + mRepoName);
+        variables.put("path", path);
         variables.put("iid", String.valueOf(mIssue.number()));
         Map<String, Object> body = new HashMap<>();
-        body.put("query", DESCRIPTION_EDIT_QUERY);
+        body.put("query", String.format(DESCRIPTION_EDIT_QUERY, getWorkItemContainer()));
         body.put("variables", variables);
         // Whether you're subscribed comes in the same answer, for the screen's menu (#290)
         Boolean[] subscribed = new Boolean[1];
@@ -580,17 +561,15 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
      * projects, which rendering the markdown again can't resolve (#199).
      */
     private void loadDescriptionHtml(TextView descriptionView, String markdown) {
-        String projectPath = getProjectPath();
+        String projectPath = getDescriptionHtmlPath();
         if (projectPath == null) {
             return;
         }
-        String field = isMergeRequestView() ? "mergeRequest" : "issue";
         Map<String, Object> variables = new HashMap<>();
         variables.put("path", projectPath);
         variables.put("iid", String.valueOf(mIssue.number()));
         Map<String, Object> body = new HashMap<>();
-        body.put("query", "query($path: ID!, $iid: String!) { project(fullPath: $path) {"
-                + " item: " + field + "(iid: $iid) { descriptionHtml } } }");
+        body.put("query", getDescriptionHtmlQuery());
         body.put("variables", variables);
         Object id = mIssue.id();
         ServiceFactory.getGraphQL(com.gl4a.gitlab.service.GitLabGraphQLService.class)
@@ -613,6 +592,34 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
     }
 
     /**
+     * What holds the work item, for its "Edited … by …" line and subscription: "project", or
+     * "group" for an epic (#312), with its path, null if unknown.
+     */
+    protected String getWorkItemContainer() {
+        return "project";
+    }
+
+    @androidx.annotation.Nullable
+    protected String getWorkItemContainerPath() {
+        return mRepoOwner != null && mRepoName != null ? mRepoOwner + "/" + mRepoName : null;
+    }
+
+    /**
+     * The GraphQL query for GitLab's stored rendering of the description, answering as
+     * project.item.descriptionHtml for $path and $iid, and the path it's asked for.
+     */
+    protected String getDescriptionHtmlQuery() {
+        String field = isMergeRequestView() ? "mergeRequest" : "issue";
+        return "query($path: ID!, $iid: String!) { project(fullPath: $path) {"
+                + " item: " + field + "(iid: $iid) { descriptionHtml } } }";
+    }
+
+    @androidx.annotation.Nullable
+    protected String getDescriptionHtmlPath() {
+        return getProjectPath();
+    }
+
+    /**
      * The issue's or MR's project path: from owner/repo, or, when opened from a cross-project
      * list with only a project ID, from its web URL (namespace/repo before "/-/"). Notes are
      * rendered against it so their references link to the right project (#197).
@@ -627,6 +634,10 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         if (webUrl != null) {
             List<String> segments = android.net.Uri.parse(webUrl).getPathSegments();
             int dash = segments.indexOf("-");
+            // A group's page (an epic, #312) has no project to render against
+            if (!segments.isEmpty() && "groups".equals(segments.get(0))) {
+                return null;
+            }
             if (dash >= 2) {
                 return android.text.TextUtils.join("/", segments.subList(0, dash));
             }
@@ -641,17 +652,21 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
     /** Subclasses override to true when displaying a merge request rather than an issue. */
     protected boolean isMergeRequestView() { return false; }
 
-    private void loadIssueBodyReactions(ReactionBar bar) {
-        GitLabAwardEmojiService service = ServiceFactory.get(GitLabAwardEmojiService.class, false);
-        boolean isMR = isMergeRequestView();
-        Single<Response<List<GitLabAwardEmoji>>> request = isMR
+    /** The reactions on the issue's or MR's own description. */
+    protected Single<Response<List<GitLabAwardEmoji>>> loadBodyAwardEmojis(boolean bypassCache) {
+        GitLabAwardEmojiService service =
+                ServiceFactory.get(GitLabAwardEmojiService.class, bypassCache);
+        return isMergeRequestView()
                 ? service.getMergeRequestAwardEmojis(mIssue.projectId, mIssue.iid, 1, 100)
                 : service.getIssueAwardEmojis(mIssue.projectId, mIssue.iid, 1, 100);
-        request.map(ApiHelpers::throwOnFailure)
+    }
+
+    private void loadIssueBodyReactions(ReactionBar bar) {
+        loadBodyAwardEmojis(false).map(ApiHelpers::throwOnFailure)
                 .compose(RxUtils::doInBackground)
                 .subscribe(emojis -> {
                     Map<String, Integer> counts = new HashMap<>();
-                    String ownLogin = com.gl4a.Gl4Application.get().getAuthLogin();
+                    String ownLogin = com.gl4a.utils.Accounts.myUsername();
                     java.util.Set<String> viewerReacted = new java.util.HashSet<>();
                     for (GitLabAwardEmoji e : emojis) {
                         counts.merge(e.name, 1, Integer::sum);
@@ -676,7 +691,32 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
                 }, error -> { /* non-fatal — leave bar hidden */ });
     }
 
-    private void fillLabels(List<GitLabLabel> labels) {
+    /** The header's assignees, hidden when there are none. */
+    protected void bindAssignees(List<GitLabUser> assignees) {
+        View assigneeGroup = mListHeaderView.findViewById(R.id.assignee_container);
+        if (assignees != null && !assignees.isEmpty()) {
+            ViewGroup assigneeContainer = mListHeaderView.findViewById(R.id.assignee_list);
+            LayoutInflater inflater = getLayoutInflater();
+            assigneeContainer.removeAllViews();
+            for (GitLabUser assignee : assignees) {
+                View row = inflater.inflate(R.layout.row_assignee, assigneeContainer, false);
+                TextView tvAssignee = row.findViewById(R.id.tv_assignee);
+                tvAssignee.setText(ApiHelpers.getUserDisplayName(getActivity(), assignee));
+
+                ImageView ivAssignee = row.findViewById(R.id.iv_assignee);
+                AvatarHandler.assignAvatar(ivAssignee, assignee);
+                ivAssignee.setTag(assignee);
+                ivAssignee.setOnClickListener(this);
+
+                assigneeContainer.addView(row);
+            }
+            assigneeGroup.setVisibility(View.VISIBLE);
+        } else {
+            assigneeGroup.setVisibility(View.GONE);
+        }
+    }
+
+    protected void fillLabels(List<GitLabLabel> labels) {
         View labelGroup = mListHeaderView.findViewById(R.id.label_container);
         if (labels != null && !labels.isEmpty()) {
             TextView labelView = mListHeaderView.findViewById(R.id.labels);
@@ -699,7 +739,7 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         boolean isMR = mIssue.pullRequest() != null;
         Single<Response<List<GitLabAwardEmoji>>> request = isMR
                 ? service.getMergeRequestAwardEmojis(mIssue.projectId, mIssue.iid, 1, 100)
-                : service.getIssueAwardEmojis(mIssue.projectId, mIssue.iid, 1, 100);
+                : loadBodyAwardEmojis(bypassCache);
         return request.map(response -> {
             List<GitLabReaction> result = new java.util.ArrayList<>();
             if (response.isSuccessful() && response.body() != null) {

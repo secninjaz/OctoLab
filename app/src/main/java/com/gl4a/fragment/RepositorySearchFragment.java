@@ -51,8 +51,7 @@ public class RepositorySearchFragment extends PagedDataBaseFragment<GitLabProjec
             return Single.just(Response.success(new ApiHelpers.DummyPage<>()));
         }
 
-        if (com.gl4a.utils.ApiHelpers.loginEquals(login,
-                com.gl4a.Gl4Application.get().getAuthLogin())) {
+        if (com.gl4a.utils.Accounts.isMe(login)) {
             // Your own projects: within them, by the current filter, with GitLab's project list
             // (not the site-wide, rate-limited search; everyone else's are in Search, #309)
             java.util.Map<String, String> params =

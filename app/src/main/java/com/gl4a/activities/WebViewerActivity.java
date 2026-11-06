@@ -146,10 +146,9 @@ public abstract class WebViewerActivity extends BaseActivity implements
         okhttp3.Response resp = null;
         try {
             okhttp3.OkHttpClient client = com.gl4a.ServiceFactory.getImageHttpClient();
-            String tok = com.gl4a.Gl4Application.get().getAuthToken();
+            // The image client adds the account's token, in the header its kind needs (#70)
             okhttp3.Request.Builder rb = new okhttp3.Request.Builder()
-                    .url(urlStr)
-                    .header("PRIVATE-TOKEN", tok != null ? tok : "");
+                    .url(urlStr);
             // Videos are fetched in ranges, so they play and seek without being downloaded whole
             String range = request.getRequestHeaders().get("Range");
             if (range != null) rb.header("Range", range);

@@ -15,7 +15,7 @@ import com.gl4a.db.BookmarksProvider;
 
 /**
  * THE bookmark handling for every screen that can be bookmarked (users, projects, groups,
- * issues, merge requests, commits, snippets): its menu item, saving and removing, the list's
+ * issues, epics, merge requests, commits, snippets): its menu item, saving and removing, the list's
  * icon and opening a bookmark (#263). A new kind (e.g. milestones, epics) is a type in
  * {@link BookmarksProvider.Columns}, an icon in {@link #iconFor} and a {@link Target} on its
  * screen.
@@ -75,6 +75,12 @@ public final class BookmarkActions {
         public static Target mergeRequest(String url, String title, String project, long iid) {
             return new Target(BookmarksProvider.Columns.TYPE_MERGE_REQUEST, url, title,
                     project + "!" + iid);
+        }
+
+        /** An epic, with its group and number below, as {@link #issue} (#312). */
+        public static Target epic(String url, String title, String group, long iid) {
+            return new Target(BookmarksProvider.Columns.TYPE_EPIC, url, title,
+                    group + "&" + iid);
         }
 
         /** A commit, with its project and short ID below, as {@link #issue} (#289). */
@@ -250,6 +256,7 @@ public final class BookmarkActions {
             case BookmarksProvider.Columns.TYPE_MERGE_REQUEST: return R.drawable.pull_request;
             case BookmarksProvider.Columns.TYPE_COMMIT: return R.drawable.commit;
             case BookmarksProvider.Columns.TYPE_SNIPPET: return R.drawable.snippet_bookmark;
+            case BookmarksProvider.Columns.TYPE_EPIC: return R.drawable.epic;
             default: return 0;
         }
     }

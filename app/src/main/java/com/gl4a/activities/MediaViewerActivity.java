@@ -143,9 +143,9 @@ public class MediaViewerActivity extends BaseActivity implements
         Uri uri = Uri.parse(mUrls[mUrlIndex]);
         Map<String, String> headers = new HashMap<>();
         String instanceHost = Uri.parse(Gl4Application.get().getInstanceUrl()).getHost();
-        String tok = Gl4Application.get().getAuthToken();
-        if (tok != null && instanceHost != null && instanceHost.equalsIgnoreCase(uri.getHost())) {
-            headers.put("PRIVATE-TOKEN", tok);
+        if (instanceHost != null && instanceHost.equalsIgnoreCase(uri.getHost())) {
+            // The account's token in the header its kind needs (#70)
+            headers.putAll(com.gl4a.utils.AccountAuth.storedHeaders());
         }
         mVideoView.setVideoURI(uri, headers);
     }

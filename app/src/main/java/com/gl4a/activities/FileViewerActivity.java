@@ -318,12 +318,11 @@ public class FileViewerActivity extends WebViewerActivity
     private void checkTypeWithGitLab() {
         com.gl4a.utils.SingleFactory.getProjectId(mRepoOwner, mRepoName)
                 .map(projectId -> {
-                    String tok = com.gl4a.Gl4Application.get().getAuthToken();
+                    // The image client adds the account's token (#70)
                     okhttp3.Request head = new okhttp3.Request.Builder()
                             .url(com.gl4a.utils.DownloadUtils.repositoryFileUrl(
                                     projectId, mPath, mRef))
                             .head()
-                            .header("PRIVATE-TOKEN", tok != null ? tok : "")
                             .build();
                     try (okhttp3.Response resp = com.gl4a.ServiceFactory.getImageHttpClient()
                             .newCall(head).execute()) {
@@ -495,8 +494,7 @@ public class FileViewerActivity extends WebViewerActivity
         try {
             okhttp3.OkHttpClient client = com.gl4a.ServiceFactory.getImageHttpClient();
             okhttp3.Request req = new okhttp3.Request.Builder()
-                    .url(urlStr)
-                    .header("PRIVATE-TOKEN", tok != null ? tok : "")
+                    .url(urlStr) // the image client adds the account's token (#70)
                     .build();
             try (okhttp3.Response resp = client.newCall(req).execute()) {
                 if (!resp.isSuccessful() || resp.body() == null) return null;

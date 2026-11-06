@@ -163,7 +163,7 @@ public class ReactionBar extends HorizontalScrollView implements View.OnClickLis
         if (mDetailsCache == null || mReferenceItem == null) return;
         java.util.List<GitLabReaction> details = mDetailsCache.getReactions(mReferenceItem);
         if (details == null) return;
-        String ownLogin = Gl4Application.get().getAuthLogin();
+        String ownLogin = com.gl4a.utils.Accounts.myUsername();
         java.util.Set<String> viewerReacted = new java.util.HashSet<>();
         for (GitLabReaction r : details) {
             if (ApiHelpers.loginEquals(r.user(), ownLogin)) viewerReacted.add(r.content());
@@ -439,7 +439,7 @@ public class ReactionBar extends HorizontalScrollView implements View.OnClickLis
             if (viewType == 0) {
                 ImageView avatar = convertView.findViewById(R.id.avatar);
                 TextView name = convertView.findViewById(R.id.name);
-                String ownLogin = Gl4Application.get().getAuthLogin();
+                String ownLogin = com.gl4a.utils.Accounts.myUsername();
                 GitLabUser user = mUsers.get(position);
 
                 AvatarHandler.assignAvatar(avatar, user);
@@ -578,7 +578,7 @@ public class ReactionBar extends HorizontalScrollView implements View.OnClickLis
                 return;
             }
 
-            String ownLogin = Gl4Application.get().getAuthLogin();
+            String ownLogin = com.gl4a.utils.Accounts.myUsername();
             reactions.stream()
                     .filter(reaction -> ApiHelpers.loginEquals(reaction.user(), ownLogin))
                     .forEach(reaction -> mUserOwnReactions.put(reaction.content(), reaction.id()));

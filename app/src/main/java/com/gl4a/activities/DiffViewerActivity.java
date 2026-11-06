@@ -439,7 +439,7 @@ public abstract class DiffViewerActivity<C extends GitLabComment> extends WebVie
 
             Menu menu = getMenu();
             CommentWrapper comment = mWrappedComments.get(mId);
-            String ownLogin = Gl4Application.get().getAuthLogin();
+            String ownLogin = com.gl4a.utils.Accounts.myUsername();
 
             getMenuInflater().inflate(R.menu.commit_comment_actions, menu);
             if (id == 0 || !canReply()) {

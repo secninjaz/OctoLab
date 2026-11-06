@@ -238,7 +238,8 @@ public abstract class BaseActivity extends AppCompatActivity implements
             String login = Gl4Application.get().getAuthLogin();
             Snackbar.make(mCoordinatorLayout, login != null
                             ? getString(R.string.load_auth_failure_notice_account,
-                                    com.gl4a.utils.ApiHelpers.formatUsername(login),
+                                    com.gl4a.utils.ApiHelpers.formatUsername(
+                                            com.gl4a.utils.Accounts.of(login).username),
                                     android.net.Uri.parse(Gl4Application.get().getInstanceUrl())
                                             .getHost())
                             : getString(R.string.load_auth_failure_notice),
@@ -842,6 +843,12 @@ public abstract class BaseActivity extends AppCompatActivity implements
     private void setupNavigationDrawer() {
         NavigationView leftDrawer = findViewById(R.id.left_drawer);
         applyHighlightColor(leftDrawer);
+        // Rows added when it switches to the account list fade in with the rest (#316)
+        if (leftDrawer != null && leftDrawer.getChildCount() > 0
+                && leftDrawer.getChildAt(0) instanceof androidx.recyclerview.widget.RecyclerView) {
+            ((androidx.recyclerview.widget.RecyclerView) leftDrawer.getChildAt(0))
+                    .setItemAnimator(new com.gl4a.widget.TogetherItemAnimator());
+        }
         mRightDrawer = findViewById(R.id.right_drawer);
         applyHighlightColor(mRightDrawer);
 

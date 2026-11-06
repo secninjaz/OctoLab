@@ -305,8 +305,10 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         Gl4Application app = Gl4Application.get();
         for (String login : app.getAllLogins()) {
             redactor.addServer(app.getInstanceUrlForLogin(login))
-                    .addAccount(login, app.getNameForLogin(login))
-                    .addSecret(app.getTokenForLogin(login));
+                    .addAccount(com.gl4a.utils.Accounts.of(login).username, app.getNameForLogin(login))
+                    .addSecret(app.getTokenForLogin(login))
+                    // An OAuth sign-in's refresh token too (#70)
+                    .addSecret(app.getRefreshTokenForLogin(login));
         }
         com.gl4a.utils.LogRedactor.Result result = redactor.redact(DebugLogger.get().getText());
         StringBuilder replaced = new StringBuilder();

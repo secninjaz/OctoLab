@@ -621,7 +621,7 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
                 "scope", "created_by_me")));
         filters.add(new java.util.HashMap<>(java.util.Collections.singletonMap(
                 "scope", "assigned_to_me")));
-        String login = com.gl4a.Gl4Application.get().getAuthLogin();
+        String login = com.gl4a.utils.Accounts.myUsername();
         if (mergeRequests && login != null) {
             java.util.Map<String, String> reviewing = new java.util.HashMap<>();
             reviewing.put("scope", "all");

@@ -38,7 +38,7 @@ public final class FeedItemActions {
 
     /** Only issues and merge requests can be unsubscribed from on GitLab. */
     public static boolean canUnsubscribe(GitLabTodo todo) {
-        return (isIssue(todo) || isMergeRequest(todo)) && todo.target != null
+        return !todo.isEpic() && (isIssue(todo) || isMergeRequest(todo)) && todo.target != null
                 && todo.target.iid > 0 && projectId(todo) > 0;
     }
 
@@ -117,6 +117,13 @@ public final class FeedItemActions {
         String url = todo.target.webUrl != null ? todo.target.webUrl
                 : todo.targetUrl != null ? stripAnchor(todo.targetUrl) : null;
         if (url == null) return null;
+        if (todo.isEpic()) {
+            com.gl4a.gitlab.model.GitLabIssue epic = new com.gl4a.gitlab.model.GitLabIssue();
+            epic.webUrl = url;
+            String group = epic.groupPath();
+            return BookmarkActions.Target.epic(url, todo.target.title,
+                    group != null ? group : "", todo.target.iid);
+        }
         if (isIssue(todo)) {
             return BookmarkActions.Target.issue(url, todo.target.title, path, todo.target.iid);
         }

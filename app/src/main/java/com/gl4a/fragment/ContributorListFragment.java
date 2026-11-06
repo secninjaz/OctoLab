@@ -36,7 +36,10 @@ public class ContributorListFragment extends PagedDataBaseFragment<GitLabContrib
         final GitLabProjectService service =
                 ServiceFactory.get(GitLabProjectService.class, bypassCache);
         return SingleFactory.getProjectId(repoOwner, repoName)
-                .doOnSuccess(projectId -> mProjectId = projectId)
+                .doOnSuccess(projectId -> {
+                    mProjectId = projectId;
+                    if (mAdapter != null) mAdapter.setProjectId(projectId);
+                })
                 .flatMap(projectId -> service.getContributors(projectId, page, 25))
                 .map(response -> {
                     if (!response.isSuccessful() || response.body() == null) {
@@ -56,7 +59,17 @@ public class ContributorListFragment extends PagedDataBaseFragment<GitLabContrib
     protected RootAdapter<GitLabContributor, ? extends RecyclerView.ViewHolder> onCreateAdapter() {
         ContributorAdapter adapter = new ContributorAdapter(getActivity());
         adapter.setOnItemClickListener(this);
+        mAdapter = adapter;
         return adapter;
+    }
+
+    private ContributorAdapter mAdapter;
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Accounts found meanwhile, e.g. by tapping a contributor, show on return (#322)
+        if (mAdapter != null) mAdapter.notifyDataSetChanged();
     }
 
     @Override

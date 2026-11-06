@@ -34,24 +34,17 @@ import com.gl4a.gitlab.service.GitLabOAuthService;
 import com.gl4a.gitlab.service.GitLabUserService;
 import com.gl4a.utils.ApiHelpers;
 import com.gl4a.utils.IntentUtils;
+import com.gl4a.utils.OAuthLogin;
 import com.gl4a.utils.RxUtils;
 
 import io.reactivex.Single;
 
 /**
- * GitLab OAuth login activity (formerly Github4AndroidActivity).
- * Handles the OAuth 2.0 PKCE flow for GitLab instances.
+ * The first screen without an account, and where gitlab.com's answer to "Sign in with
+ * gitlab.com" arrives, also when adding an account later (#70, see {@link OAuthLogin}).
  */
 public class GitLabLoginActivity extends BaseActivity implements
         View.OnClickListener, LoginModeChooserFragment.ParentCallback {
-    private static final String PARAM_CLIENT_ID = "client_id";
-    private static final String PARAM_CODE = "code";
-    private static final String PARAM_SCOPE = "scope";
-    private static final String PARAM_CALLBACK_URI = "redirect_uri";
-    private static final String PARAM_RESPONSE_TYPE = "response_type";
-
-    private static final Uri CALLBACK_URI = Uri.parse("gl4a://oauth");
-
     private View mContent;
     private View mProgress;
 
@@ -71,10 +64,9 @@ public class GitLabLoginActivity extends BaseActivity implements
         super.onCreate(savedInstanceState);
 
         Gl4Application app = Gl4Application.get();
-        if (app.isAuthorized()) {
-            if (!handleIntent(getIntent())) {
-                goToToplevelActivity();
-            }
+        boolean signingIn = OAuthLogin.isCallback(getIntent().getData());
+        if (app.isAuthorized() && !signingIn) {
+            goToToplevelActivity();
             finish();
         } else {
             setContentView(R.layout.main);
@@ -89,6 +81,9 @@ public class GitLabLoginActivity extends BaseActivity implements
             mContent = findViewById(R.id.welcome_container);
             mProgress = findViewById(R.id.login_progress_container);
 
+            if (signingIn) {
+                setProgressShown(true);
+            }
             handleIntent(getIntent());
         }
     }
@@ -100,49 +95,51 @@ public class GitLabLoginActivity extends BaseActivity implements
         }
     }
 
-    private static java.util.Map<String, String> buildTokenBody(String code, String redirectUri) {
-        java.util.Map<String, String> body = new java.util.HashMap<>();
-        body.put("client_id", BuildConfig.CLIENT_ID);
-        body.put("client_secret", BuildConfig.CLIENT_SECRET);
-        body.put("code", code);
-        body.put("grant_type", "authorization_code");
-        body.put("redirect_uri", redirectUri);
-        return body;
-    }
-
     private boolean handleIntent(Intent intent) {
         Uri data = intent.getData();
-        if (data != null
-                && data.getScheme().equals(CALLBACK_URI.getScheme())
-                && data.getHost().equals(CALLBACK_URI.getHost())) {
-            final String code = data.getQueryParameter(PARAM_CODE);
-            if (code == null) {
-                onLoginCanceled();
-                return true;
-            }
-
-            GitLabOAuthService service = ServiceFactory.getOAuthService(GitLabOAuthService.class);
-            service.getToken(buildTokenBody(code, CALLBACK_URI.toString()))
-                    .map(ApiHelpers::throwOnFailure)
-                    .flatMap(token -> {
-                        GitLabUserService userService = ServiceFactory.get(GitLabUserService.class, true,
-                                null, token.accessToken(), null);
-                        Single<GitLabUser> userSingle = userService.getCurrentUser()
-                                .map(ApiHelpers::throwOnFailure);
-                        return Single.zip(Single.just(token), userSingle,
-                                (t, user) -> Pair.create(t.accessToken(), user));
-                    })
-                    .compose(upstream -> RxUtils.doInBackground(upstream))
-                    .subscribe(pair -> {
-                        // OAuth2 flow — store with OAuth token type so Bearer header is used
-                        Gl4Application.get().addAccount(pair.second, pair.first,
-                                Gl4Application.TOKEN_TYPE_OAUTH);
-                        goToToplevelActivity();
-                        finish();
-                    }, this::handleLoadFailure);
+        if (!OAuthLogin.isCallback(data)) {
+            return false;
+        }
+        if (OAuthLogin.isCanceled(data)) {
+            onLoginCanceled();
+            leaveIfSignedIn();
             return true;
         }
-        return false;
+        setProgressShown(true);
+        OAuthLogin.complete(this, data)
+                .compose(RxUtils::doInBackground)
+                .subscribe(result -> {
+                    boolean adding = Gl4Application.get().isAuthorized();
+                    String key = OAuthLogin.addAccount(result);
+                    if (adding) {
+                        // The home screen switches to the new account, as after token login
+                        startActivity(com.gl4a.activities.home.HomeActivity
+                                .makeAccountAddedIntent(this, key));
+                    } else {
+                        goToToplevelActivity();
+                    }
+                    finish();
+                }, error -> {
+                    setProgressShown(false);
+                    if (Gl4Application.get().isAuthorized()) {
+                        // Adding an account: back to the app, saying why
+                        android.widget.Toast.makeText(this, R.string.login_oauth_failed,
+                                android.widget.Toast.LENGTH_LONG).show();
+                        android.util.Log.d(Gl4Application.LOG_TAG, "OAuth sign-in failed", error);
+                        leaveIfSignedIn();
+                    } else {
+                        handleLoadFailure(error);
+                    }
+                });
+        return true;
+    }
+
+    /** Back to the app when an account is already signed in; this screen is for none. */
+    private void leaveIfSignedIn() {
+        if (Gl4Application.get().isAuthorized()) {
+            goToToplevelActivity();
+            finish();
+        }
     }
 
     @Override
@@ -198,8 +195,8 @@ public class GitLabLoginActivity extends BaseActivity implements
     }
 
     @Override
-    public void onLoginStartOauth() {
-        launchOauthLogin(this);
+    public void onLoginStartOauth(String instanceUrl) {
+        OAuthLogin.start(this, instanceUrl);
     }
 
     @Override
@@ -223,18 +220,5 @@ public class GitLabLoginActivity extends BaseActivity implements
     private void setProgressShown(boolean show) {
         mContent.setVisibility(show ? View.GONE : View.VISIBLE);
         mProgress.setVisibility(show ? View.VISIBLE : View.GONE);
-    }
-
-    public static void launchOauthLogin(Activity activity) {
-        Gl4Application app = Gl4Application.get();
-        String instanceBase = app.getInstanceBaseUrl();
-        Uri uri = Uri.parse(instanceBase + "/oauth/authorize")
-                .buildUpon()
-                .appendQueryParameter(PARAM_CLIENT_ID, BuildConfig.CLIENT_ID)
-                .appendQueryParameter(PARAM_RESPONSE_TYPE, "code")
-                .appendQueryParameter(PARAM_SCOPE, "read_user api read_repository")
-                .appendQueryParameter(PARAM_CALLBACK_URI, CALLBACK_URI.toString())
-                .build();
-        IntentUtils.openInCustomTabOrBrowser(activity, uri);
     }
 }

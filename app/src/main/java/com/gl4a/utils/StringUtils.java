@@ -136,6 +136,26 @@ public class StringUtils {
         return null;
     }
 
+    /**
+     * Dates such as an epic's start and due (#312), short: "1–30 Nov", "1 Nov", the year only
+     * when it isn't this one; null when neither is set.
+     */
+    @androidx.annotation.Nullable
+    public static String formatShortDateRange(Context context, @androidx.annotation.Nullable
+            String start, @androidx.annotation.Nullable String end) {
+        Date from = parseIsoDate(start);
+        Date to = parseIsoDate(end);
+        if (from == null && to == null) return null;
+        if (from == null) from = to;
+        if (to == null) to = from;
+        // Noon, as a range ending at midnight is shown as ending the day before
+        long halfDay = 12 * 60 * 60 * 1000L;
+        int flags = DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_ABBREV_MONTH
+                | DateUtils.FORMAT_UTC;
+        return DateUtils.formatDateRange(context, from.getTime() + halfDay,
+                to.getTime() + halfDay, flags);
+    }
+
     public static CharSequence formatExactTime(Context context, Date date) {
         return DateUtils.formatDateTime(context, date.getTime(), DateUtils.FORMAT_SHOW_DATE
                 | DateUtils.FORMAT_SHOW_TIME

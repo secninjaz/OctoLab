@@ -94,9 +94,7 @@ public class GroupTree implements View.OnClickListener {
 
     /** A spinner in place of the tree until {@link #setRoots} replaces it (#242). */
     public void showLoading() {
-        mContainer.removeAllViews();
-        mContainer.addView(mActivity.getLayoutInflater()
-                .inflate(R.layout.row_group_tree_loading, mContainer, false));
+        com.gl4a.utils.InlineLoading.showIn(mContainer);
     }
 
     /** Rebuilds the rows from the retained state, e.g. after rotation. */
@@ -260,6 +258,29 @@ public class GroupTree implements View.OnClickListener {
         restore();
     }
 
+    /**
+     * Replaces the roots but keeps what's open: groups expanded or being expanded stay so, e.g.
+     * when Groups adds your projects' groups to the list it already shows (#320).
+     */
+    public void updateRoots(List<?> roots, MembershipRoles roles) {
+        mState.roots = roots;
+        mState.roles = roles;
+        restore();
+    }
+
+    /** The row now showing the group at {@code path}, or null: rows are replaced on rebuild. */
+    private Node shownNode(String path) {
+        for (int i = 0; i < mContainer.getChildCount(); i++) {
+            View content = mContainer.getChildAt(i).findViewById(R.id.row_content);
+            Object tag = content != null ? content.getTag() : null;
+            if (tag instanceof Node && ((Node) tag).group != null
+                    && path.equals(pathOf(((Node) tag).group))) {
+                return (Node) tag;
+            }
+        }
+        return null;
+    }
+
     private static String pathOf(GitLabGroup group) {
         return group.fullPath != null ? group.fullPath : group.path;
     }
@@ -334,19 +355,21 @@ public class GroupTree implements View.OnClickListener {
         }
         node.loading = true;
         // A spinner under the group while its children load (#242)
-        View spinner = mActivity.getLayoutInflater()
-                .inflate(R.layout.row_group_tree_loading, mContainer, false);
-        mContainer.addView(spinner, mContainer.indexOfChild(node.row) + 1);
+        View spinner = com.gl4a.utils.InlineLoading.insert(mContainer,
+                mContainer.indexOfChild(node.row) + 1);
         loadChildren(path, false, isSortByActivity(mActivity))
                 .compose(RxUtils::doInBackground)
                 .subscribe(children -> {
                     node.loading = false;
-                    mContainer.removeView(spinner);
+                    com.gl4a.utils.InlineLoading.remove(spinner);
                     mState.childrenByPath.put(path, children);
-                    showChildren(node, children);
+                    // Under whichever row shows the group now: the tree may have been rebuilt
+                    // while they loaded, replacing the tapped row (#320)
+                    Node shown = mContainer.indexOfChild(node.row) >= 0 ? node : shownNode(path);
+                    if (shown != null && !shown.expanded) showChildren(shown, children);
                 }, error -> {
                     node.loading = false;
-                    mContainer.removeView(spinner);
+                    com.gl4a.utils.InlineLoading.remove(spinner);
                     Toast.makeText(mActivity, R.string.group_tree_loading_failed,
                             Toast.LENGTH_SHORT).show();
                 });

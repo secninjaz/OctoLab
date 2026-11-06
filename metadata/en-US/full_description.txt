@@ -3,14 +3,19 @@ OctoLab is a free and open-source, unofficial GitLab client for Android. It work
 FEATURES
 
 Accounts
-* Personal Access Token (PAT) login
+* Sign in with gitlab.com in your browser (OAuth), or with a Personal Access Token on any GitLab instance
 * Multi-account: self-hosted and gitlab.com side by side
+
+Role-aware
+* Shows only what your GitLab role allows (Guest, Reporter, Developer, Maintainer, Owner)
+* Actions your role doesn't allow are hidden or explained
 
 Issues and merge requests
 * Browse, create, edit and comment on issues
 * Filter by label, assignee or milestone
 * View merge requests, comment and review diffs
 * Subscribe to or unsubscribe from issues and merge requests
+* Epics (GitLab Premium and Ultimate): a group's epics with their child items, comments and reactions
 
 To-dos and notifications
 * To-dos | Participating: your to-dos, and new comments on issues and merge requests you take part in
@@ -23,6 +28,7 @@ Activity
 Projects
 * Browse files, README, branches, tags, commits and releases
 * Search a project's code
+* Projects and groups by your role or visibility, with search
 * Images, videos and files open in the app
 
 Also

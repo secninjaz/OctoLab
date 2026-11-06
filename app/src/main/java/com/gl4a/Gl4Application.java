@@ -51,6 +51,8 @@ public class Gl4Application extends Application implements
     private static final String KEY_PREFIX_INSTANCE_URL = "instance_url_";
     private static final String KEY_PREFIX_AVATAR_URL   = "avatar_url_";
     private static final String KEY_PREFIX_NAME         = "name_";
+    // The GitLab username of an account whose key isn't its username (#318)
+    private static final String KEY_PREFIX_USERNAME     = "username_";
 
     @Override
     public void onCreate() {
@@ -206,21 +208,36 @@ public class Gl4Application extends Application implements
         return login != null ? mTokenStore.getToken(login) : null;
     }
 
-    public void addAccount(GitLabUser user, String token, String tokenType) {
+    public String addAccount(GitLabUser user, String token, String tokenType) {
+        return addAccount(user, token, tokenType,
+                getPrefs().getString(KEY_INSTANCE_URL, DEFAULT_INSTANCE));
+    }
+
+    /**
+     * Adds the account on {@code instanceUrl} and makes it the active one with its server.
+     * Signing in with OAuth names gitlab.com here, so the server field isn't changed while the
+     * browser is open, which would send the active account's requests elsewhere (#70).
+     */
+    public String addAccount(GitLabUser user, String token, String tokenType,
+            String instanceUrl) {
         SharedPreferences prefs = getPrefs();
-        String login = user.login();
+        String login = com.gl4a.utils.Accounts.keyFor(user.login(), instanceUrl);
         Set<String> logins = StringUtils.getEditableStringSetFromPrefs(prefs, KEY_ALL_LOGINS);
+        // Already added: it now uses this sign-in, and the home screen says so (#317)
+        sReplacedAccount = logins.contains(login) ? login : null;
         logins.add(login);
-        // Snapshot the current instance URL into this account's per-account slot
-        String currentUrl = getPrefs().getString(KEY_INSTANCE_URL, DEFAULT_INSTANCE);
+        // This account's per-account server slot
+        String currentUrl = instanceUrl;
         mTokenStore.putToken(login, token, tokenType);
         prefs.edit()
+                .putString(KEY_INSTANCE_URL, currentUrl)
                 .putString(KEY_ACTIVE_LOGIN, login)
                 .putStringSet(KEY_ALL_LOGINS, logins)
                 .putLong(KEY_PREFIX_USER_ID + login, user.id())
                 .putString(KEY_PREFIX_INSTANCE_URL + login, currentUrl)
                 .putString(KEY_PREFIX_AVATAR_URL + login, user.avatarUrl())
                 .putString(KEY_PREFIX_NAME + login, user.name())
+                .putString(KEY_PREFIX_USERNAME + login, user.login())
                 .apply();
         // Ensure notifications are enabled by default for every new login.
         // setDefaultValues() writes the XML default only if the key is absent.
@@ -229,12 +246,37 @@ public class Gl4Application extends Application implements
         }
         ServiceFactory.invalidateCache();
         updateNotificationWorker(prefs);
+        return login;
     }
 
     /** Backwards-compat overload — defaults to PAT (most common). */
-    public void addAccount(GitLabUser user, String token) {
-        addAccount(user, token, TOKEN_TYPE_PAT);
+    public String addAccount(GitLabUser user, String token) {
+        return addAccount(user, token, TOKEN_TYPE_PAT);
     }
+
+    // An account that was already added and signed in again, until the home screen says so
+    private static volatile String sReplacedAccount;
+
+    /**
+     * The account a sign-in just replaced the token of, once: an account signed in again with
+     * a token or in the browser (#317). Null if the last sign-in added a new account.
+     */
+    @androidx.annotation.Nullable
+    public static String takeReplacedAccount() {
+        String login = sReplacedAccount;
+        sReplacedAccount = null;
+        return login;
+    }
+
+    /**
+     * The account's GitLab username (its key, for accounts added before #318). Ask
+     * {@link com.gl4a.utils.Accounts} instead: it answers both "which account" and "is this me".
+     */
+    public String getUsernameForLogin(String login) {
+        if (login == null) return null;
+        return getPrefs().getString(KEY_PREFIX_USERNAME + login, login);
+    }
+
 
     public String getAuthTokenType() {
         String login = getAuthLogin();
@@ -255,15 +297,19 @@ public class Gl4Application extends Application implements
         if (login != null) {
             long userId = getPrefs().getLong(KEY_PREFIX_USER_ID + login, -1);
             if (userId >= 0) {
-                return GitLabUser.create(login, userId);
+                // The GitLab user: its username, not the account's key (#318)
+                return GitLabUser.create(getUsernameForLogin(login), userId);
             }
         }
         return null;
     }
 
+    /** The active account's own GitLab user, kept under the account's key (#318). */
     public void setCurrentAccountInfo(GitLabUser user) {
+        String login = getAuthLogin();
+        if (login == null) return;
         getPrefs().edit()
-                .putLong(KEY_PREFIX_USER_ID + user.login(), user.id())
+                .putLong(KEY_PREFIX_USER_ID + login, user.id())
                 .apply();
     }
 
@@ -272,17 +318,33 @@ public class Gl4Application extends Application implements
         if (login == null) return;
         Set<String> logins = StringUtils.getEditableStringSetFromPrefs(getPrefs(), KEY_ALL_LOGINS);
         logins.remove(login);
+        // An OAuth sign-in is also revoked on GitLab, so its tokens stop working there (#70)
+        if (TOKEN_TYPE_OAUTH.equals(mTokenStore.getTokenType(login))
+                && mTokenStore.getRefreshToken(login) != null) {
+            com.gl4a.utils.AccountAuth.revokeInBackground(getInstanceUrlForLogin(login),
+                    mTokenStore.getToken(login), mTokenStore.getRefreshToken(login));
+        }
         mTokenStore.removeToken(login);
         // Its participating notifications go with it (#280)
         com.gl4a.utils.ParticipatingInbox.get(this).deleteAccount(login);
+        // ...and the git authors' accounts it learnt (#322)
+        com.gl4a.utils.GitAuthorLinks.deleteAccount(login);
+        String next = logins.size() > 0 ? logins.iterator().next() : null;
         getPrefs().edit()
-                .putString(KEY_ACTIVE_LOGIN, logins.size() > 0 ? logins.iterator().next() : null)
+                .putString(KEY_ACTIVE_LOGIN, null)
                 .putStringSet(KEY_ALL_LOGINS, logins)
                 .remove(KEY_PREFIX_USER_ID + login)
+                .remove(KEY_PREFIX_USERNAME + login)
                 .apply();
+        // The next account the way the account switcher makes it active, with its own server:
+        // it kept the removed account's, and its token went there and was rejected (#314)
+        if (next != null) {
+            setActiveLogin(next);
+        }
         ServiceFactory.invalidateCache();
         NotificationsWorker.cancel(this);
     }
+
 
     private SharedPreferences getPrefs() {
         return getSharedPreferences(SettingsFragment.PREF_NAME, MODE_PRIVATE);
@@ -332,6 +394,23 @@ public class Gl4Application extends Application implements
 
     public String getTokenForLogin(String login) {
         return mTokenStore.getToken(login);
+    }
+
+    /** The refresh token of an account signed in with OAuth (#70), else null. */
+    public String getRefreshTokenForLogin(String login) {
+        return mTokenStore.getRefreshToken(login);
+    }
+
+    /** When an OAuth account's access token runs out, in milliseconds; 0 if unknown. */
+    public long getTokenExpiresAtForLogin(String login) {
+        return mTokenStore.getExpiresAt(login);
+    }
+
+    /** Keeps an OAuth account's new tokens, after sign-in or a refresh (#70). */
+    public void putOAuthTokens(String login, String accessToken, String refreshToken,
+            long expiresAt) {
+        mTokenStore.putOAuthTokens(login, accessToken, TOKEN_TYPE_OAUTH, refreshToken,
+                expiresAt);
     }
 
     public String getTokenTypeForLogin(String login) {

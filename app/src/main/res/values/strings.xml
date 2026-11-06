@@ -18,9 +18,12 @@
     <string name="logout">Logout</string>
     <string name="choose_account_for_link">Multiple accounts on this instance — choose one to open this link with</string>
     <string name="login">Login</string>
-    <string name="login_oauth">Login via OAuth (coming soon)</string>
+    <string name="login_oauth">Sign in with %1$s</string>
+    <string name="login_oauth_unavailable">Sign in in the browser (not available for this server)</string>
+    <string name="account_signed_in_again">%1$s on %2$s was already added: it now uses this sign-in.</string>
+    <string name="login_oauth_failed">Signing in didn\'t work. Please try again.</string>
     <string name="login_token">Login using access token</string>
-    <string name="login_summary_oauth">Opens your GitLab instance in the browser to authorize OctoLab via OAuth.</string>
+    <string name="login_summary_oauth">Opens your GitLab in the browser, where you sign in and allow OctoLab access. Your password stays with GitLab.</string>
     <string name="login_summary_token">Enter a Personal Access Token with api + read_user scopes.</string>
     <string name="login_create_token">Create a token on %1$s</string>
     <string name="instance_url_hint">Instance URL (default: https://gitlab.com)</string>
@@ -787,6 +790,30 @@
     <string name="group">Group</string>
     <string name="group_projects">Projects</string>
     <string name="group_members">Members</string>
+    <!-- Epics (#312) -->
+    <string name="group_epics">Epics</string>
+    <string name="epic">Epic</string>
+    <string name="epics">Epics</string>
+    <string name="epic_dates">Dates</string>
+    <string name="epic_start_date">Start: %1$s</string>
+    <string name="epic_due_date">Due: %1$s</string>
+    <string name="epic_children">Child items</string>
+    <string name="epic_parent">Parent</string>
+    <plurals name="epic_child_epics">
+        <item quantity="one">%d epic</item>
+        <item quantity="other">%d epics</item>
+    </plurals>
+    <plurals name="epic_child_issues">
+        <item quantity="one">%d issue</item>
+        <item quantity="other">%d issues</item>
+    </plurals>
+    <string name="epic_children_closed">%1$d of %2$d closed</string>
+    <string name="state_closed_suffix">Closed</string>
+    <string name="epic_comment_hint">Comment on this epic</string>
+    <string name="no_epics_found">No epics so far.</string>
+    <string name="no_search_epics_found">No epics found matching the search.</string>
+    <string name="share_epic_subject">Epic &amp;%1$d (%2$s) in %3$s</string>
+    <string name="share_epic_comment_subject">Comment in epic &amp;%1$d in %2$s</string>
     <string name="group_subgroups">Subgroups and projects</string>
     <string name="group_expand">Expand or collapse</string>
     <string name="groups">Groups</string>

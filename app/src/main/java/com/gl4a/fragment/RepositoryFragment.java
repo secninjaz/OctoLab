@@ -683,8 +683,7 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         View row = mContentView.findViewById(R.id.ll_last_commit);
         android.widget.ImageView avatar = mContentView.findViewById(R.id.iv_last_commit_avatar);
         // The commit lists' author avatar and tap to the profile (#239, #244)
-        com.gl4a.utils.AvatarHandler.assignGitAuthorAvatar(avatar, commit.authorName,
-                commit.authorEmail);
+        com.gl4a.utils.AvatarHandler.assignCommitAuthorAvatar(avatar, commit);
         avatar.setOnClickListener(v ->
                 com.gl4a.utils.AvatarHandler.openGitAuthorProfile(getActivity(), commit));
         ((TextView) mContentView.findViewById(R.id.tv_last_commit_title)).setText(commit.title);
@@ -832,7 +831,7 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         // Query the project's starrers list and check if the current login appears.
         // GitLab has no dedicated "has the current user starred this project?" endpoint,
         // but the starrers list (per_page=100) is the most reliable available approach.
-        String currentLogin = Gl4Application.get().getAuthLogin();
+        String currentLogin = com.gl4a.utils.Accounts.myUsername();
         if (currentLogin == null) {
             mIsStarring = false;
             updateStargazerUi();
@@ -886,11 +885,10 @@ public class RepositoryFragment extends LoadingFragmentBase implements
                 if (uri.getHost() == null || !uri.getHost().equalsIgnoreCase(instanceHost))
                     return null;
                 try {
-                    String tok = Gl4Application.get().getAuthToken();
+                    // The image client adds the account's token, in the header its kind needs (#70)
                     okhttp3.OkHttpClient client = ServiceFactory.getImageHttpClient();
                     okhttp3.Response resp = client.newCall(new okhttp3.Request.Builder()
                             .url(uri.toString())
-                            .header("PRIVATE-TOKEN", tok != null ? tok : "")
                             .build()).execute();
                     if (!resp.isSuccessful() || resp.body() == null) return null;
                     byte[] bytes = resp.body().bytes();
@@ -975,7 +973,7 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         try {
             okhttp3.OkHttpClient client = ServiceFactory.getImageHttpClient();
             try (okhttp3.Response resp = client.newCall(new okhttp3.Request.Builder()
-                    .url(urlStr).header("PRIVATE-TOKEN", tok != null ? tok : "")
+                    .url(urlStr) // the image client adds the account's token (#70)
                     .build()).execute()) {
                 if (!resp.isSuccessful() || resp.body() == null) return null;
                 byte[] bytes = resp.body().bytes();

@@ -45,6 +45,7 @@ public class BookmarksProvider extends ContentProvider {
         int TYPE_MERGE_REQUEST = 4;
         int TYPE_COMMIT = 5;
         int TYPE_SNIPPET = 6;
+        int TYPE_EPIC = 7;
     }
 
     private static final int MATCH_ALL = 0;

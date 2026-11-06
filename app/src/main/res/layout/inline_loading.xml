@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Shown in a group tree while a group's children load (#242) -->
+<!-- THE "loading in place" (#321, InlineLoading): a small spinner where content will
+     appear, e.g. a group's children (#242), a commit's details, an epic's child items -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"

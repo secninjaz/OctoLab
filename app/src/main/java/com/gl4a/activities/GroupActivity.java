@@ -66,6 +66,7 @@ public class GroupActivity extends BaseActivity implements
         mTree = new GroupTree(this, findViewById(R.id.ll_subgroups), mTreeState);
         findViewById(R.id.tv_projects).setOnClickListener(this);
         findViewById(R.id.tv_members).setOnClickListener(this);
+        findViewById(R.id.tv_epics).setOnClickListener(this);
         setChildScrollDelegate(this);
         setContentShown(false);
         loadGroup(false);
@@ -152,6 +153,8 @@ public class GroupActivity extends BaseActivity implements
             startActivity(RepositoryListActivity.makeIntent(this, groupPath(), true));
         } else if (id == R.id.tv_members) {
             startActivity(OrganizationMemberListActivity.makeIntent(this, groupPath()));
+        } else if (id == R.id.tv_epics) {
+            startActivity(EpicListActivity.makeIntent(this, groupPath()));
         }
     }
 
@@ -183,6 +186,7 @@ public class GroupActivity extends BaseActivity implements
                     supportInvalidateOptionsMenu();
                     setContentShown(true);
                     loadSubgroups(force);
+                    loadEpicsAvailable(force);
                 }, this::handleLoadFailure);
     }
 
@@ -197,6 +201,19 @@ public class GroupActivity extends BaseActivity implements
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle(getActionBarTitle());
         }
+    }
+
+    /**
+     * Shows the Epics row when GitLab lists the group's epics: only servers with epics (Premium
+     * or Ultimate) answer, so nothing else needs knowing (#312).
+     */
+    private void loadEpicsAvailable(boolean force) {
+        View row = findViewById(R.id.tv_epics);
+        ServiceFactory.get(com.gl4a.gitlab.service.GitLabEpicService.class, force)
+                .listEpics(Uri.encode(groupPath()), "all", null, null, null, 1, 1)
+                .compose(com.gl4a.utils.RxUtils::doInBackground)
+                .subscribe(response -> row.setVisibility(response.isSuccessful()
+                        ? View.VISIBLE : View.GONE), error -> row.setVisibility(View.GONE));
     }
 
     /** Tree data and the viewer's roles, cached together so badges survive rotation (#172). */

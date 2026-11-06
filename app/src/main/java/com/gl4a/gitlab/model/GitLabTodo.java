@@ -42,6 +42,31 @@ public class GitLabTodo {
     public String type() { return targetType; }
     public String reason() { return actionName; }
     public boolean isCommit() { return TYPE_COMMIT.equals(targetType); }
+    /**
+     * The target's reference as GitLab writes it ("#12", "!3", "&5"), from what GitLab sends
+     * with the to-do; built from the type and number only when GitLab sent none (#312).
+     * Empty without a numbered target.
+     */
+    public String reference() {
+        if (target == null || target.iid <= 0) return "";
+        if (target.references != null && target.references.shortRef != null
+                && !target.references.shortRef.isEmpty()) {
+            return target.references.shortRef;
+        }
+        String prefix = isEpic() ? "&" : "MergeRequest".equals(targetType) ? "!" : "#";
+        return prefix + target.iid;
+    }
+
+    /**
+     * About an epic (#312): GitLab names it "Epic", or, as a group's work item, links it under
+     * /groups/…/-/epics/ or /-/work_items/.
+     */
+    public boolean isEpic() {
+        if ("Epic".equals(targetType)) return true;
+        String url = target != null && target.webUrl != null ? target.webUrl : targetUrl;
+        return url != null && url.contains("/groups/")
+                && (url.contains("/-/epics/") || url.contains("/-/work_items/"));
+    }
     public boolean isUnread() { return "pending".equals(state); }
     public GitLabProject repository() { return project; }
 

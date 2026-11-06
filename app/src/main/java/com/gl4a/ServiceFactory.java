@@ -265,19 +265,12 @@ public class ServiceFactory {
                             rb.url(currentBase + url.substring(createdForBase.length()));
                         }
                     }
-                    String tok = token != null ? token : Gl4Application.get().getAuthToken();
-                    if (tok != null) {
-                        // PATs use PRIVATE-TOKEN header; OAuth2 access tokens use Bearer.
-                        String tokenType = token != null
-                                ? inferTokenType(token)
-                                : Gl4Application.get().getAuthTokenType();
-                        if (Gl4Application.TOKEN_TYPE_OAUTH.equals(tokenType)) {
-                            rb.header("Authorization", "Bearer " + tok);
-                        } else {
-                            rb.header("PRIVATE-TOKEN", tok);
-                        }
+                    if (token != null) {
+                        // A token being checked at login, not yet an account's
+                        com.gl4a.utils.AccountAuth.apply(rb, token, inferTokenType(token));
+                        return chain.proceed(rb.build());
                     }
-                    return chain.proceed(rb.build());
+                    return proceedAsAccount(chain, rb, Gl4Application.get().getAuthLogin());
                 });
         if (BuildConfig.DEBUG) cb.addInterceptor(LOGGING_INTERCEPTOR);
         cb.addInterceptor(new com.gl4a.utils.DebugLoggingInterceptor());
@@ -308,20 +301,36 @@ public class ServiceFactory {
     }
 
     /**
-     * Creates an uncached Retrofit service for a specific account's base URL and token.
-     * Used by NotificationsWorker to poll todos for each logged-in account independently.
+     * Sends a request as {@code login}, its token renewed first if it's an OAuth one about to
+     * run out, and once more after a renewal if GitLab rejected it as expired (#70).
      */
-    public static <S> S getForAccount(Class<S> serviceClass, String apiBaseUrl, String token) {
+    private static okhttp3.Response proceedAsAccount(okhttp3.Interceptor.Chain chain,
+            Request.Builder rb, String login) throws java.io.IOException {
+        if (login == null) return chain.proceed(rb.build());
+        String tok = com.gl4a.utils.AccountAuth.accessToken(login);
+        String type = Gl4Application.get().getTokenTypeForLogin(login);
+        com.gl4a.utils.AccountAuth.apply(rb, tok, type);
+        okhttp3.Response response = chain.proceed(rb.build());
+        if (response.code() == 401 && tok != null) {
+            String renewed = com.gl4a.utils.AccountAuth.refreshAfterRejection(login, tok);
+            if (renewed != null) {
+                response.close();
+                com.gl4a.utils.AccountAuth.apply(rb, renewed, type);
+                return chain.proceed(rb.build());
+            }
+        }
+        return response;
+    }
+
+    /**
+     * Creates an uncached Retrofit service for a specific account's base URL, sent as that
+     * account. Used by NotificationsWorker to poll todos for each logged-in account
+     * independently.
+     */
+    public static <S> S getForAccount(Class<S> serviceClass, String apiBaseUrl, String login) {
         OkHttpClient client = sApiHttpClient.newBuilder()
-                .addInterceptor(chain -> {
-                    Request.Builder rb = chain.request().newBuilder();
-                    if (Gl4Application.TOKEN_TYPE_OAUTH.equals(inferTokenType(token))) {
-                        rb.header("Authorization", "Bearer " + token);
-                    } else {
-                        rb.header("PRIVATE-TOKEN", token);
-                    }
-                    return chain.proceed(rb.build());
-                })
+                .addInterceptor(chain -> proceedAsAccount(chain,
+                        chain.request().newBuilder(), login))
                 // Background checks in the debug log too (#277)
                 .addInterceptor(new com.gl4a.utils.DebugLoggingInterceptor())
                 .build();
@@ -340,7 +349,27 @@ public class ServiceFactory {
      */
     public static <S> S getGraphQL(Class<S> serviceClass) {
         return getForAccount(serviceClass, Gl4Application.get().getInstanceUrl() + "/api/",
-                Gl4Application.get().getAuthToken());
+                Gl4Application.get().getAuthLogin());
+    }
+
+    /**
+     * An uncached service sending {@code token} of the given kind, for a token that isn't an
+     * account's yet: asking who signed in with OAuth (#70).
+     */
+    public static <S> S getForToken(Class<S> serviceClass, String apiBaseUrl, String token,
+            String tokenType) {
+        OkHttpClient client = sApiHttpClient.newBuilder()
+                .addInterceptor(chain -> chain.proceed(com.gl4a.utils.AccountAuth.apply(
+                        chain.request().newBuilder(), token, tokenType).build()))
+                .addInterceptor(new com.gl4a.utils.DebugLoggingInterceptor())
+                .build();
+        return new Retrofit.Builder()
+                .baseUrl(apiBaseUrl)
+                .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
+                .addConverterFactory(MoshiConverterFactory.create(MOSHI))
+                .client(client)
+                .build()
+                .create(serviceClass);
     }
 
     /** The JSON reader and writer the API uses, e.g. to keep a model locally. */
@@ -378,15 +407,7 @@ public class ServiceFactory {
                         login = null;
                     }
                     if (login != null) {
-                        String tok = Gl4Application.get().getTokenForLogin(login);
-                        if (tok != null) {
-                            boolean oauth = Gl4Application.TOKEN_TYPE_OAUTH.equals(
-                                    Gl4Application.get().getTokenTypeForLogin(login));
-                            req = req.newBuilder()
-                                    .header(oauth ? "Authorization" : "PRIVATE-TOKEN",
-                                            oauth ? "Bearer " + tok : tok)
-                                    .build();
-                        }
+                        return proceedAsAccount(chain, req.newBuilder(), login);
                     }
                     return chain.proceed(req);
                 })

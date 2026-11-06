@@ -109,6 +109,16 @@ public interface GitLabUserService {
             @Query("per_page") int perPage
     );
 
+    /**
+     * Activity in all the user's projects, by anyone, newest first: GitLab web's "Your
+     * projects" activity (#315).
+     */
+    @GET("events?scope=all")
+    Single<Response<List<GitLabEvent>>> getEventsInOwnProjects(
+            @Query("page") int page,
+            @Query("per_page") int perPage
+    );
+
     // All events visible to the authenticated user across accessible projects.
     // GitLab does not expose a truly public unauthenticated event feed; this endpoint
     // returns the broadest activity stream available for the authenticated user.

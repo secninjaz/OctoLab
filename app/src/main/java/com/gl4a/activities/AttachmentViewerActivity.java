@@ -122,10 +122,9 @@ public class AttachmentViewerActivity extends WebViewerActivity {
     }
 
     private File downloadFrom(String url) throws IOException {
-        String tok = Gl4Application.get().getAuthToken();
+        // The image client adds the account's token, in the header its kind needs (#70)
         Request request = new Request.Builder()
                 .url(url)
-                .header("PRIVATE-TOKEN", tok != null ? tok : "")
                 .build();
         try (Response resp = ServiceFactory.getImageHttpClient().newCall(request).execute()) {
             if (!resp.isSuccessful() || resp.body() == null) {

@@ -82,6 +82,16 @@
             android:paddingBottom="@dimen/content_padding"
             app:rowText="@string/group_members" />
 
+        <!-- Shown once GitLab answers for the group's epics (#312): not every server has them -->
+        <com.gl4a.widget.OverviewRow
+            android:id="@+id/tv_epics"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="@dimen/content_padding"
+            android:paddingBottom="@dimen/content_padding"
+            android:visibility="gone"
+            app:rowText="@string/group_epics" />
+
         <TextView
             android:id="@+id/tv_subgroups_header"
             android:layout_width="match_parent"

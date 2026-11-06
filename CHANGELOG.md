@@ -3,7 +3,28 @@
 All notable changes to OctoLab are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.6.0] - 2026-11-06
+
+### Added
+- Sign in with gitlab.com in your browser (OAuth). The sign-in renews itself, and removing the account in OctoLab revokes it on gitlab.com (#70)
+- Epics (GitLab Premium and Ultimate): a group's epics (Open, Closed, All, with search, sorting and dates), and each epic's page with its description, labels, dates, assignees, parent, child items with progress, comments and reactions. Epic links, to-dos and bookmarks open in the app (#312)
+- Signing in again to an account that's already added says that it now uses the new sign-in (#317)
+
+### Changed
+- Your Projects in Your Activity shows GitLab's own activity across all your projects, as on GitLab web (#315)
+- Work items and Merge requests start with the Assigned tab, then Created; the tab you last used stays (#323)
+- To-dos and notifications name items as GitLab does, e.g. "Epic &3" and "MR !12" (#312)
+
+### Fixed
+- Projects without their own logo show their group's logo in To-dos and notifications (#313)
+- After logging out or switching accounts, the next account loads normally, without a "token isn't valid anymore" message (#314)
+- Switching between accounts quickly stays within GitLab's limit on requests; Your Projects and Starred activity load with far fewer requests (#315)
+- The drawer's account list shows all its rows together (#316)
+- The same username on two servers can be added as two accounts (#318)
+- The About tab's last commit shows its author's GitLab account and picture, as the Commits tab does (#319)
+- Contributors show their GitLab account's picture, found as tapping them finds it (#322)
+- Groups: a group opened while the list is still loading opens on the first tap (#320)
+- A commit's details (parent, branches, merge requests) show a loading indicator in place instead of appearing later (#321)
 
 ## [1.5.4] - 2026-11-03
 

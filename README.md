@@ -15,14 +15,19 @@ Built and maintained by [SecNinjaz](https://secninjaz.com).
 ## Features
 
 **Accounts**
-- Personal Access Token (PAT) login (OAuth login planned)
+- Sign in with gitlab.com in your browser (OAuth), or with a Personal Access Token on any GitLab instance
 - Multi-account: self-hosted and gitlab.com side by side
+
+**Role-aware**
+- Shows only what your GitLab role allows (Guest, Reporter, Developer, Maintainer, Owner)
+- Actions your role doesn't allow are hidden or explained
 
 **Issues and merge requests**
 - Browse, create, edit and comment on issues
 - Filter by label, assignee or milestone
 - View merge requests, comment and review diffs
 - Subscribe to or unsubscribe from issues and merge requests
+- Epics (GitLab Premium and Ultimate): a group's epics with their child items, comments and reactions
 
 **To-dos and notifications**
 - To-dos | Participating: your to-dos, and new comments on issues and merge requests you take part in
@@ -35,6 +40,7 @@ Built and maintained by [SecNinjaz](https://secninjaz.com).
 **Projects**
 - Browse files, README, branches, tags, commits and releases
 - Search a project's code
+- Projects and groups by your role or visibility, with search
 - Images, videos and files open in the app
 
 **Also**
@@ -49,10 +55,22 @@ No tracking, no analytics, no proprietary services.
 
 ## Screenshots
 
-<p float="left">
-  <img src="screenshots/03.png" width="180" alt="Project overview" />
-  <img src="screenshots/08.png" width="180" alt="Issues list" />
-  <img src="screenshots/07.png" width="180" alt="Diff viewer" />
+<p align="center">
+  <img src="screenshots/framed/03.png" width="30%" alt="Project overview" />
+  <img src="screenshots/framed/08.png" width="30%" alt="Work items" />
+  <img src="screenshots/framed/09.png" width="30%" alt="To-dos" />
+</p>
+
+<p align="center">
+  <img src="screenshots/framed/02.png" width="30%" alt="Your activity" />
+  <img src="screenshots/framed/06.png" width="30%" alt="Commit" />
+  <img src="screenshots/framed/07.png" width="30%" alt="Diff viewer" />
+</p>
+
+<p align="center">
+  <img src="screenshots/framed/01.png" width="30%" alt="Navigation drawer" />
+  <img src="screenshots/framed/04.png" width="30%" alt="Files" />
+  <img src="screenshots/framed/05.png" width="30%" alt="Commits" />
 </p>
 
 ---
@@ -91,21 +109,14 @@ All three use the same signing key, so you can switch between them without reins
    cd octolab
    ```
 
-2. Create `app/client.properties` with your GitLab OAuth app credentials:
-   ```
-   ClientId="YOUR_GITLAB_CLIENT_ID"
-   ClientSecret="YOUR_GITLAB_CLIENT_SECRET"
-   ```
-   To create an OAuth app: GitLab → User Settings → Applications → Add new application
-   - Redirect URI: `gl4a://oauth`
-   - Scopes: `api`, `read_user`, `read_repository`, `write_repository`, `openid`
-
-3. Build:
+2. Build:
    ```bash
-   ./gradlew assembleDebug
+   ./gradlew assembleCommunityDebug
    ```
 
-The APK will be at `app/build/outputs/apk/debug/app-debug.apk`.
+The APK will be at `app/build/outputs/apk/community/debug/app-community-debug.apk`.
+
+No other setup is needed: "Sign in with gitlab.com", and Personal Access Token sign-in on any instance, gitlab.com or self-hosted, work in every build. Only to also sign in with OAuth on your own GitLab instance and open its links in the app, build the `internal` variant for it: see [SETUP-OAUTH-SELFHOSTED.md](SETUP-OAUTH-SELFHOSTED.md).
 
 ---
 
@@ -114,6 +125,8 @@ The APK will be at `app/build/outputs/apk/debug/app-debug.apk`.
 - **OAuth** — opens your GitLab instance in the browser to authorize
 - **Access Token** — enter a Personal Access Token with `api` + `read_user` scopes
 - **Instance URL** — defaults to `https://gitlab.com`, change to your self-hosted URL
+
+Self-hosted instances work out of the box with a Personal Access Token. Only if you also want OAuth sign-in on your own instance, or its links to open in the app by default, build the app for your instance: see [SETUP-OAUTH-SELFHOSTED.md](SETUP-OAUTH-SELFHOSTED.md).
 
 ---
 

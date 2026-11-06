@@ -128,7 +128,7 @@ public class NotificationHandlingService extends IntentService {
                         // With the to-do's own account, which may not be the active one
                         com.gl4a.ServiceFactory.getForAccount(
                                 com.gl4a.gitlab.service.GitLabTodoService.class,
-                                NotificationsWorker.apiBaseForLogin(login), token)
+                                NotificationsWorker.apiBaseForLogin(login), login)
                                 .markAsDone(todoId)
                                 .blockingGet();
                     } catch (RuntimeException e) {

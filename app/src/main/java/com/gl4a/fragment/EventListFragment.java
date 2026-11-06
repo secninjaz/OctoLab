@@ -92,12 +92,19 @@ public abstract class EventListFragment extends PagedDataBaseFragment<GitLabEven
 
     private void fetchMissingProjectPaths(Collection<GitLabEvent> events) {
         Set<Long> needed = new HashSet<>();
+        boolean known = false;
         for (GitLabEvent e : events) {
-            if (e.projectId > 0 && !mProjectPaths.containsKey(e.projectId)
-                    && !mFetchingIds.contains(e.projectId)) {
+            if (e.projectId <= 0 || mProjectPaths.containsKey(e.projectId)) continue;
+            // Known this session from a list or an earlier lookup: no request (#315)
+            String path = com.gl4a.utils.ProjectPaths.get(e.projectId);
+            if (path != null) {
+                mProjectPaths.put(e.projectId, path);
+                known = true;
+            } else if (!mFetchingIds.contains(e.projectId)) {
                 needed.add(e.projectId);
             }
         }
+        if (known && mAdapter != null) mAdapter.setProjectPaths(mProjectPaths);
         if (needed.isEmpty()) return;
         mFetchingIds.addAll(needed);
 
@@ -113,6 +120,7 @@ public abstract class EventListFragment extends PagedDataBaseFragment<GitLabEven
                     response -> {
                         if (response.isSuccessful() && response.body() != null) {
                             GitLabProject p = response.body();
+                            com.gl4a.utils.ProjectPaths.put(p);
                             String path = p.pathWithNamespace != null
                                     ? p.pathWithNamespace : p.name;
                             if (path != null) mProjectPaths.put(p.id, path);

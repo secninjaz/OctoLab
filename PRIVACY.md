@@ -4,8 +4,11 @@ OctoLab Privacy Policy
 What information do we collect?
 --------------------------------
 OctoLab does not store your GitLab username or password.
-Instead, you log in using a Personal Access Token (PAT), which is a revokable
-access token stored locally on your device, in Android's encrypted storage.
+You log in either with a Personal Access Token (PAT), or, on gitlab.com, by logging in
+with your browser as you normally would, which then gives OctoLab a token. Either way
+OctoLab never sees your password, and the token is stored only on your device, in
+Android's encrypted storage. Removing the account in OctoLab also revokes a gitlab.com
+sign-in.
 
 On your device only, OctoLab also keeps:
 - your bookmarks

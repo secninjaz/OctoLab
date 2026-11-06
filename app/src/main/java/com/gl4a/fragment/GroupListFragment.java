@@ -126,6 +126,8 @@ public class GroupListFragment extends Fragment implements BaseActivity.Refresha
             return;
         }
         final boolean withProjectGroups = query == null && SCOPE_MINE.equals(scope);
+        // Whether your groups were shown before your projects' groups came (#320)
+        final boolean[] shownFirst = new boolean[1];
         mLoad = Single.fromCallable(() -> query != null ? searchGroups(force, scope, query)
                         : loadAllGroups(force, byActivity, scope))
                 .zipWith(force ? MembershipRoles.load() : MembershipRoles.loadCached(), Data::new)
@@ -134,7 +136,10 @@ public class GroupListFragment extends Fragment implements BaseActivity.Refresha
                     // Your groups first, at once; your projects' groups a moment later (#308)
                     if (!withProjectGroups) return Single.just(data);
                     // (an empty first part isn't "no groups" yet: keep the spinner)
-                    if (!data.groups.isEmpty()) show(data);
+                    if (!data.groups.isEmpty()) {
+                        show(data, false);
+                        shownFirst[0] = true;
+                    }
                     return Single.fromCallable(() -> new Data(
                                     withGroupsOfMyProjects(data.groups, force, byActivity),
                                     data.roles))
@@ -142,7 +147,9 @@ public class GroupListFragment extends Fragment implements BaseActivity.Refresha
                 })
                 .subscribe(data -> {
                     if (query == null) sCache.put(key, data);
-                    show(data);
+                    // Your projects' groups added to the list already shown: what you opened
+                    // meanwhile stays open (#320)
+                    show(data, shownFirst[0]);
                 }, error -> {
                     View v = getView();
                     if (v == null) return;
@@ -328,6 +335,11 @@ public class GroupListFragment extends Fragment implements BaseActivity.Refresha
     }
 
     private void show(Data data) {
+        show(data, false);
+    }
+
+    /** @param keepOpen keep the groups opened in the list already shown (#320) */
+    private void show(Data data, boolean keepOpen) {
         View view = getView();
         if (view == null || mTree == null) return;
         view.findViewById(R.id.progress).setVisibility(View.GONE);
@@ -336,6 +348,10 @@ public class GroupListFragment extends Fragment implements BaseActivity.Refresha
                 : R.string.groups_none_mine);
         empty.setVisibility(data.groups.isEmpty() ? View.VISIBLE : View.GONE);
         view.findViewById(R.id.ll_tree).setVisibility(View.VISIBLE);
-        mTree.setRoots(data.groups, data.roles);
+        if (keepOpen) {
+            mTree.updateRoots(data.groups, data.roles);
+        } else {
+            mTree.setRoots(data.groups, data.roles);
+        }
     }
 }

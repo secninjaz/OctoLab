@@ -1076,8 +1076,8 @@ public class HttpImageGetter {
         try {
             HttpUrl url = HttpUrl.parse(urlStr);
             if (url == null) return null;
+            // The image client adds the account's token, in the header its kind needs (#70)
             Request.Builder rb = new Request.Builder().url(url);
-            if (tok != null) rb.header("PRIVATE-TOKEN", tok);
             try (Response resp = mClient.newCall(rb.build()).execute()) {
                 if (!resp.isSuccessful() || resp.body() == null) return null;
                 // Embed small images only; big ones keep their URL for the async loader (#187).
@@ -1170,15 +1170,9 @@ public class HttpImageGetter {
         Bitmap bitmap = null;
 
         if (!mDestroyed && url != null) {
-            // Explicitly add auth for the GitLab instance — belt-and-suspenders
-            // alongside the sImageHttpClient interceptor.
+            // The image client adds the account's token for the instance's own addresses, in
+            // the header its kind needs (#70)
             Request.Builder reqBuilder = new Request.Builder().url(url);
-            String instanceHost = android.net.Uri.parse(
-                    com.gl4a.Gl4Application.get().getInstanceUrl()).getHost();
-            if (instanceHost != null && instanceHost.equalsIgnoreCase(url.host())) {
-                String tok = com.gl4a.Gl4Application.get().getAuthToken();
-                if (tok != null) reqBuilder.header("PRIVATE-TOKEN", tok);
-            }
             Request request = reqBuilder.build();
             try (Response response = mClient.newCall(request).execute()) {
                 if (response.isSuccessful() && response.body() != null) {
@@ -1286,8 +1280,8 @@ public class HttpImageGetter {
         HttpUrl url = HttpUrl.parse(videoUrl);
         String instanceHost = instanceUrl != null ? android.net.Uri.parse(instanceUrl).getHost() : null;
         if (url != null && instanceHost != null && instanceHost.equalsIgnoreCase(url.host())) {
-            String tok = Gl4Application.get().getAuthToken();
-            if (tok != null) headers.put("PRIVATE-TOKEN", tok);
+            // The account's token in the header its kind needs (#70)
+            headers.putAll(com.gl4a.utils.AccountAuth.storedHeaders());
         }
         // The uploads API first, like images; the web URL still works for public uploads.
         String apiUrl = videoUrl.replaceAll("/-/project/(\\d+)/uploads/",

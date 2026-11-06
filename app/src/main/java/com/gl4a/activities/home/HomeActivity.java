@@ -67,6 +67,24 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
     }
 
+    private static final String EXTRA_ACCOUNT_ADDED = "account_added";
+
+    /** Back from signing in with gitlab.com: the new account, made the active one (#70). */
+    public static Intent makeAccountAddedIntent(Context context, String login) {
+        return new Intent(context, HomeActivity.class)
+                .putExtra(EXTRA_ACCOUNT_ADDED, login)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+    }
+
+    private void handleAccountAdded(@Nullable Intent intent) {
+        String login = intent != null ? intent.getStringExtra(EXTRA_ACCOUNT_ADDED) : null;
+        if (login == null) return;
+        intent.removeExtra(EXTRA_ACCOUNT_ADDED);
+        // Also for the same account signing in again: reloaded with its new token, as after
+        // token login
+        switchActiveUser(login);
+    }
+
     private void handleRelogin(@Nullable Intent intent) {
         if (intent == null || !intent.getBooleanExtra(EXTRA_RELOGIN, false)) return;
         intent.removeExtra(EXTRA_RELOGIN);
@@ -108,6 +126,10 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
     // To-dos | Participating (#280): GitLab's pending to-do count (-1 unknown), and the unread
     // participating notifications per account, for the bell, the switcher and the tabs
     private int mTodoCount = -1;
+    /** An account switch is restarting this screen: its parts are gone, nothing to save (#314). */
+    private boolean mSwitchingAccount;
+    /** This screen was restarted by an account switch and built fresh (#314). */
+    private boolean mRestartedForAccount;
     /** A screen switch is moving the pager: not a tab the user chose (#284). */
     private boolean mSwitchingScreen;
     private java.util.Map<String, Integer> mParticipatingUnread = new java.util.HashMap<>();
@@ -126,6 +148,7 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
             });
 
     private static final String STATE_KEY_FACTORY_ITEM = "factoryItem";
+    private static final String STATE_KEY_ACCOUNT_SWITCH = "accountSwitch";
 
     private static final int ID_LOADER_USER = 0;
     private static final int ID_LOADER_NOTIFICATIONS_INDICATOR = 1;
@@ -154,6 +177,7 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         setIntent(intent);
         handleNotificationAccountSwitch(intent);
         handleRelogin(intent);
+        handleAccountAdded(intent);
     }
 
     private void handleNotificationAccountSwitch(android.content.Intent intent) {
@@ -163,7 +187,10 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         intent.removeExtra(EXTRA_NOTIFICATION_ACCOUNT);
         String active = com.gl4a.Gl4Application.get().getAuthLogin();
         if (!notifAccount.equals(active)) {
-            switchActiveUser(notifAccount);
+            // The home screen opens again for that account, on To-dos
+            switchActiveUser(notifAccount, R.id.notifications);
+            openTodoTarget(intent);
+            return;
         }
         // Navigate to the notifications tab regardless.
         mSelectedFactoryId = R.id.notifications;
@@ -220,6 +247,8 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
             finish();
             return;
         }
+        // Before any tab is picked: Assigned moved before Created (#323)
+        IssueListFactory.moveRememberedTabs(getPrefs());
         if (savedInstanceState != null) {
             mSelectedFactoryId = savedInstanceState.getInt(STATE_KEY_FACTORY_ITEM);
         } else {
@@ -227,7 +256,21 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         }
         mFactory = getFactoryForItem(mSelectedFactoryId);
 
-        super.onCreate(savedInstanceState);
+        // Restarted by an account switch: built fresh for the new account, as at a cold start,
+        // only the screen kept. Android restoring the previous account's parts brought back a
+        // Projects list still asking for the previous account's projects (#314).
+        mRestartedForAccount = savedInstanceState != null
+                && savedInstanceState.getBoolean(STATE_KEY_ACCOUNT_SWITCH);
+        super.onCreate(mRestartedForAccount ? null : savedInstanceState);
+        if (mRestartedForAccount) {
+            // ...and the tab it had, kept for this account (#284)
+            int count = getTabTitleResIds() != null ? getTabTitleResIds().length : 0;
+            int tab = getPrefs().getInt(lastTabKey(mUserLogin, mSelectedFactoryId), 0);
+            mSwitchingScreen = true;
+            getPager().setCurrentItem(count > 0 ? Math.min(Math.max(tab, 0), count - 1) : 0,
+                    false);
+            mSwitchingScreen = false;
+        }
 
         ActionBar actionBar = getSupportActionBar();
         actionBar.setDisplayShowHomeEnabled(true);
@@ -236,6 +279,18 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         loadUserInfo(false);
         loadNotificationIndicator(false);
         mFactory.onStartLoadingData();
+
+        // Signed in again to an account already added: say what happened (#317)
+        String replaced = Gl4Application.takeReplacedAccount();
+        if (replaced != null) {
+            com.google.android.material.snackbar.Snackbar.make(getRootLayout(),
+                    getString(R.string.account_signed_in_again,
+                            ApiHelpers.formatUsername(
+                                    Gl4Application.get().getUsernameForLogin(replaced)),
+                            android.net.Uri.parse(Gl4Application.get()
+                                    .getInstanceUrlForLogin(replaced)).getHost()),
+                    com.google.android.material.snackbar.Snackbar.LENGTH_LONG).show();
+        }
 
         // Opened from a to-do's notification: go to its target (#178)
         if (savedInstanceState == null && getIntent() != null) {
@@ -302,11 +357,21 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putInt(STATE_KEY_FACTORY_ITEM, mSelectedFactoryId);
-        mFactory.onSaveInstanceState(outState);
+        // Not on an account switch: the screen's parts were just removed, and nothing of the
+        // previous account's screen applies to the new one (Projects crashed saving its list)
+        if (mSwitchingAccount) {
+            outState.putBoolean(STATE_KEY_ACCOUNT_SWITCH, true);
+        } else {
+            mFactory.onSaveInstanceState(outState);
+        }
     }
 
     @Override
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        if (mRestartedForAccount) {
+            // Nothing of the previous account's screen is restored (#314)
+            return;
+        }
         super.onRestoreInstanceState(savedInstanceState);
         if (savedInstanceState != null) {
             mFactory.onRestoreInstanceState(savedInstanceState);
@@ -400,7 +465,7 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
 
         switch (id) {
             case R.id.profile:
-                startActivity(UserActivity.makeIntent(this, mUserLogin));
+                startActivity(UserActivity.makeIntent(this, username()));
                 return true;
             case R.id.logout:
                 Gl4Application.get().logout();
@@ -436,38 +501,66 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
     }
 
     private void switchActiveUser(String login) {
-        // Switching account stays on this screen and tab, which becomes the new account's last
-        // tab for the screen (#284)
-        getPrefs().edit().putInt(lastTabKey(login, mSelectedFactoryId),
-                getPager().getCurrentItem()).apply();
+        switchActiveUser(login, mSelectedFactoryId);
+    }
+
+    /**
+     * Makes {@code login} the active account, on {@code screenId}. Switching account stays on
+     * the screen and tab, which becomes the new account's last tab for the screen (#284).
+     *
+     * The screen restarts in place, as before, but its tabs are removed first, with their kept
+     * results: a restart kept them, a previous account's error too (shown as the new one's
+     * "isn't valid"), and the previous tabs stayed behind, reloading on every later switch
+     * (#314). Opening a new home screen instead flashed the whole screen.
+     */
+    private void switchActiveUser(String login, int screenId) {
+        if (screenId == mSelectedFactoryId) {
+            getPrefs().edit().putInt(lastTabKey(login, screenId),
+                    getPager().getCurrentItem()).apply();
+        }
         Gl4Application.get().setActiveLogin(login);
         mUserLogin = login;
-        onRefresh();
         closeDrawers();
-        switchTo(mSelectedFactoryId, getFactoryForItem(mSelectedFactoryId));
+        // The header and to-do count for the new account, started now: the restart takes
+        // over these loads instead of showing the previous account's
+        loadUserInfo(true);
+        loadNotificationIndicator(true);
+        FragmentManager fm = getSupportFragmentManager();
+        androidx.fragment.app.FragmentTransaction removal = fm.beginTransaction();
+        for (Fragment fragment : fm.getFragments()) {
+            removal.remove(fragment);
+        }
+        removal.commitNowAllowingStateLoss();
+        mSelectedFactoryId = screenId;
+        mSwitchingAccount = true;
         recreate();
+    }
+
+    /** The active account's GitLab username; mUserLogin is its key (#318). */
+    private String username() {
+        return com.gl4a.utils.Accounts.of(mUserLogin).username;
     }
 
     private FragmentFactory getFactoryForItem(int id) {
         switch (id) {
             case R.id.news_feed:
-                return new NewsFeedFactory(this, mUserLogin);
+                return new NewsFeedFactory(this, username());
             case R.id.notifications:
                 return new NotificationListFactory(this);
             case R.id.my_repos:
-                return new RepositoryFactory(this, mUserLogin, getPrefs());
+                return new RepositoryFactory(this, username(), getPrefs());
             case R.id.my_groups:
                 return new GroupListFactory(this);
             case R.id.my_issues:
-                return new IssueListFactory(this, mUserLogin, false, getPrefs());
+                return new IssueListFactory(this, username(), false, getPrefs());
             case R.id.my_prs:
-                return new IssueListFactory(this, mUserLogin, true, getPrefs());
+                return new IssueListFactory(this, username(), true, getPrefs());
             case R.id.my_gists:
-                return new GistFactory(this, mUserLogin);
+                return new GistFactory(this, username());
             case R.id.search:
                 return new SearchFactory(this);
             case R.id.bookmarks:
-                return new BookmarkFactory(this, mUserLogin, getPrefs());
+                return new BookmarkFactory(this, username(), getPrefs());
             case R.id.pub_timeline:
                 return new TimelineFactory(this);
             case R.id.trend:
@@ -597,7 +690,8 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
             String login = mOtherAccountLogins.valueAt(i);
             int count = getAccountCount(login);
             CharSequence label = ApiHelpers.formatAccountLine(
-                    Gl4Application.get().getNameForLogin(login), login);
+                    Gl4Application.get().getNameForLogin(login),
+                    com.gl4a.utils.Accounts.of(login).label());
             item.setTitle(label);
             if (!(item.getActionView() instanceof android.widget.FrameLayout)) {
                 item.setActionView(R.layout.drawer_count_badge);
@@ -649,14 +743,14 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
     }
 
     @Override
-    public void onLoginStartOauth() {
-        GitLabLoginActivity.launchOauthLogin(this);
+    public void onLoginStartOauth(String instanceUrl) {
+        com.gl4a.utils.OAuthLogin.start(this, instanceUrl);
     }
 
     @Override
     public void onLoginFinished(String token, GitLabUser user) {
-        Gl4Application.get().addAccount(user, token);
-        switchActiveUser(user.login());
+        // By its key: the username, or with the server when that's taken elsewhere (#318)
+        switchActiveUser(Gl4Application.get().addAccount(user, token));
     }
 
     @Override
@@ -784,8 +878,9 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
     private void updateHeaderNames(String name) {
         if (mUserNameView == null || mUserExtraView == null) return;
         boolean hasName = !TextUtils.isEmpty(name) && !name.matches("\\*+");
-        mUserNameView.setText(hasName ? name : mUserLogin);
-        mUserExtraView.setText(ApiHelpers.formatUsername(mUserLogin));
+        String label = com.gl4a.utils.Accounts.of(mUserLogin).label();
+        mUserNameView.setText(hasName ? name : label);
+        mUserExtraView.setText(ApiHelpers.formatUsername(label));
         mUserExtraView.setVisibility(hasName ? View.VISIBLE : View.GONE);
     }
 
@@ -841,7 +936,8 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
                 }
 
                 CharSequence label = ApiHelpers.formatAccountLine(
-                        Gl4Application.get().getNameForLogin(login), login);
+                        Gl4Application.get().getNameForLogin(login),
+                    com.gl4a.utils.Accounts.of(login).label());
                 MenuItem item = mLeftDrawerMenu.add(R.id.other_accounts, id, Menu.NONE, label);
                 mOtherAccountLogins.put(id, login);
                 id++;

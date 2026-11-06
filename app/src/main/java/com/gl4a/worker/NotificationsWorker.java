@@ -535,7 +535,7 @@ public class NotificationsWorker extends Worker {
             try {
                 Log.d(TAG, "Fetching todos for " + login + " at " + apiBase);
                 GitLabTodoService service =
-                        ServiceFactory.getForAccount(GitLabTodoService.class, apiBase, token);
+                        ServiceFactory.getForAccount(GitLabTodoService.class, apiBase, login);
                 retrofit2.Response<List<GitLabTodo>> response =
                         service.listTodosByState("pending", 1, 100).blockingGet();
                 allTodos = ApiHelpers.throwOnFailure(response);
@@ -707,18 +707,18 @@ public class NotificationsWorker extends Worker {
         }
         Context context = getApplicationContext();
         com.gl4a.utils.Participation participation =
-                com.gl4a.utils.Participation.forAccount(context, login, apiBase, token);
+                com.gl4a.utils.Participation.forAccount(context, login, apiBase);
         String sinceIso = com.gl4a.utils.Participation.isoTime(since);
         List<com.gl4a.gitlab.model.GitLabIssue> changed =
                 new ArrayList<>(participation.items(false, sinceIso, false));
         changed.addAll(participation.items(true, sinceIso, false));
 
         com.gl4a.gitlab.service.GitLabIssueService issues = ServiceFactory.getForAccount(
-                com.gl4a.gitlab.service.GitLabIssueService.class, apiBase, token);
+                com.gl4a.gitlab.service.GitLabIssueService.class, apiBase, login);
         com.gl4a.gitlab.service.GitLabMergeRequestService mrs = ServiceFactory.getForAccount(
-                com.gl4a.gitlab.service.GitLabMergeRequestService.class, apiBase, token);
+                com.gl4a.gitlab.service.GitLabMergeRequestService.class, apiBase, login);
         com.gl4a.gitlab.service.GitLabProjectService projects = ServiceFactory.getForAccount(
-                com.gl4a.gitlab.service.GitLabProjectService.class, apiBase, token);
+                com.gl4a.gitlab.service.GitLabProjectService.class, apiBase, login);
         Map<Long, com.gl4a.gitlab.model.GitLabProject> projectsById = new HashMap<>();
         Map<Long, android.graphics.Bitmap> logos = new HashMap<>();
         Map<String, android.graphics.Bitmap> icons = new HashMap<>();
@@ -744,12 +744,17 @@ public class NotificationsWorker extends Worker {
             for (com.gl4a.gitlab.model.GitLabComment note : notes) {
                 if (posted >= MAX_TODO_NOTIFICATIONS_PER_ACCOUNT) break;
                 if (note.system || note.author == null
-                        || ApiHelpers.loginEquals(note.author, login)
+                        || com.gl4a.utils.Accounts.isAccount(
+                                com.gl4a.utils.Accounts.of(login), note.author)
                         || com.gl4a.utils.Participation.isoMillis(note.createdAt) <= since) {
                     continue;
                 }
                 String body = note.body();
-                if (body != null && body.contains("@" + login)) continue;
+                // Mentions are by GitLab username, not the account's key (#318)
+                if (body != null
+                        && body.contains("@" + com.gl4a.utils.Accounts.of(login).username)) {
+                    continue;
+                }
                 com.gl4a.gitlab.model.GitLabProject project = projectsById.get(item.projectId);
                 if (project == null && !projectsById.containsKey(item.projectId)) {
                     try {
@@ -1028,8 +1033,8 @@ public class NotificationsWorker extends Worker {
                 ref += " " + todo.commitTitle;
             }
         } else if (todo.target != null) {
-            String prefix = "MergeRequest".equals(todo.targetType) ? "!" : "#";
-            ref = " in " + prefix + todo.target.iid;
+            // As GitLab writes it: "#12", "!3", "&5" (#312)
+            ref = " in " + todo.reference();
         }
         return authorName + " " + verb + ref;
     }

@@ -25,6 +25,10 @@ public class SecureTokenStore {
     private static final String LEGACY_FILE_NAME = "Gh4a-secure-pref";
     private static final String KEY_PREFIX_TOKEN = "token_";
     private static final String KEY_PREFIX_TOKEN_TYPE = "token_type_";
+    // Signed in with OAuth (#70): the token that gets a new access token, and when the
+    // current one runs out (milliseconds)
+    private static final String KEY_PREFIX_REFRESH_TOKEN = "refresh_token_";
+    private static final String KEY_PREFIX_EXPIRES_AT = "token_expires_at_";
 
     private final SharedPreferences mPrefs;
 
@@ -109,7 +113,32 @@ public class SecureTokenStore {
         mPrefs.edit()
                 .remove(KEY_PREFIX_TOKEN + login)
                 .remove(KEY_PREFIX_TOKEN_TYPE + login)
+                .remove(KEY_PREFIX_REFRESH_TOKEN + login)
+                .remove(KEY_PREFIX_EXPIRES_AT + login)
                 .apply();
+    }
+
+    public String getRefreshToken(String login) {
+        return login != null ? mPrefs.getString(KEY_PREFIX_REFRESH_TOKEN + login, null) : null;
+    }
+
+    /** When the access token runs out, in milliseconds; 0 if unknown or it doesn't. */
+    public long getExpiresAt(String login) {
+        return login != null ? mPrefs.getLong(KEY_PREFIX_EXPIRES_AT + login, 0) : 0;
+    }
+
+    /**
+     * An OAuth sign-in's tokens, written together (#70). Committed, not applied: the refresh
+     * token can be used once only, so a new one must be on disk before the old one is lost.
+     */
+    public void putOAuthTokens(String login, String accessToken, String tokenType,
+            String refreshToken, long expiresAt) {
+        mPrefs.edit()
+                .putString(KEY_PREFIX_TOKEN + login, accessToken)
+                .putString(KEY_PREFIX_TOKEN_TYPE + login, tokenType)
+                .putString(KEY_PREFIX_REFRESH_TOKEN + login, refreshToken)
+                .putLong(KEY_PREFIX_EXPIRES_AT + login, expiresAt)
+                .commit();
     }
 
     /**

@@ -260,7 +260,7 @@ public class CommentViewHolder
             mCallback.loadReactionDetails(item, false)
                     .subscribe(details -> {
                         requested.withReactionDetails(details,
-                                Gl4Application.get().getAuthLogin());
+                                com.gl4a.utils.Accounts.myUsername());
                         if (mBoundItem != item) {
                             return;
                         }
@@ -269,7 +269,7 @@ public class CommentViewHolder
                     }, error -> { /* non-fatal */ });
         }
 
-        String ourLogin = Gl4Application.get().getAuthLogin();
+        String ourLogin = com.gl4a.utils.Accounts.myUsername();
         boolean canEdit = ApiHelpers.loginEquals(user, ourLogin)
                 || ApiHelpers.loginEquals(mRepoOwner, ourLogin);
 

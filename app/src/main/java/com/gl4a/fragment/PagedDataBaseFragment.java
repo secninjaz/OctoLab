@@ -83,7 +83,9 @@ public abstract class PagedDataBaseFragment<T> extends LoadingListFragmentBase i
         super.onRecyclerViewInflated(view, inflater);
         mAdapter = onCreateAdapter();
 
-        mLoadingView = inflater.inflate(R.layout.list_loading_view, view, false);
+        // The shared spinner, shown while the next page loads (#321)
+        mLoadingView = com.gl4a.utils.InlineLoading.create(view);
+        mLoadingView.setVisibility(View.GONE);
         mAdapter.setFooterView(mLoadingView, this);
         mAdapter.setOnItemClickListener(this);
         view.setAdapter(mAdapter);

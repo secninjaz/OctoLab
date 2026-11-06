@@ -14,6 +14,12 @@ public final class FeedTypeIcons {
     private FeedTypeIcons() {
     }
 
+    /** A to-do's: an epic's also when GitLab sends it as a work item (#312). */
+    @DrawableRes
+    public static int forTodo(com.gl4a.gitlab.model.GitLabTodo todo) {
+        return forTarget(todo.isEpic() ? "Epic" : todo.type());
+    }
+
     /** A to-do's or participating comment's target_type. */
     @DrawableRes
     public static int forTarget(String targetType) {
@@ -22,6 +28,7 @@ public final class FeedTypeIcons {
             // With a margin as the other icons have (#288)
             case "Issue" -> R.drawable.feed_badge_issue;
             case "MergeRequest" -> R.drawable.pull_request;
+            case "Epic" -> R.drawable.epic;
             case "Commit" -> R.drawable.commit;
             case "Release" -> R.drawable.release;
             case "Discussion" -> R.drawable.discussion;

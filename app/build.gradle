@@ -35,13 +35,17 @@ android {
     defaultConfig {
         minSdkVersion 23
         targetSdkVersion 33
-        versionCode 224
-        versionName "1.5.4"
+        versionCode 225
+        versionName "1.6.0"
         applicationId "com.secninjaz.octolab"
         resourceConfigurations += ['en']
 
         buildConfigField 'String', 'CLIENT_ID', ClientId
         buildConfigField 'String', 'CLIENT_SECRET', ClientSecret
+        // OctoLab's application on gitlab.com, for "Sign in with gitlab.com" (#70). Public by
+        // design (PKCE, no secret), so every build, F-Droid's included, has it.
+        buildConfigField 'String', 'GITLAB_COM_CLIENT_ID',
+                '"c8d25d6a94e3d172c45edb2c495a852e96e0aaea9dac2defa8a567ddbceb5c04"'
     }
 
     signingConfigs {
@@ -53,6 +57,9 @@ android {
         // Community/public release — distributed via GitHub. Only gitlab.com in intent filters.
         community {
             dimension "distribution"
+            // Signing in with OAuth: gitlab.com only (#70)
+            buildConfigField 'String', 'INTERNAL_OAUTH_HOST', '""'
+            buildConfigField 'String', 'INTERNAL_OAUTH_CLIENT_ID', '""'
         }
         // Internal builds — GitLab CI. Adds the internal instance's link filter via
         // src/internal/AndroidManifest.xml. The host is the GitLab instance running the CI
@@ -62,11 +69,17 @@ android {
         internal {
             dimension "distribution"
             applicationIdSuffix ".internal"
-            manifestPlaceholders = [internalGitlabHost:
-                    (project.findProperty("internalGitlabHost")
-                            ?: System.getenv("INTERNAL_GITLAB_HOST")
-                            ?: System.getenv("CI_SERVER_HOST")
-                            ?: "internal-gitlab.invalid")]
+            def internalHost = project.findProperty("internalGitlabHost")
+                    ?: System.getenv("INTERNAL_GITLAB_HOST")
+                    ?: System.getenv("CI_SERVER_HOST")
+                    ?: "internal-gitlab.invalid"
+            manifestPlaceholders = [internalGitlabHost: internalHost]
+            // Signing in with OAuth on the internal instance too (#70): OctoLab's application
+            // there, from the CI settings like the host, so neither is in the repository.
+            // Without it, internal builds offer OAuth for gitlab.com only.
+            buildConfigField 'String', 'INTERNAL_OAUTH_HOST', "\"${internalHost}\""
+            buildConfigField 'String', 'INTERNAL_OAUTH_CLIENT_ID',
+                    "\"${project.findProperty("internalOAuthClientId") ?: System.getenv("INTERNAL_OAUTH_CLIENT_ID") ?: ""}\""
         }
     }
 

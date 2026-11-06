@@ -362,7 +362,7 @@ public class RepositoryListContainerFragment extends Fragment implements
 
         public static FilterDrawerHelper create(String userLogin, boolean isOrg) {
             int menuResId;
-            if (ApiHelpers.loginEquals(userLogin, Gl4Application.get().getAuthLogin())) {
+            if (com.gl4a.utils.Accounts.isMe(userLogin)) {
                 menuResId = R.menu.repo_filter_logged_in;
             } else if (isOrg) {
                 menuResId = R.menu.repo_filter_org;

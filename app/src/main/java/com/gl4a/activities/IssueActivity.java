@@ -213,7 +213,7 @@ public class IssueActivity extends BaseActivity implements
 
         boolean authorized = Gl4Application.get().isAuthorized();
         boolean isCreator = mIssue != null && authorized &&
-                ApiHelpers.loginEquals(mIssue.user(), Gl4Application.get().getAuthLogin());
+                com.gl4a.utils.Accounts.isMe(mIssue.user());
         boolean isClosed = mIssue != null && "closed".equals(mIssue.state());
         boolean isCollaborator = mIsCollaborator != null && mIsCollaborator;
         boolean closerIsCreator = mIssue != null
@@ -399,7 +399,7 @@ public class IssueActivity extends BaseActivity implements
 
     private void updateFabVisibility() {
         boolean isIssueOwner = mIssue != null
-                && ApiHelpers.loginEquals(mIssue.user(), Gl4Application.get().getAuthLogin());
+                && com.gl4a.utils.Accounts.isMe(mIssue.user());
         boolean isCollaborator = mIsCollaborator != null && mIsCollaborator;
         boolean shouldHaveFab = (isIssueOwner || isCollaborator) && mIssue != null;
         CoordinatorLayout rootLayout = getRootLayout();

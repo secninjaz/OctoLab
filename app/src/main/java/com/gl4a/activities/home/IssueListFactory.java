@@ -15,13 +15,13 @@ import com.gl4a.utils.ApiHelpers;
 public class IssueListFactory extends FragmentFactory {
     private static final String STATE_KEY_SHOWING_CLOSED = "issue:showing_closed";
 
-    // Issues: Created / Assigned / Mentioned / Participating
+    // Issues: Assigned / Created / Mentioned / Participating (Assigned first, #323)
     private static final int[] ISSUE_TAB_TITLES = new int[] {
-            R.string.created, R.string.assigned, R.string.mentioned, R.string.participating
+            R.string.assigned, R.string.created, R.string.mentioned, R.string.participating
     };
-    // MRs: Created / Assigned / Reviews / Mentioned  (Reviews = scope=reviews_for_me)
+    // MRs: Assigned / Created / Reviews / Mentioned  (Reviews = scope=reviews_for_me)
     private static final int[] MR_TAB_TITLES = new int[] {
-            R.string.created, R.string.assigned, R.string.reviews, R.string.mentioned,
+            R.string.assigned, R.string.created, R.string.reviews, R.string.mentioned,
             // The shared definition of participating, as for issues (#267)
             R.string.participating
     };
@@ -71,12 +71,35 @@ public class IssueListFactory extends FragmentFactory {
         return mHeaderColorAttrs;
     }
 
-    // Issue scopes: Created / Assigned / Mentioned / Participating
+    // Issue scopes: Assigned / Created / Mentioned / Participating
     private static final String[] ISSUE_SCOPES =
-            { "created_by_me", "assigned_to_me", "mentioned", "participating" };
-    // MR scopes:   Created / Assigned / Reviews / Mentioned
+            { "assigned_to_me", "created_by_me", "mentioned", "participating" };
+    // MR scopes:   Assigned / Created / Reviews / Mentioned / Participating
     private static final String[] MR_SCOPES =
-            { "created_by_me", "assigned_to_me", "reviews_for_me", "mentioned", "participating" };
+            { "assigned_to_me", "created_by_me", "reviews_for_me", "mentioned", "participating" };
+
+    private static final String PREF_ASSIGNED_FIRST = "issue_tabs_assigned_first";
+
+    /**
+     * Once, after Assigned and Created swapped places (#323): the last tab each account used
+     * on these screens is kept by position, so a remembered Created (0) becomes 1 and Assigned
+     * (1) becomes 0, and everyone stays on the tab they were on.
+     */
+    public static void moveRememberedTabs(SharedPreferences prefs) {
+        if (prefs.getBoolean(PREF_ASSIGNED_FIRST, false)) return;
+        SharedPreferences.Editor editor = prefs.edit();
+        for (java.util.Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
+            String key = e.getKey();
+            if (!key.startsWith("last_tab_")
+                    || !(key.endsWith("_my_issues") || key.endsWith("_my_prs"))
+                    || !(e.getValue() instanceof Integer)) {
+                continue;
+            }
+            int tab = (Integer) e.getValue();
+            if (tab == 0 || tab == 1) editor.putInt(key, 1 - tab);
+        }
+        editor.putBoolean(PREF_ASSIGNED_FIRST, true).apply();
+    }
 
     @Override
     protected Fragment makeFragment(int position) {

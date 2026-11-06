@@ -133,6 +133,10 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
     private void loadDetails() {
         if (mDetailsLoading) return;
         mDetailsLoading = true;
+        // The card in place with a spinner while its details load, not appearing later (#321)
+        mContentView.findViewById(R.id.card_details).setVisibility(View.VISIBLE);
+        com.gl4a.utils.InlineLoading.showIn(
+                (LinearLayout) mContentView.findViewById(R.id.ll_commit_details));
         com.gl4a.gitlab.service.GitLabCommitService service =
                 com.gl4a.ServiceFactory.get(com.gl4a.gitlab.service.GitLabCommitService.class,
                         false);
@@ -167,7 +171,12 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
                                 (List<java.util.Map<String, Object>>) result[0],
                                 (List<com.gl4a.gitlab.model.GitLabIssue>) result[1],
                                 (String) result[2], owner, repo),
-                        error -> { });
+                        error -> {
+                            if (mContentView != null) {
+                                mContentView.findViewById(R.id.card_details)
+                                        .setVisibility(View.GONE);
+                            }
+                        });
     }
 
     private boolean mDetailsLoading;
@@ -331,7 +340,7 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
         final Gl4Application app = Gl4Application.get();
 
         ImageView ivGravatar = mContentView.findViewById(R.id.iv_gravatar);
-        AvatarHandler.assignAvatar(ivGravatar, mCommit.author());
+        AvatarHandler.assignCommitAuthorAvatar(ivGravatar, mCommit);
         ivGravatar.setOnClickListener(this);
         ivGravatar.setTag(mCommit.authorEmail);
 

@@ -44,37 +44,55 @@ public final class CommitAuthors {
         return commits;
     }
 
-    @SuppressWarnings("unchecked")
     private static void attachBatch(String path, List<GitLabCommit> commits) {
         try {
-            StringBuilder query = new StringBuilder("query($p: ID!");
-            StringBuilder fields = new StringBuilder();
-            Map<String, Object> variables = new HashMap<>();
-            variables.put("p", path);
-            for (int i = 0; i < commits.size(); i++) {
-                if (commits.get(i).authorUser != null || commits.get(i).id == null) continue;
-                query.append(", $r").append(i).append(": String!");
-                fields.append(" c").append(i).append(": commit(ref: $r").append(i)
-                        .append(") { author { id username name avatarUrl webUrl } }");
-                variables.put("r" + i, commits.get(i).id);
-            }
-            if (fields.length() == 0) return;
-            query.append(") { project(fullPath: $p) { repository {").append(fields)
-                    .append(" } } }");
-            Map<String, Object> body = new HashMap<>();
-            body.put("query", query.toString());
-            body.put("variables", variables);
-            Response<Map<String, Object>> response = ServiceFactory
-                    .getGraphQL(GitLabGraphQLService.class).rawQuery(body).blockingGet();
-            Map<String, Object> repository = child(child(child(response.body(), "data"),
-                    "project"), "repository");
-            if (repository == null) return;
-            for (int i = 0; i < commits.size(); i++) {
-                Map<String, Object> author = child(child(repository, "c" + i), "author");
-                if (author != null) commits.get(i).authorUser = toUser(author);
-            }
+            link(path, commits);
         } catch (Exception e) {
             Log.d(Gl4Application.LOG_TAG, "Commit authors unavailable", e);
+        }
+    }
+
+    /**
+     * Sets the linked account on each of {@code commits} (one GraphQL query, up to 50), and
+     * remembers it for their emails. Throws {@link AvatarHandler.RateLimitedException} when
+     * GitLab says too many requests, so callers that look up many can wait (#322).
+     */
+    @SuppressWarnings("unchecked")
+    static void link(String path, List<GitLabCommit> commits) throws Exception {
+        StringBuilder query = new StringBuilder("query($p: ID!");
+        StringBuilder fields = new StringBuilder();
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("p", path);
+        for (int i = 0; i < commits.size(); i++) {
+            if (commits.get(i).authorUser != null || commits.get(i).id == null) continue;
+            query.append(", $r").append(i).append(": String!");
+            fields.append(" c").append(i).append(": commit(ref: $r").append(i)
+                    .append(") { author { id username name avatarUrl webUrl } }");
+            variables.put("r" + i, commits.get(i).id);
+        }
+        if (fields.length() == 0) return;
+        query.append(") { project(fullPath: $p) { repository {").append(fields)
+                .append(" } } }");
+        Map<String, Object> body = new HashMap<>();
+        body.put("query", query.toString());
+        body.put("variables", variables);
+        Response<Map<String, Object>> response = ServiceFactory
+                .getGraphQL(GitLabGraphQLService.class).rawQuery(body).blockingGet();
+        if (response.code() == 429) {
+            throw new AvatarHandler.RateLimitedException(
+                    AvatarHandler.retryAfterMs(response));
+        }
+        Map<String, Object> repository = child(child(child(response.body(), "data"),
+                "project"), "repository");
+        if (repository == null) return;
+        for (int i = 0; i < commits.size(); i++) {
+            Map<String, Object> author = child(child(repository, "c" + i), "author");
+            if (author != null) {
+                GitLabCommit commit = commits.get(i);
+                commit.authorUser = toUser(author);
+                // Every git author with this email shows that account too (#319)
+                AvatarHandler.rememberGitAuthor(commit.authorEmail, commit.authorUser);
+            }
         }
     }
 

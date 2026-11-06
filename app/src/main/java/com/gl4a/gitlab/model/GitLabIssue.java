@@ -36,6 +36,11 @@ public class GitLabIssue implements Parcelable {
     @Json(name = "references") public GitLabReferences references;
     // GitLab's own type of a to-do's target, e.g. "ISSUE", "TASK", "INCIDENT"; not parcelled
     @Json(name = "type") public String type;
+    // Set only on epics (#312): the group they belong to, and their work item's ID, which
+    // GitLab files their comments under
+    @Json(name = "group_id") public long groupId;
+    @Json(name = "work_item_id") public long workItemId;
+    @Json(name = "start_date") public String startDate;
 
     // GitHub SDK compatible methods
     public long id() { return id; }
@@ -63,6 +68,27 @@ public class GitLabIssue implements Parcelable {
     /** Returns the issue description rendered as HTML for display in the app. */
     public String bodyHtml() { return com.gl4a.utils.HtmlUtils.markdownToHtml(description); }
     public GitLabReactions reactions() { return null; }
+
+    /** An epic, from a group's epic list or page, rather than a project's issue (#312). */
+    public boolean isEpic() {
+        return groupId > 0 || (webUrl != null && webUrl.contains("/-/epics/"));
+    }
+
+    /** "&" for epics, "!" for merge requests, "#" for issues, as GitLab writes them. */
+    public String referencePrefix() {
+        if (isEpic()) return "&";
+        return webUrl != null && webUrl.contains("/-/merge_requests/") ? "!" : "#";
+    }
+
+    /** An epic's group path from its web URL (/groups/a/b/-/epics/3 → a/b), else null. */
+    @androidx.annotation.Nullable
+    public String groupPath() {
+        if (webUrl == null) return null;
+        java.util.List<String> segments = android.net.Uri.parse(webUrl).getPathSegments();
+        int dash = segments.indexOf("-");
+        if (dash < 2 || !"groups".equals(segments.get(0))) return null;
+        return android.text.TextUtils.join("/", segments.subList(1, dash));
+    }
 
     /** Returns labels with colour data (populated when fetched with with_labels_details=true). */
     public List<GitLabLabel> labels() {
@@ -109,6 +135,9 @@ public class GitLabIssue implements Parcelable {
         // but we must write/read a flag to keep the stream in sync.
         in.readInt(); // timeStats placeholder
         in.readInt(); // references placeholder
+        groupId = in.readLong();
+        workItemId = in.readLong();
+        startDate = in.readString();
     }
 
     @Override
@@ -153,6 +182,9 @@ public class GitLabIssue implements Parcelable {
         // timeStats and references: placeholder flags (not yet Parcelable)
         dest.writeInt(0);
         dest.writeInt(0);
+        dest.writeLong(groupId);
+        dest.writeLong(workItemId);
+        dest.writeString(startDate);
     }
 
     @Override

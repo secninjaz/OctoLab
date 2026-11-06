@@ -44,7 +44,7 @@ public class DropDownUserAdapter extends BaseAdapter implements Filterable {
 
     public void replace(Set<GitLabUser> newUsers) {
         synchronized (mLock) {
-            String ourLogin = Gl4Application.get().getAuthLogin();
+            String ourLogin = com.gl4a.utils.Accounts.myUsername();
             mOriginalUsers.clear();
             for (GitLabUser user : newUsers) {
                 if (!TextUtils.equals(ourLogin, user.login())) {

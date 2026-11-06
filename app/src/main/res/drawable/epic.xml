@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- GitLab's "work-item-epic" icon from gitlab-org/gitlab-svgs (MIT) (#312), in the theme's
+     icon colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="16"
+    android:viewportHeight="16">
+    <path
+        android:fillColor="@color/icon_foreground"
+        android:pathData="M12.482 1.01c.343.052.639.28.775.605l2.628 6.308a1.5 1.5 0 0 1 -1.189 2.064L14.5 10h-13v.75c0 .138.112.25.25.25h12l.077.004a.75 .75 0 0 1 0 1.492l-.077.004H3.5v.75c0 .138.112.25.25.25h8.5a.75 .75 0 0 1 0 1.5h-8.5A1.75 1.75 0 0 1 2 13.25v-.75h-.25A1.75 1.75 0 0 1 0 10.75V8.436c.005-.108.022-.218.052-.327l.063-.186 2.628-6.308c.136-.326.432-.553.775-.604L3.667 1h8.666l.15.01zM1.5 8.5h13l-2.5-6H4l-2.5 6z" />
+</vector>

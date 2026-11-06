@@ -240,6 +240,144 @@
 
     </RelativeLayout>
 
+    <!-- An epic's start and due dates (#312) -->
+    <RelativeLayout
+        android:id="@+id/dates_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="@dimen/overview_item_spacing"
+        android:paddingLeft="@dimen/content_padding"
+        android:paddingRight="@dimen/content_padding"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <ImageView
+            android:id="@+id/iv_dates"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginRight="10dp"
+            android:padding="3dp"
+            android:src="@drawable/icon_calendar"
+            app:tint="@color/icon_foreground" />
+
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_dates_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@id/iv_dates"
+            android:text="@string/epic_dates"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+            android:textColor="?android:attr/textColorPrimary" />
+
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_dates"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_dates_label"
+            android:layout_toRightOf="@id/iv_dates"
+            android:textAppearance="@style/TextAppearance.AppCompat.Small"
+            tools:text="Start: 1 Nov 2026 · Due: 30 Nov 2026" />
+
+    </RelativeLayout>
+
+    <!-- An epic's parent epic (#312), opened on tap -->
+    <RelativeLayout
+        android:id="@+id/parent_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackground"
+        android:paddingBottom="@dimen/overview_item_spacing"
+        android:paddingLeft="@dimen/content_padding"
+        android:paddingRight="@dimen/content_padding"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <ImageView
+            android:id="@+id/iv_parent"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginRight="10dp"
+            android:padding="3dp"
+            android:src="@drawable/epic" />
+
+        <TextView
+            android:id="@+id/tv_parent_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@id/iv_parent"
+            android:text="@string/epic_parent"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+            android:textColor="?android:attr/textColorPrimary" />
+
+        <TextView
+            android:id="@+id/tv_parent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_parent_label"
+            android:layout_toRightOf="@id/iv_parent"
+            android:textAppearance="@style/TextAppearance.AppCompat.Small"
+            android:textColor="?android:attr/textColorLink"
+            tools:text="F-06: Automated Incident Logging" />
+
+    </RelativeLayout>
+
+    <!-- An epic's child epics and issues (#312) -->
+    <RelativeLayout
+        android:id="@+id/children_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="@dimen/overview_item_spacing"
+        android:paddingLeft="@dimen/content_padding"
+        android:paddingRight="@dimen/content_padding"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <ImageView
+            android:id="@+id/iv_children"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginRight="10dp"
+            android:src="@drawable/epic" />
+
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_children_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@id/iv_children"
+            android:text="@string/epic_children"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+            android:textColor="?android:attr/textColorPrimary" />
+
+        <!-- GitLab's counts, children's children included, as on GitLab web -->
+        <TextView
+            android:id="@+id/tv_children_counts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_children_label"
+            android:layout_toRightOf="@id/iv_children"
+            android:textAppearance="@style/TextAppearance.AppCompat.Small"
+            tools:text="5 epics · 5 issues · 2 of 10 closed" />
+
+        <ProgressBar
+            android:id="@+id/pb_children"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_children_counts"
+            android:layout_marginTop="4dp"
+            android:layout_toRightOf="@id/iv_children"
+            android:progressTint="?attr/colorIssueClosed" />
+
+    </RelativeLayout>
+
+    <!-- An epic's children (#312), in the issue list's rows, which bring their own padding -->
+    <LinearLayout
+        android:id="@+id/children_list"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone" />
+
     <com.gl4a.widget.CommitStatusBox
         android:id="@+id/commit_status_box"
         android:layout_width="match_parent"

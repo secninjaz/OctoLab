@@ -122,7 +122,7 @@ public final class NoteReactionsLoader {
     /** Stores the loaded reactions and edit details on each comment that has an entry. */
     public static List<GitLabComment> apply(List<GitLabComment> comments,
             Map<Long, NoteDetails> details) {
-        String ownLogin = Gl4Application.get().getAuthLogin();
+        String ownLogin = Accounts.myUsername();
         for (GitLabComment comment : comments) {
             NoteDetails note = details.get(comment.id());
             if (note != null) {

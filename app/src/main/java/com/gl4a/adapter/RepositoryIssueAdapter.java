@@ -21,8 +21,15 @@ import android.content.Context;
 import com.gl4a.R;
 
 public class RepositoryIssueAdapter extends IssueAdapter {
+    // Rows from here don't say where they're from (a group's own epics, #312)
+    private String mHomePath;
+
     public RepositoryIssueAdapter(Context context) {
         super(context);
+    }
+
+    public void setHomePath(String path) {
+        mHomePath = path;
     }
 
     @Override
@@ -31,10 +38,12 @@ public class RepositoryIssueAdapter extends IssueAdapter {
 
         // GitLab webUrl: https://host/namespace/project/-/issues/{iid}
         //                https://host/namespace/project/-/merge_requests/{iid}
-        boolean isMR = issue.webUrl != null && issue.webUrl.contains("/-/merge_requests/");
-        String prefix = isMR ? "!" : "#";
+        //                https://host/groups/group/subgroup/-/epics/{iid}
         String repoDisplay = "";
-        if (issue.webUrl != null) {
+        if (issue.isEpic()) {
+            String group = issue.groupPath();
+            if (group != null) repoDisplay = group;
+        } else if (issue.webUrl != null) {
             try {
                 java.util.List<String> segs =
                         android.net.Uri.parse(issue.webUrl).getPathSegments();
@@ -42,7 +51,34 @@ public class RepositoryIssueAdapter extends IssueAdapter {
                 if (segs.size() >= 2) repoDisplay = segs.get(0) + "/" + segs.get(1);
             } catch (Exception ignored) {}
         }
-        holder.tvNumber.setText(prefix + issue.number()
+        if (repoDisplay.equals(mHomePath)) repoDisplay = "";
+        android.text.SpannableStringBuilder number = new android.text.SpannableStringBuilder(
+                issue.referencePrefix() + issue.number()
                 + (repoDisplay.isEmpty() ? "" : " on " + repoDisplay));
+        if (issue.isEpic()) {
+            // An epic's dates on its number's line, as GitLab web lists them (#312): the
+            // milestone's slot on the right is too narrow for a range
+            String dates = com.gl4a.utils.StringUtils.formatShortDateRange(mContext,
+                    issue.startDate, issue.dueDate);
+            if (dates != null) {
+                number.append(" \u00b7 ");
+                android.graphics.drawable.Drawable clock =
+                        androidx.core.content.ContextCompat.getDrawable(mContext,
+                                R.drawable.due_small);
+                if (clock != null) {
+                    int at = number.length();
+                    number.append("\u2009 ");
+                    number.setSpan(new com.gl4a.widget.CenteredIconSpan(clock), at, at + 1, 0);
+                }
+                number.append(dates);
+            }
+            // One line; a long one loses its end, never the number
+            holder.tvNumber.setMaxLines(1);
+            holder.tvNumber.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        } else {
+            holder.tvNumber.setMaxLines(Integer.MAX_VALUE);
+            holder.tvNumber.setEllipsize(null);
+        }
+        holder.tvNumber.setText(number);
     }
 }

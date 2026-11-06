@@ -84,7 +84,7 @@ public class UserFragment extends LoadingFragmentBase implements
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mUser = getArguments().getParcelable("user");
-        mIsSelf = ApiHelpers.loginEquals(mUser, Gl4Application.get().getAuthLogin());
+        mIsSelf = com.gl4a.utils.Accounts.isMe(mUser);
         setHasOptionsMenu(true);
     }
 

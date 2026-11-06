@@ -105,13 +105,10 @@ public class DownloadUtils {
         }
         final String token = Gl4Application.get().getAuthToken();
         if (addAuthHeader && token != null) {
-            // Use PRIVATE-TOKEN for GitLab (PAT) or Authorization: Bearer for OAuth
+            // The token in the header its kind needs (#70)
             String tokenType = Gl4Application.get().getAuthTokenType();
-            if (Gl4Application.TOKEN_TYPE_OAUTH.equals(tokenType)) {
-                request.addRequestHeader("Authorization", "Bearer " + token);
-            } else {
-                request.addRequestHeader("PRIVATE-TOKEN", token);
-            }
+            request.addRequestHeader(AccountAuth.headerName(tokenType),
+                    AccountAuth.headerValue(token, tokenType));
         }
         if (mimeType != null) {
             request.setMimeType(mimeType);
@@ -142,12 +139,7 @@ public class DownloadUtils {
                 .header("Accept", "application/octet-stream");
         final String token = Gl4Application.get().getAuthToken();
         if (token != null) {
-            String tokenType = Gl4Application.get().getAuthTokenType();
-            if (Gl4Application.TOKEN_TYPE_OAUTH.equals(tokenType)) {
-                requestBuilder.addHeader("Authorization", "Bearer " + token);
-            } else {
-                requestBuilder.addHeader("PRIVATE-TOKEN", token);
-            }
+            AccountAuth.apply(requestBuilder, token, Gl4Application.get().getAuthTokenType());
         }
 
         final Handler handler = new Handler(Looper.getMainLooper());

@@ -55,6 +55,7 @@ public final class Participation {
 
     private final Context mContext;
     private final String mLogin;
+    private final String mUsername;
     private final GitLabUserService mUsers;
     private final GitLabIssueService mIssues;
     private final GitLabMergeRequestService mMergeRequests;
@@ -101,6 +102,8 @@ public final class Participation {
             GitLabGraphQLService graphQL) {
         mContext = context.getApplicationContext();
         mLogin = login;
+        // The account's GitLab username, for asking GitLab; mLogin keys what's kept (#318)
+        mUsername = login != null ? Accounts.of(login).username : null;
         mUsers = users;
         mIssues = issues;
         mMergeRequests = mergeRequests;
@@ -115,19 +118,18 @@ public final class Participation {
      */
     public static Participation forActiveAccount(Context context, boolean bypassCache) {
         com.gl4a.Gl4Application app = com.gl4a.Gl4Application.get();
-        return forAccount(context, app.getAuthLogin(), app.getApiBaseUrl(), app.getAuthToken());
+        return forAccount(context, app.getAuthLogin(), app.getApiBaseUrl());
     }
 
     /** For any account, e.g. its notifications in the background check. */
-    public static Participation forAccount(Context context, String login, String apiBase,
-            String token) {
+    public static Participation forAccount(Context context, String login, String apiBase) {
         return new Participation(context, login,
-                ServiceFactory.getForAccount(GitLabUserService.class, apiBase, token),
-                ServiceFactory.getForAccount(GitLabIssueService.class, apiBase, token),
-                ServiceFactory.getForAccount(GitLabMergeRequestService.class, apiBase, token),
+                ServiceFactory.getForAccount(GitLabUserService.class, apiBase, login),
+                ServiceFactory.getForAccount(GitLabIssueService.class, apiBase, login),
+                ServiceFactory.getForAccount(GitLabMergeRequestService.class, apiBase, login),
                 // GraphQL lives at …/api/graphql, beside …/api/v4/
                 ServiceFactory.getForAccount(GitLabGraphQLService.class,
-                        apiBase.replaceFirst("v4/?$", ""), token));
+                        apiBase.replaceFirst("v4/?$", ""), login));
     }
 
     /**
@@ -286,7 +288,7 @@ public final class Participation {
         if (mergeRequests && mLogin != null) {
             Map<String, String> reviewing = new HashMap<>();
             reviewing.put("scope", "all");
-            reviewing.put("reviewer_username", mLogin);
+            reviewing.put("reviewer_username", mUsername);
             filters.add(reviewing);
         }
         return filters;
@@ -461,8 +463,8 @@ public final class Participation {
                 + " currentUser { authoredMergeRequests" + page + " assignedMergeRequests" + page
                 + " reviewRequestedMergeRequests" + page + " } }";
         Map<String, Object> variables = new HashMap<>();
-        variables.put("u", mLogin);
-        variables.put("us", Collections.singletonList(mLogin));
+        variables.put("u", mUsername);
+        variables.put("us", Collections.singletonList(mUsername));
         variables.put("t", updatedAfter);
         Object data = get(graphQL(query, variables), "data");
         Object user = get(data, "currentUser");

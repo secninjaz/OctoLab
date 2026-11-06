@@ -117,7 +117,7 @@ public class RepositoryListFragment extends PagedDataBaseFragment<GitLabProject>
     protected void updateEmptyState() {
         super.updateEmptyState();
         android.view.View view = getView();
-        if (view == null || !ApiHelpers.loginEquals(mLogin, Gl4Application.get().getAuthLogin())
+        if (view == null || !com.gl4a.utils.Accounts.isMe(mLogin)
                 || !("member".equals(mRepoType) || "all".equals(mRepoType))) {
             return;
         }
@@ -150,7 +150,7 @@ public class RepositoryListFragment extends PagedDataBaseFragment<GitLabProject>
     @Override
     protected Single<Response<GitLabPage<GitLabProject>>> loadPage(int page, boolean bypassCache) {
         final GitLabProjectService service = ServiceFactory.get(GitLabProjectService.class, bypassCache);
-        final boolean isSelf = ApiHelpers.loginEquals(mLogin, Gl4Application.get().getAuthLogin());
+        final boolean isSelf = com.gl4a.utils.Accounts.isMe(mLogin);
 
         Single<Response<List<GitLabProject>>> raw;
         if (isSelf) {
@@ -190,6 +190,6 @@ public class RepositoryListFragment extends PagedDataBaseFragment<GitLabProject>
 
     /** Your own projects or a group's: role badges show your role. */
     private boolean isViewerList() {
-        return mIsOrg || ApiHelpers.loginEquals(mLogin, Gl4Application.get().getAuthLogin());
+        return mIsOrg || com.gl4a.utils.Accounts.isMe(mLogin);
     }
 }

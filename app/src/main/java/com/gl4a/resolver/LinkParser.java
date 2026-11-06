@@ -42,6 +42,7 @@ import java.util.List;
  *   Compare:         /{owner}/{repo}/-/compare/{from}...{to}
  *   Releases:        /{owner}/{repo}/-/releases[/{tagName}]
  *   Groups:          /groups/{groupPath}[-/members]
+ *   Epics:           /groups/{groupPath}/-/epics[/{iid}], also as /-/work_items/{iid}
  */
 public class LinkParser {
 
@@ -106,7 +107,7 @@ public class LinkParser {
                 case "dashboard":
                     return new ParseResult(HomeActivity.makeIntent(activity, R.id.news_feed));
                 case "groups":
-                    return parseGroupLink(activity, uri, parts);
+                    return parseGroupLink(activity, uri, parts, initialCommentFallback);
                 case "explore":
                     return new ParseResult(HomeActivity.makeIntent(activity, R.id.my_repos));
                 default:
@@ -259,7 +260,7 @@ public class LinkParser {
 
     @Nullable
     private static ParseResult parseGroupLink(FragmentActivity activity, Uri uri,
-            List<String> parts) {
+            List<String> parts, IntentUtils.InitialCommentMarker initialCommentFallback) {
         // /groups/{groupPath} or /groups/{groupPath}/-/members; the path may be nested
         // (/groups/parent/child), up to the "-" separator (#103).
         int dashIndex = parts.indexOf("-");
@@ -271,6 +272,19 @@ public class LinkParser {
             String action = parts.get(dashIndex + 1);
             if ("members".equals(action)) {
                 return new ParseResult(OrganizationMemberListActivity.makeIntent(activity, groupPath));
+            }
+            // A group's work items are its epics (#312)
+            if ("epics".equals(action) || "work_items".equals(action)) {
+                String id = parts.size() > dashIndex + 2 ? parts.get(dashIndex + 2) : null;
+                if (id == null) {
+                    return new ParseResult(
+                            com.gl4a.activities.EpicListActivity.makeIntent(activity, groupPath));
+                }
+                if (!id.matches("\\d+")) return null;
+                IntentUtils.InitialCommentMarker initialComment = generateInitialCommentMarker(
+                        uri.getFragment(), "note_", initialCommentFallback);
+                return new ParseResult(com.gl4a.activities.EpicActivity.makeIntent(activity,
+                        groupPath, Integer.parseInt(id), initialComment));
             }
         }
         return new ParseResult(com.gl4a.activities.GroupActivity.makeIntent(activity, groupPath));
