@@ -47,9 +47,25 @@ public class GistActivity extends BaseActivity implements View.OnClickListener {
                 .putExtra("id", snippetId);
     }
 
+    /** A project's snippet, {@code projectPath} as "group/project" (#324). */
+    public static Intent makeIntent(Context context, String projectPath, long snippetId) {
+        return makeIntent(context, snippetId).putExtra("project", projectPath);
+    }
+
+    /** The snippet, from the project's snippets when it has a project, else the user's. */
+    static io.reactivex.Single<retrofit2.Response<GitLabSnippet>> loadSnippet(
+            GitLabSnippetService service, @Nullable String projectPath, long snippetId) {
+        return projectPath != null
+                ? service.getProjectSnippet(Uri.encode(projectPath), snippetId)
+                : service.getSnippet(snippetId);
+    }
+
     private static final int ID_LOADER_GIST = 0;
 
     private long mSnippetId;
+    // The project of a project snippet, "group/project"; null for a personal snippet (#324)
+    @Nullable
+    private String mProjectPath;
     private GitLabSnippet mSnippet;
     // GitLab personal snippets do not have a star endpoint; stub the field
     private Boolean mIsStarred = null;
@@ -75,6 +91,7 @@ public class GistActivity extends BaseActivity implements View.OnClickListener {
     protected void onInitExtras(Bundle extras) {
         super.onInitExtras(extras);
         mSnippetId = extras.getLong("id");
+        mProjectPath = extras.getString("project");
     }
 
     @Override
@@ -126,7 +143,8 @@ public class GistActivity extends BaseActivity implements View.OnClickListener {
     @Override
     public void onClick(View view) {
         GitLabSnippet.SnippetFile file = (GitLabSnippet.SnippetFile) view.getTag();
-        startActivity(GistViewerActivity.makeIntent(this, String.valueOf(mSnippetId), file.filename()));
+        startActivity(GistViewerActivity.makeIntent(this, String.valueOf(mSnippetId),
+                file.filename()).putExtra("project", mProjectPath));
     }
 
     @Override
@@ -192,7 +210,7 @@ public class GistActivity extends BaseActivity implements View.OnClickListener {
 
     private void loadGist(boolean force) {
         GitLabSnippetService service = ServiceFactory.get(GitLabSnippetService.class, force);
-        service.getSnippet(mSnippetId)
+        loadSnippet(service, mProjectPath, mSnippetId)
                 .map(ApiHelpers::throwOnFailure)
                 .compose(makeLoaderSingle(ID_LOADER_GIST, force))
                 .subscribe(result -> {

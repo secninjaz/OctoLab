@@ -9,7 +9,6 @@ import com.gl4a.gitlab.model.GitLabProject;
 import com.gl4a.gitlab.model.GitLabTodo;
 import com.gl4a.gitlab.service.GitLabIssueService;
 import com.gl4a.gitlab.service.GitLabMergeRequestService;
-import com.gl4a.gitlab.service.GitLabProjectService;
 import com.gl4a.gitlab.service.GitLabTodoService;
 import com.gl4a.model.NotificationHolder;
 import com.gl4a.model.NotificationListLoadResult;
@@ -61,23 +60,30 @@ public class SingleFactory {
      */
     public static Single<Boolean> isAppUserRepoCollaborator(String repoOwner, String repoName,
             boolean bypassCache) {
+        // Developer (30) or above can push → treated as collaborator
+        return getAppUserAccessLevel(repoOwner, repoName, bypassCache).map(level -> level >= 30);
+    }
+
+    /**
+     * The logged-in user's role in the project (10 Guest … 50 Owner, through the project or its
+     * group), 0 when not a member, logged out or unknown.
+     */
+    public static Single<Integer> getAppUserAccessLevel(String repoOwner, String repoName,
+            boolean bypassCache) {
         Gl4Application app = Gl4Application.get();
         if (!app.isAuthorized()) {
-            return Single.just(false);
+            return Single.just(0);
         }
 
-        GitLabProjectService service = ServiceFactory.get(GitLabProjectService.class, bypassCache);
-
         // Resolve owner/repo → project, then check permissions
-        return service.getProjectByPath(encodedPath(repoOwner, repoName))
+        return ProjectLookup.byPath(encodedPath(repoOwner, repoName), bypassCache)
                 .map(response -> {
-                    if (!response.isSuccessful() || response.body() == null) return false;
+                    if (!response.isSuccessful() || response.body() == null) return 0;
                     GitLabProject project = response.body();
-                    if (project.permissions == null) return false;
-                    // Developer (30) or above can push → treated as collaborator
-                    return project.permissions.canPush();
+                    if (project.permissions == null) return 0;
+                    return project.permissions.accessLevel();
                 })
-                .onErrorReturn(e -> false);
+                .onErrorReturn(e -> 0);
     }
 
     // ---------------------------------------------------------------------------
@@ -95,8 +101,7 @@ public class SingleFactory {
         if (cached != null) {
             return Single.just(cached);
         }
-        GitLabProjectService service = ServiceFactory.get(GitLabProjectService.class, false);
-        return service.getProjectByPath(encodedPath(repoOwner, repoName))
+        return ProjectLookup.byPath(encodedPath(repoOwner, repoName), false)
                 .map(ApiHelpers::throwOnFailure)
                 .map(project -> {
                     sProjectIdCache.put(cacheKey, project.id);
@@ -115,14 +120,12 @@ public class SingleFactory {
      */
     public static Single<GitLabMergeRequest> getMergeRequest(String repoOwner, String repoName,
             int iid, boolean bypassCache) {
-        GitLabProjectService projectService =
-                ServiceFactory.get(GitLabProjectService.class, bypassCache);
         GitLabMergeRequestService mrService =
                 ServiceFactory.get(GitLabMergeRequestService.class, bypassCache);
         GitLabIssueService issueService =
                 ServiceFactory.get(GitLabIssueService.class, bypassCache);
 
-        return projectService.getProjectByPath(encodedPath(repoOwner, repoName))
+        return ProjectLookup.byPath(encodedPath(repoOwner, repoName), bypassCache)
                 .map(ApiHelpers::throwOnFailure)
                 .flatMap(project -> mrService.getMergeRequest(project.id, iid)
                         .map(ApiHelpers::throwOnFailure)

@@ -46,6 +46,27 @@ public interface GitLabSnippetService {
             @Path(value = "filePath", encoded = true) String filePath
     );
 
+    // A project's snippets (#324): the project as its URL-encoded path ("group%2Fproject")
+    @GET("projects/{project}/snippets/{id}")
+    Single<Response<GitLabSnippet>> getProjectSnippet(
+            @Path(value = "project", encoded = true) String project,
+            @Path("id") long snippetId
+    );
+
+    @GET("projects/{project}/snippets/{id}/raw")
+    Single<Response<okhttp3.ResponseBody>> getRawProjectSnippet(
+            @Path(value = "project", encoded = true) String project,
+            @Path("id") long snippetId
+    );
+
+    @GET("projects/{project}/snippets/{id}/files/{ref}/{filePath}/raw")
+    Single<Response<okhttp3.ResponseBody>> getProjectSnippetFileRaw(
+            @Path(value = "project", encoded = true) String project,
+            @Path("id") long snippetId,
+            @Path("ref") String ref,
+            @Path(value = "filePath", encoded = true) String filePath
+    );
+
     @POST("snippets")
     Single<Response<GitLabSnippet>> createSnippet(@Body Map<String, Object> body);
 

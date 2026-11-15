@@ -58,6 +58,7 @@ import com.gl4a.gitlab.model.GitLabIssue;
 import com.gl4a.gitlab.service.GitLabIssueService;
 import com.gl4a.utils.ApiHelpers;
 import com.gl4a.utils.IntentUtils;
+import com.gl4a.utils.ProjectAccess;
 import com.gl4a.utils.RxUtils;
 import com.gl4a.utils.SingleFactory;
 import com.gl4a.widget.BottomSheetCompatibleScrollingViewBehavior;
@@ -110,6 +111,8 @@ public class IssueActivity extends BaseActivity implements
     private IntentUtils.InitialCommentMarker mInitialComment;
     private ViewGroup mHeader;
     private Boolean mIsCollaborator;
+    // Reporter or above: may close and reopen any work item (#329)
+    private boolean mCanCloseIssues;
     // Whether you're subscribed, once the issue's page has asked GitLab (#290)
     private Boolean mSubscribed;
     private IssueStateTrackingFloatingActionButton mEditFab;
@@ -216,10 +219,10 @@ public class IssueActivity extends BaseActivity implements
                 com.gl4a.utils.Accounts.isMe(mIssue.user());
         boolean isClosed = mIssue != null && "closed".equals(mIssue.state());
         boolean isCollaborator = mIsCollaborator != null && mIsCollaborator;
-        boolean closerIsCreator = mIssue != null
-                && ApiHelpers.userEquals(mIssue.user(), mIssue.closedBy());
-        boolean canClose = mIssue != null && authorized && (isCreator || isCollaborator);
-        boolean canOpen = canClose && (isCollaborator || closerIsCreator);
+        // As on GitLab: the author, and Reporter or above, may close and reopen (#329)
+        boolean canClose = mIssue != null && authorized
+                && (isCreator || isCollaborator || mCanCloseIssues);
+        boolean canOpen = canClose;
 
         if (!canClose || isClosed) {
             menu.removeItem(R.id.issue_close);
@@ -526,10 +529,12 @@ public class IssueActivity extends BaseActivity implements
             supportInvalidateOptionsMenu();
             return;
         }
-        SingleFactory.isAppUserRepoCollaborator(mRepoOwner, mRepoName, force)
+        SingleFactory.getAppUserAccessLevel(mRepoOwner, mRepoName, force)
                 .compose(makeLoaderSingle(ID_LOADER_COLLABORATOR_STATUS, force))
-                .subscribe(result -> {
-                    mIsCollaborator = result;
+                .subscribe(level -> {
+                    // Developer (30) or above, as SingleFactory.isAppUserRepoCollaborator
+                    mIsCollaborator = level >= 30;
+                    mCanCloseIssues = ProjectAccess.canCloseIssues(level);
                     showUiIfDone();
                     supportInvalidateOptionsMenu();
                 }, this::handleLoadFailure);

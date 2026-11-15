@@ -435,8 +435,9 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
     private void loadRepository() {
         // We always skip the cache in this case, since the project endpoint may change open issues count etc.
         boolean skipCache = true;
-        GitLabProjectService service = ServiceFactory.get(GitLabProjectService.class, skipCache);
-        service.getProjectByPath(URLEncoder.encode(mRepoOwner + "/" + mRepoName, StandardCharsets.UTF_8))
+        // Asks GitLab, and keeps the answer for the screens that follow (#333)
+        com.gl4a.utils.ProjectLookup.byPath(
+                URLEncoder.encode(mRepoOwner + "/" + mRepoName, StandardCharsets.UTF_8), skipCache)
                 .map(ApiHelpers::throwOnFailure)
                 .compose(makeLoaderSingle(ID_LOADER_REPO, skipCache))
                 .subscribe(result -> {

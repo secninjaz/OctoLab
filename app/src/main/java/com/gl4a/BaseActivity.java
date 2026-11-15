@@ -107,6 +107,21 @@ public abstract class BaseActivity extends AppCompatActivity implements
     private boolean mContentShown;
     private boolean mContentEmpty;
     private boolean mErrorShown;
+    // The error shown is the network's, so it may load again on its own (#326)
+    private boolean mConnectionErrorShown;
+    private final com.gl4a.utils.NetworkReload mNetworkReload =
+            new com.gl4a.utils.NetworkReload(this, new com.gl4a.utils.NetworkReload.Screen() {
+                @Override
+                public boolean showsConnectionError() {
+                    return mErrorShown && mConnectionErrorShown && !isFinishing();
+                }
+
+                @Override
+                public void reload() {
+                    setErrorViewVisibility(false, null);
+                    onRefresh();
+                }
+            });
     private boolean mCanSwipeToRefresh = true;
 
     private AppBarLayout mHeader;
@@ -553,6 +568,19 @@ public abstract class BaseActivity extends AppCompatActivity implements
         mDisposeOnStop.clear();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // A connection error on view loads again once the network is back (#326)
+        mNetworkReload.start();
+    }
+
+    @Override
+    protected void onPause() {
+        mNetworkReload.stop();
+        super.onPause();
+    }
+
     @NonNull
     @Override
     public MenuInflater getMenuInflater() {
@@ -702,7 +730,9 @@ public abstract class BaseActivity extends AppCompatActivity implements
 
         content.setVisibility(visible ? View.GONE : View.VISIBLE);
         mErrorShown = visible;
+        mConnectionErrorShown = visible && com.gl4a.utils.NetworkReload.isConnectionError(e);
         updateSwipeToRefreshState();
+        if (mConnectionErrorShown) mNetworkReload.onErrorShown(e);
 
         if (error == null) {
             if (!visible) {

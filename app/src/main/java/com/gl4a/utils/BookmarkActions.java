@@ -224,9 +224,7 @@ public final class BookmarkActions {
                     .map(ApiHelpers::throwOnFailure)
                     .map(group -> new Object[] { group.id, group.avatarUrl });
         } else {
-            lookup = com.gl4a.ServiceFactory.get(
-                    com.gl4a.gitlab.service.GitLabProjectService.class, false)
-                    .getProjectByPath(Uri.encode(fullPath))
+            lookup = ProjectLookup.byPath(Uri.encode(fullPath), false)
                     .map(ApiHelpers::throwOnFailure)
                     .map(project -> new Object[] { project.id, project.avatarUrl });
         }

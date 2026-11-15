@@ -3,6 +3,24 @@
 All notable changes to OctoLab are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+## [1.6.1] - 2026-11-15
+
+### Added
+- Project snippet links open in the app, with their files (#324)
+- Settings → Recent runs says when Android stopped or held back a background check and why, and how the app's previous run ended; tap it to see every line, and Share logs includes it (#325)
+
+### Fixed
+- Notifications: a background check can no longer wait without end on a network that went away and hold back the next ones; after a check couldn't reach a server, it checks again as soon as you're back online, connect a VPN or join Wi-Fi (#325)
+- A screen showing a connection error loads again by itself when the network comes back or changes, e.g. once a VPN connects (#326)
+- Opening projects and folders on gitlab.com no longer runs into "too many requests": file sizes come in one request per folder, and a project is looked up once for all its screens (#333)
+- Tapping a merge request comment in Activity opens it in the app at the comment instead of the browser (#328, [GitHub #5](https://github.com/secninjaz/OctoLab/issues/5))
+- Reporters can close and reopen work items, as on GitLab; authors can always reopen their own (#329, [GitHub #4](https://github.com/secninjaz/OctoLab/issues/4))
+- Filtering issues or merge requests by label, milestone or assignee no longer says the project doesn't exist when the list was opened from a merge request or a link; "No label", "No milestone" and "No assignee" show only those without one (#330, [GitHub #3](https://github.com/secninjaz/OctoLab/issues/3))
+- The assignee filter works for merge request lists (#331)
+- Links in plain text to a server you're signed in to, such as a project's URL, a profile's website or a commit message, open with the active account instead of asking which one to use (#332)
+
 ## [1.6.0] - 2026-11-06
 
 ### Added

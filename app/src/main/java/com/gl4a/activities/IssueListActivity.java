@@ -57,6 +57,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
+import io.reactivex.Single;
+
 public class IssueListActivity extends BaseFragmentPagerActivity implements
         View.OnClickListener, LoadingListFragmentBase.OnRecyclerViewCreatedListener,
         SearchView.OnCloseListener, SearchView.OnQueryTextListener,
@@ -654,7 +656,7 @@ public class IssueListActivity extends BaseFragmentPagerActivity implements
             // TODO: GitLab does not have a direct assignee listing endpoint — use project members
             var projectService = ServiceFactory.getForFullPagedLists(
                     com.gl4a.gitlab.service.GitLabProjectService.class, false);
-            registerTemporarySubscription(projectService.getAllMembers(mProjectId, 1, 100)
+            registerTemporarySubscription(projectId().flatMap(id -> projectService.getAllMembers(id, 1, 100))
                     .<List<GitLabUser>>map(ApiHelpers::throwOnFailure)
                     .compose(RxUtils::doInBackground)
                     .compose(RxUtils.<List<GitLabUser>>wrapWithProgressDialog(this, R.string.loading_msg))
@@ -670,7 +672,7 @@ public class IssueListActivity extends BaseFragmentPagerActivity implements
             showMilestonesDialog();
         } else {
             var service = ServiceFactory.getForFullPagedLists(GitLabIssueService.class, false);
-            registerTemporarySubscription(service.getMilestones(mProjectId, "active", 1, 100)
+            registerTemporarySubscription(projectId().flatMap(id -> service.getMilestones(id, "active", 1, 100))
                     .<List<GitLabMilestone>>map(ApiHelpers::throwOnFailure)
                     .compose(RxUtils::doInBackground)
                     .compose(RxUtils.<List<GitLabMilestone>>wrapWithProgressDialog(this, R.string.loading_msg))
@@ -686,7 +688,7 @@ public class IssueListActivity extends BaseFragmentPagerActivity implements
             showLabelsDialog();
         } else {
             var service = ServiceFactory.getForFullPagedLists(GitLabIssueService.class, false);
-            registerTemporarySubscription(service.getLabels(mProjectId, 1, 100)
+            registerTemporarySubscription(projectId().flatMap(id -> service.getLabels(id, 1, 100))
                     .<List<GitLabLabel>>map(ApiHelpers::throwOnFailure)
                     .compose(RxUtils::doInBackground)
                     .compose(RxUtils.<List<GitLabLabel>>wrapWithProgressDialog(this, R.string.loading_msg))
@@ -695,6 +697,16 @@ public class IssueListActivity extends BaseFragmentPagerActivity implements
                         showLabelsDialog();
                     }, this::handleLoadFailure));
         }
+    }
+
+    /**
+     * The project's id, worked out from its path when the list was opened without it (from a
+     * merge request, a link…), as the list itself does: the label, milestone and assignee
+     * pickers asked GitLab for project -1 and said it doesn't exist (#330).
+     */
+    private Single<Long> projectId() {
+        return mProjectId > 0 ? Single.just(mProjectId)
+                : SingleFactory.getProjectId(mRepoOwner, mRepoName).doOnSuccess(id -> mProjectId = id);
     }
 
     private void filterParticipating() {

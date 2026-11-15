@@ -56,7 +56,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
@@ -226,38 +225,70 @@ public class ContentListFragment extends ListDataBaseFragment<GitLabTreeItem> im
         fetchFileSizes(data);
     }
 
-    private void fetchFileSizes(List<GitLabTreeItem> items) {
-        List<GitLabTreeItem> blobs = new ArrayList<>();
-        for (GitLabTreeItem item : items) {
-            if ("blob".equals(item.type())) blobs.add(item);
-        }
-        if (blobs.isEmpty()) return;
+    // GitLab answers at most this many files per question
+    private static final int SIZES_PER_REQUEST = 100;
 
-        GitLabRepositoryService service = ServiceFactory.get(GitLabRepositoryService.class, false);
-        long projectId = mRepository.id();
+    /**
+     * The files' sizes, from GitLab in one GraphQL question per 100 files, not one request per
+     * file: those used up gitlab.com's limit on requests when opening a project (#333).
+     * Best-effort: without an answer, sizes just aren't shown.
+     */
+    private void fetchFileSizes(List<GitLabTreeItem> items) {
+        List<String> paths = new ArrayList<>();
+        for (GitLabTreeItem item : items) {
+            if ("blob".equals(item.type()) && item.path() != null) paths.add(item.path());
+        }
+        if (paths.isEmpty() || mRepository.pathWithNamespace == null) return;
+
         String ref = mRef != null ? mRef : mRepository.defaultBranch();
         Map<String, Long> sizes = new HashMap<>();
-        AtomicInteger remaining = new AtomicInteger(blobs.size());
+        List<io.reactivex.Single<Map<String, Object>>> requests = new ArrayList<>();
+        for (int i = 0; i < paths.size(); i += SIZES_PER_REQUEST) {
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("path", mRepository.pathWithNamespace);
+            variables.put("ref", ref);
+            variables.put("paths", paths.subList(i, Math.min(i + SIZES_PER_REQUEST, paths.size())));
+            Map<String, Object> body = new HashMap<>();
+            body.put("query", "query($path: ID!, $ref: String!, $paths: [String!]!) {"
+                    + " project(fullPath: $path) { repository {"
+                    + " blobs(ref: $ref, paths: $paths, first: " + SIZES_PER_REQUEST + ") {"
+                    + " nodes { path size } } } } }");
+            body.put("variables", variables);
+            requests.add(ServiceFactory.getGraphQL(
+                            com.gl4a.gitlab.service.GitLabGraphQLService.class)
+                    .rawQuery(body)
+                    .map(ApiHelpers::throwOnFailure));
+        }
+        io.reactivex.Single.concat(requests)
+                .doOnNext(response -> addSizes(response, sizes))
+                .ignoreElements()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .onErrorComplete()
+                .subscribe(() -> {
+                    if (mAdapter != null && !sizes.isEmpty()) mAdapter.updateFileSizes(sizes);
+                });
+    }
 
-        for (GitLabTreeItem blob : blobs) {
-            String encodedPath = blob.path().replace("/", "%2F");
-            service.getFileHead(projectId, encodedPath, ref)
-                    .subscribeOn(Schedulers.io())
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe(response -> {
-                        String sizeHeader = response.headers().get("X-Gitlab-Size");
-                        if (sizeHeader != null) {
-                            try { sizes.put(blob.path(), Long.parseLong(sizeHeader)); }
-                            catch (NumberFormatException ignored) {}
-                        }
-                        if (remaining.decrementAndGet() == 0 && mAdapter != null) {
-                            mAdapter.updateFileSizes(sizes);
-                        }
-                    }, e -> {
-                        if (remaining.decrementAndGet() == 0 && mAdapter != null) {
-                            mAdapter.updateFileSizes(sizes);
-                        }
-                    });
+    @SuppressWarnings("unchecked")
+    private static void addSizes(Map<String, Object> response, Map<String, Long> sizes) {
+        Object node = response.get("data");
+        for (String key : new String[] { "project", "repository", "blobs", "nodes" }) {
+            node = node instanceof Map ? ((Map<String, Object>) node).get(key) : null;
+        }
+        if (!(node instanceof List)) return;
+        for (Object blob : (List<?>) node) {
+            if (!(blob instanceof Map)) continue;
+            Object path = ((Map<String, Object>) blob).get("path");
+            Object size = ((Map<String, Object>) blob).get("size");
+            if (!(path instanceof String) || size == null) continue;
+            try {
+                // GitLab sends it as a string (BigInt) or a number
+                sizes.put((String) path, size instanceof Number ? ((Number) size).longValue()
+                        : Long.parseLong(size.toString()));
+            } catch (NumberFormatException ignored) {
+                // no size for this one
+            }
         }
     }
 

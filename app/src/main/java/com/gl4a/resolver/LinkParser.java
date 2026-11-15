@@ -188,6 +188,13 @@ public class LinkParser {
                     return parseWikiLink(activity, parts, user, repo, dashIndex);
                 case "members":
                     return new ParseResult(OrganizationMemberListActivity.makeIntent(activity, user));
+                case "snippets":
+                    // A project's snippet opens in-app like a personal one (#324)
+                    if (id != null && id.matches("[0-9]+")) {
+                        return new ParseResult(com.gl4a.activities.GistActivity.makeIntent(
+                                activity, user + "/" + repo, Long.parseLong(id)));
+                    }
+                    return null;
             }
             return null;
         }

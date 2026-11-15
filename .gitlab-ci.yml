@@ -510,6 +510,8 @@ release:gitlab:
     - |
       VERSION="${CI_COMMIT_TAG#v}"
       CHANGELOG=$(awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found && NF{print}" CHANGELOG.md)
+      # The internal tracker's issue numbers here; GitHub's links only on GitHub
+      CHANGELOG=$(printf '%s\n' "$CHANGELOG" | python3 scripts/changelog_refs.py gitlab)
       if [ -z "$CHANGELOG" ]; then
         CHANGELOG="See CHANGELOG.md for details."
       fi

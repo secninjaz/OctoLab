@@ -157,9 +157,8 @@ public class CommitFragment extends LoadingFragmentBase implements OnClickListen
                         .map(ApiHelpers::throwOnFailure)
                         .onErrorReturnItem(new java.util.ArrayList<>());
         // The project's default branch, shown first among the branches as GitLab web does
-        io.reactivex.Single<String> defaultBranch = com.gl4a.ServiceFactory.get(
-                        com.gl4a.gitlab.service.GitLabProjectService.class, false)
-                .getProjectByPath(android.net.Uri.encode(owner + "/" + repo))
+        io.reactivex.Single<String> defaultBranch = com.gl4a.utils.ProjectLookup
+                .byPath(android.net.Uri.encode(owner + "/" + repo), false)
                 .map(ApiHelpers::throwOnFailure)
                 .map(p -> p.defaultBranch() != null ? p.defaultBranch() : "")
                 .onErrorReturnItem("");

@@ -53,6 +53,15 @@ public final class ProjectAccess {
                 project != null ? project.mergeRequestsAccessLevel : null, false);
     }
 
+    /**
+     * Closing and reopening any work item: Reporter or above, as on GitLab (#329). Takes the
+     * role as {@link com.gl4a.utils.SingleFactory#getAppUserAccessLevel} gives it; 0, not a
+     * member or unknown, doesn't allow it. Authors may close and reopen their own anyway.
+     */
+    public static boolean canCloseIssues(int accessLevel) {
+        return accessLevel >= REPORTER;
+    }
+
     /** Work items: any member may see them, unless the project turned them off. */
     public static boolean canSeeIssues(GitLabProject project) {
         return allows(project, project != null ? project.issuesAccessLevel : null, true);

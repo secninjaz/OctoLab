@@ -120,6 +120,9 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         mWorkerSyncNowPref  = findPreference(KEY_WORKER_SYNC_NOW);
         mWorkerSyncNowPref.setOnPreferenceClickListener(this);
         mWorkerLogPref = findPreference(KEY_WORKER_LOG_PREF);
+        // Settings shows a few lines; the whole list opens on a tap (#325)
+        mWorkerLogPref.setSelectable(true);
+        mWorkerLogPref.setOnPreferenceClickListener(this);
         refreshWorkerStatus();
 
         mDebugLoggingPref = findPreference(KEY_DEBUG_LOGGING);
@@ -178,17 +181,33 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                     lastSyncSummary = com.gl4a.utils.StringUtils.formatRelativeTime(
                             ctx, new java.util.Date(lastCheckMs), true);
                 }
-                final String logText = com.gl4a.worker.NotificationsWorker.getWorkerLog(ctx);
+                final String warning = com.gl4a.worker.NotificationsWorker.stoppedWarning(ctx);
+                final String log = com.gl4a.worker.NotificationsWorker.getWorkerLog(ctx);
+                // Checks that stopped are said first (#325)
+                final String logText = warning == null ? log
+                        : log.isEmpty() ? warning : warning + "\n" + log;
                 requireActivity().runOnUiThread(() -> {
                     mWorkerStatusPref.setSummary(stateSummary);
                     mWorkerLastSyncPref.setSummary(lastSyncSummary);
                     if (mWorkerLogPref != null) {
-                        mWorkerLogPref.setSummary(
-                                logText.isEmpty() ? "No runs recorded yet" : logText);
+                        // A few lines fit; a tap shows them all (#325)
+                        mWorkerLogPref.setSummary(logText.isEmpty()
+                                ? ctx.getString(R.string.worker_log_empty)
+                                : firstLines(logText, 6) + "\n"
+                                        + ctx.getString(R.string.worker_log_tap_for_all));
                     }
                 });
             } catch (Exception ignored) {}
         }, ctx.getMainExecutor());
+    }
+
+    private static String firstLines(String text, int count) {
+        int end = -1;
+        for (int i = 0; i < count; i++) {
+            end = text.indexOf('\n', end + 1);
+            if (end < 0) return text;
+        }
+        return text.substring(0, end);
     }
 
     @Override
@@ -247,6 +266,9 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
             new OpenSourceComponentListDialogFragment()
                     .show(getChildFragmentManager(), "opensource");
             return true;
+        } else if (pref == mWorkerLogPref) {
+            showRecentRuns();
+            return true;
         } else if (pref == mDebugSharePref) {
             shareLogs();
             return true;
@@ -258,13 +280,52 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         return false;
     }
 
+    /** Recent runs in full, as stored (#325): the warning if checks stopped, then newest first. */
+    private String recentRunsText() {
+        Context ctx = requireContext();
+        String warning = NotificationsWorker.stoppedWarning(ctx);
+        String log = NotificationsWorker.getWorkerLog(ctx);
+        if (warning == null) return log;
+        return log.isEmpty() ? warning : warning + "\n" + log;
+    }
+
+    /** All of Recent runs, scrollable, with Share (#325). */
+    private void showRecentRuns() {
+        String text = recentRunsText();
+        if (text.isEmpty()) text = getString(R.string.worker_log_empty);
+        TextView view = new TextView(requireContext());
+        view.setText(text);
+        view.setTextIsSelectable(true);
+        view.setTypeface(android.graphics.Typeface.MONOSPACE);
+        view.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+        int pad = Math.round(20 * getResources().getDisplayMetrics().density);
+        view.setPadding(pad, pad / 2, pad, 0);
+        android.widget.ScrollView scroll = new android.widget.ScrollView(requireContext());
+        scroll.addView(view);
+        final String shared = text;
+        new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setTitle(R.string.worker_log_title)
+                .setView(scroll)
+                .setPositiveButton(R.string.close, null)
+                .setNeutralButton(R.string.share, (dialog, which) -> shareLogText(shared))
+                .show();
+    }
+
+    /** The debug log, and Recent runs after it, in one file to share (#325). */
+    private String logTextToShare() {
+        String runs = recentRunsText();
+        String log = DebugLogger.get().getText();
+        return runs.isEmpty() ? log
+                : log + "\n\n==== " + getString(R.string.worker_log_title) + " ====\n" + runs;
+    }
+
     /**
      * Shares the debug log redacted (recommended) or original, as ntfy does (#278). The log has
      * the GitLab servers' addresses, usernames and project paths, never tokens.
      */
     private void shareLogs() {
         DebugLogger logger = DebugLogger.get();
-        if (logger.size() == 0) {
+        if (logger.size() == 0 && recentRunsText().isEmpty()) {
             Toast.makeText(getContext(), R.string.debug_no_logs, Toast.LENGTH_LONG).show();
             return;
         }
@@ -277,7 +338,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                     if (which == 0) {
                         shareRedactedLogs();
                     } else {
-                        shareLogText(logger.getText());
+                        shareLogText(logTextToShare());
                     }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
@@ -310,7 +371,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                     // An OAuth sign-in's refresh token too (#70)
                     .addSecret(app.getRefreshTokenForLogin(login));
         }
-        com.gl4a.utils.LogRedactor.Result result = redactor.redact(DebugLogger.get().getText());
+        com.gl4a.utils.LogRedactor.Result result = redactor.redact(logTextToShare());
         StringBuilder replaced = new StringBuilder();
         for (java.util.Map.Entry<String, String> e : result.replacements.entrySet()) {
             replaced.append(e.getKey()).append(" → ").append(e.getValue()).append('\n');

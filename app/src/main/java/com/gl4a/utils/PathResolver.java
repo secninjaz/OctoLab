@@ -13,7 +13,6 @@ import com.gl4a.activities.GroupActivity;
 import com.gl4a.activities.RepositoryActivity;
 import com.gl4a.activities.UserActivity;
 import com.gl4a.gitlab.service.GitLabGroupService;
-import com.gl4a.gitlab.service.GitLabProjectService;
 import com.gl4a.gitlab.service.GitLabUserService;
 
 
@@ -103,8 +102,7 @@ public final class PathResolver {
                         .getGroupByPath(Uri.encode(path));
                 break;
             case PROJECT:
-                call = ServiceFactory.get(GitLabProjectService.class, false)
-                        .getProjectByPath(Uri.encode(path));
+                call = ProjectLookup.byPath(Uri.encode(path), false);
                 break;
             default:
                 return Single.just(false);

@@ -96,7 +96,11 @@ public class PullRequestDiffCommentLoadTask extends UrlLoadTask {
                                     mRepoOwner, mRepoName, mPullRequestNumber, mPage, mMarker)));
                         }
                     }
-                    return Single.just(Optional.<Intent>empty());
+                    // Not a comment on a line of code (an ordinary comment, or one past the first
+                    // 100): the merge request itself, at the comment, rather than the browser
+                    // (#328)
+                    return pullRequestSingle.map(pr -> Optional.of(PullRequestActivity.makeIntent(
+                            mActivity, mRepoOwner, mRepoName, mPullRequestNumber, mPage, mMarker)));
                 });
     }
 }

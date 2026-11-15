@@ -84,6 +84,8 @@ jobs:
             " CHANGELOG.md)
           fi
 
+          # GitHub's issues as links; the internal tracker's numbers mean nothing here
+          CHANGELOG=$(printf '%s\n' "$CHANGELOG" | python3 scripts/changelog_refs.py github)
           [ -z "$CHANGELOG" ] && CHANGELOG="See CHANGELOG.md for details."
           # The one Obtainium link form, as everywhere (#310)
           OBTAINIUM_LINK=$(python3 scripts/obtainium_link.py public)

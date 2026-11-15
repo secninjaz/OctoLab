@@ -251,7 +251,11 @@ public final class AccountAuth {
 
     private static synchronized OkHttpClient client() {
         if (sClient == null) {
-            sClient = ServiceFactory.getHttpClientBuilder().cache(null).build();
+            // Renewing holds the account's lock, so it may never wait without end (#325)
+            sClient = ServiceFactory.getHttpClientBuilder().cache(null)
+                    .callTimeout(ServiceFactory.CALL_TIMEOUT_SECONDS,
+                            java.util.concurrent.TimeUnit.SECONDS)
+                    .build();
         }
         return sClient;
     }

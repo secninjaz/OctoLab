@@ -91,6 +91,12 @@ public class Gl4Application extends Application implements
         // manually touch the switch. Without this, the worker posts to a channel that was
         // never registered and Android silently drops every notification (no crash, no log).
         NotificationsWorker.createNotificationChannels(this);
+        // In Recent runs, so a stop by Android shows as the app starting again (#325)
+        if (prefs.getBoolean(SettingsFragment.KEY_NOTIFICATIONS, false)) {
+            NotificationsWorker.noteAppStart(this);
+        }
+        // While the app runs, a network change checks again after a missed server (#325)
+        com.gl4a.worker.NetworkTriggers.watchWhileRunning(this);
         updateNotificationWorker(prefs);
 
         // RxJava 2: swallow UndeliverableException (error arrives after subscriber is disposed,

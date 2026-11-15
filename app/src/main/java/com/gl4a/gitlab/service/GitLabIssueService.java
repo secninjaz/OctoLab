@@ -29,6 +29,7 @@ public interface GitLabIssueService {
             @Query("labels") String labels,
             @Query("milestone") String milestone,
             @Query("assignee_username") String assignee,
+            @Query("assignee_id") String assigneeId,   // "None": no assignee
             @Query("page") int page,
             @Query("per_page") int perPage,
             @Query("order_by") String orderBy,

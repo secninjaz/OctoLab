@@ -30,6 +30,7 @@ import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
 import android.text.SpannableStringBuilder;
+import android.text.TextUtils;
 import android.text.style.TextAppearanceSpan;
 import android.util.Log;
 
@@ -72,7 +73,16 @@ public class NotificationsWorker extends Worker {
 
     /** SharedPreferences key storing the last 20 worker run log lines (newest first). */
     public static final String KEY_WORKER_LOG = "worker_run_log";
-    private static final int MAX_LOG_ENTRIES = 20;
+    // Starts, gaps and app starts are recorded too (#325): about two days are kept
+    private static final int MAX_LOG_ENTRIES = 200;
+    private static final String KEY_LAST_RUN_START = "worker_last_run_start";
+    private static final String KEY_MISSED_SERVER = "worker_missed_server";
+    // A check running longer than this is taken as gone (#325)
+    private static final long MAX_RUN_MS = 10 * 60 * 1000L;
+    private static long sRunningSince;
+    // A gap between checks this long, or longer than a few intervals, is shown: Android spaces
+    // checks out while the phone sleeps, up to a few hours, but not more (#325)
+    private static final long GAP_MIN_MS = 6 * 60 * 60 * 1000L;
 
     private static final Object sPrefsLock = new Object();
     // Android drops an app's notifications beyond about 50; the newest to-dos are shown and the
@@ -112,6 +122,7 @@ public class NotificationsWorker extends Worker {
         Log.d(TAG, "Canceling notification fetch");
         WorkManager.getInstance(context).cancelAllWorkByTag(WORK_TAG);
         WorkManager.getInstance(context).cancelUniqueWork(WORK_TAG);
+        NetworkTriggers.cancelAll(context);
         cancelLegacyWork(context);
     }
 
@@ -497,9 +508,45 @@ public class NotificationsWorker extends Worker {
     @NonNull
     @Override
     public Result doWork() {
+        long runStart = System.currentTimeMillis();
+        String trigger = NetworkTriggers.triggerOf(getInputData());
+        // One check at a time, whatever started it: two at once posted everything twice (#277).
+        // One that started long ago no longer counts: requests have a time limit (#325)
+        synchronized (NotificationsWorker.class) {
+            if (sRunningSince != 0 && runStart - sRunningSince < MAX_RUN_MS) {
+                appendWorkerLog(getApplicationContext(), runStart, "Skipped"
+                        + (trigger != null ? " (" + trigger + ")" : "")
+                        + ": a check is running", 0, false);
+                return Result.success();
+            }
+            sRunningSince = runStart;
+        }
+        try {
+            return check(runStart, trigger);
+        } finally {
+            synchronized (NotificationsWorker.class) {
+                if (sRunningSince == runStart) sRunningSince = 0;
+            }
+        }
+    }
+
+    @Override
+    public void onStopped() {
+        super.onStopped();
+        // Android stopped this check: why, if it says (#325)
+        String reason = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                ? RunDiagnostics.stopReason(getStopReason()) : null;
+        appendWorkerLog(getApplicationContext(), System.currentTimeMillis(),
+                "Stopped by Android" + (reason != null ? ": " + reason : ""), 0, false);
+    }
+
+    private Result check(long runStart, @androidx.annotation.Nullable String trigger) {
         com.gl4a.Gl4Application app = com.gl4a.Gl4Application.get();
         java.util.Set<String> logins = app.getAllLogins();
-        long runStart = System.currentTimeMillis();
+        noteRunStart(getApplicationContext(), runStart, trigger);
+        // A server out of reach because of the network: check again when a network that may
+        // reach it appears (#325)
+        boolean networkFailed = false;
         if (logins.isEmpty()) {
             appendWorkerLog(getApplicationContext(), runStart, "No accounts — skipped", 0, false);
             return Result.success();
@@ -513,6 +560,8 @@ public class NotificationsWorker extends Worker {
         // For the summary: an "OK" when no account could be reached misled (#277)
         int checked = 0;
         int failed = 0;
+        // Accounts that failed, by reason, for one line in Recent runs rather than one each
+        java.util.Map<String, List<String>> failures = new java.util.LinkedHashMap<>();
         boolean anyNew = false;
 
         for (String login : logins) {
@@ -546,9 +595,10 @@ public class NotificationsWorker extends Worker {
                 Log.d(TAG, "Failed fetching todos for " + login, e);
                 com.gl4a.utils.DebugLogger.get().error("Worker",
                         "Checking to-dos failed for " + login, rootCause(e));
-                appendWorkerLog(getApplicationContext(), System.currentTimeMillis(),
-                        "FAILED [" + login + "]: " + failureReason(e), 0, false);
+                failures.computeIfAbsent(failureReason(e), r -> new java.util.ArrayList<>())
+                        .add(login);
                 failed++;
+                networkFailed |= rootCause(e) instanceof java.io.IOException;
                 continue;
             }
 
@@ -559,6 +609,7 @@ public class NotificationsWorker extends Worker {
                     totalUnseen += comments;
                     anyNew |= comments > 0;
                 } catch (com.gl4a.utils.Participation.UnreachableException e) {
+                    networkFailed = true;
                     // Not marked as checked, so the next check covers this one (#275)
                     Log.d(TAG, "GitLab not reachable for participating comments of " + login, e);
                     com.gl4a.utils.DebugLogger.get().error("Worker",
@@ -681,8 +732,26 @@ public class NotificationsWorker extends Worker {
                     : "OK — no new todos")
                     + (failed > 0 ? " (" + failed + " of " + checked + " failed)" : "");
         }
+        // Which accounts failed and why, on the same line: one line per check, so Recent runs
+        // reaches back about a day even when some servers can't be reached (#325)
+        for (java.util.Map.Entry<String, List<String>> f : failures.entrySet()) {
+            summary += "; " + TextUtils.join(", ", f.getValue()) + ": " + f.getKey();
+        }
         appendWorkerLog(getApplicationContext(), runStart, summary, totalUnseen, anyNew);
+        prefs.edit().putBoolean(KEY_MISSED_SERVER, networkFailed).apply();
+        if (networkFailed) {
+            NetworkTriggers.arm(getApplicationContext());
+        } else {
+            NetworkTriggers.disarm(getApplicationContext(), trigger);
+        }
         return Result.success();
+    }
+
+    /** Whether the last check couldn't reach a server because of the network (#325). */
+    static boolean lastCheckMissedServer(Context ctx) {
+        SharedPreferences prefs = getPrefs(ctx);
+        return prefs.getBoolean(SettingsFragment.KEY_NOTIFICATIONS, false)
+                && prefs.getBoolean(KEY_MISSED_SERVER, false);
     }
 
     private static String keyParticipatingCheck(String login) {
@@ -789,7 +858,7 @@ public class NotificationsWorker extends Worker {
     }
 
     /** Prepends a log entry to KEY_WORKER_LOG, keeping at most MAX_LOG_ENTRIES. */
-    public static void appendWorkerLog(Context ctx, long startMs, String summary,
+    public static synchronized void appendWorkerLog(Context ctx, long startMs, String summary,
             int unseen, boolean anyNew) {
         SharedPreferences prefs = getPrefs(ctx);
         String ts = new java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.US)
@@ -806,6 +875,70 @@ public class NotificationsWorker extends Worker {
             }
         }
         prefs.edit().putString(KEY_WORKER_LOG, sb.toString()).apply();
+    }
+
+    /**
+     * Records that a check started (#325): a line in Recent runs, after one saying how long no
+     * check ran, when that was longer than Android's spacing explains.
+     */
+    private static void noteRunStart(Context ctx, long runStart,
+            @androidx.annotation.Nullable String trigger) {
+        SharedPreferences prefs = getPrefs(ctx);
+        long previous = prefs.getLong(KEY_LAST_RUN_START, 0);
+        if (previous > 0 && runStart - previous > gapLimitMs(ctx)) {
+            appendWorkerLog(ctx, runStart, "No checks for " + formatGap(runStart - previous)
+                    + ", since " + formatLogTime(previous), 0, false);
+        }
+        prefs.edit().putLong(KEY_LAST_RUN_START, runStart).apply();
+        // With what limits Android puts on it now, if any (#325)
+        String limits = RunDiagnostics.limits(ctx);
+        appendWorkerLog(ctx, runStart,
+                "Check started" + (trigger != null ? ": " + trigger : "")
+                        + (limits != null ? " [" + limits + "]" : ""), 0, false);
+    }
+
+    /** Records that the app started, e.g. after Android or an update stopped it (#325). */
+    public static void noteAppStart(Context ctx) {
+        // And how Android ended the run before, if it says (#325)
+        String exit = RunDiagnostics.previousExit(ctx, getPrefs(ctx));
+        long start = System.currentTimeMillis();
+        appendWorkerLog(ctx, start,
+                "App started" + (exit != null ? " (" + exit + ")" : ""), 0, false);
+        // And where Android's scheduler has the check, asked off the main thread (#325)
+        Context app = ctx.getApplicationContext();
+        new Thread(() -> appendWorkerLog(app, start,
+                "Scheduler: " + RunDiagnostics.schedulerState(app), 0, false)).start();
+    }
+
+    /**
+     * "No checks since …" when checks are on and none started for longer than Android's
+     * spacing explains, for the top of Recent runs (#325); null otherwise.
+     */
+    @androidx.annotation.Nullable
+    public static String stoppedWarning(Context ctx) {
+        SharedPreferences prefs = getPrefs(ctx);
+        long previous = prefs.getLong(KEY_LAST_RUN_START, 0);
+        if (!prefs.getBoolean(SettingsFragment.KEY_NOTIFICATIONS, false) || previous == 0
+                || System.currentTimeMillis() - previous <= gapLimitMs(ctx)) {
+            return null;
+        }
+        return "No checks since " + formatLogTime(previous)
+                + ": Android may have stopped them. Opening the app starts them again.";
+    }
+
+    private static long gapLimitMs(Context ctx) {
+        int interval = getPrefs(ctx).getInt(SettingsFragment.KEY_NOTIFICATION_INTERVAL, 15);
+        return Math.max(GAP_MIN_MS, 4L * interval * 60 * 1000);
+    }
+
+    private static String formatLogTime(long ms) {
+        return new java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.US)
+                .format(new java.util.Date(ms));
+    }
+
+    private static String formatGap(long ms) {
+        long hours = ms / (60 * 60 * 1000L);
+        return hours >= 48 ? (hours / 24) + " days" : hours + " h";
     }
 
     /** Returns the stored worker log string, or empty string if none. */

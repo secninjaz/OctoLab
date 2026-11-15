@@ -329,6 +329,10 @@ public class ServiceFactory {
      */
     public static <S> S getForAccount(Class<S> serviceClass, String apiBaseUrl, String login) {
         OkHttpClient client = sApiHttpClient.newBuilder()
+                // One limit for the whole request, finding the server's address included,
+                // which the connect and read limits don't cover: a background check waited
+                // without end on a network that went away (#325)
+                .callTimeout(CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .addInterceptor(chain -> proceedAsAccount(chain,
                         chain.request().newBuilder(), login))
                 // Background checks in the debug log too (#277)
@@ -359,6 +363,7 @@ public class ServiceFactory {
     public static <S> S getForToken(Class<S> serviceClass, String apiBaseUrl, String token,
             String tokenType) {
         OkHttpClient client = sApiHttpClient.newBuilder()
+                .callTimeout(CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .addInterceptor(chain -> chain.proceed(com.gl4a.utils.AccountAuth.apply(
                         chain.request().newBuilder(), token, tokenType).build()))
                 .addInterceptor(new com.gl4a.utils.DebugLoggingInterceptor())
@@ -377,6 +382,9 @@ public class ServiceFactory {
 
     public static void invalidateCache() { sCache.clear(); }
     public static OkHttpClient.Builder getHttpClientBuilder() { return sApiHttpClient.newBuilder(); }
+
+    /** The most a request sent as an account, or a token request, may take in all (#325). */
+    public static final int CALL_TIMEOUT_SECONDS = 60;
     public static OkHttpClient getImageHttpClient() { return sImageHttpClient; }
 
     static void initClient(Context context) {

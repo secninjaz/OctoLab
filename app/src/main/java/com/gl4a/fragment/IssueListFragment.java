@@ -276,6 +276,23 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
         return mEmptyTextResId;
     }
 
+    /**
+     * A filter as GitLab takes it: "No label" / "No milestone" (empty here) is "None", which
+     * GitLab reads as without one; an empty value it ignored, listing everything (#330).
+     */
+    private static String none(String filter) {
+        return filter != null && filter.isEmpty() ? "None" : filter;
+    }
+
+    /** "No assignee" is assignee_id=None; a person, their username. Issues and MRs (#331). */
+    private String assigneeUsername() {
+        return mFilterAssignee != null && mFilterAssignee.isEmpty() ? null : mFilterAssignee;
+    }
+
+    private String assigneeId() {
+        return mFilterAssignee != null && mFilterAssignee.isEmpty() ? "None" : null;
+    }
+
     @Override
     protected Single<Response<GitLabPage<GitLabIssue>>> loadPage(int page, boolean bypassCache) {
         if (mProjectMode && mIsMR) {
@@ -290,7 +307,8 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
                             .doOnSuccess(id -> mProjectId = id);
             return projectIdSingle.flatMap(id ->
                     mrService.listMergeRequests(id, mrState,
-                            mFilterLabel, mFilterMilestone, page, 25, mSortMode, mOrder, mQuery, true)
+                            none(mFilterLabel), none(mFilterMilestone), assigneeUsername(), assigneeId(),
+                            page, 25, mSortMode, mOrder, mQuery, true)
                     .map(response -> {
                         if (!response.isSuccessful())
                             return Response.<GitLabPage<GitLabIssue>>error(response.errorBody(), response.raw());
@@ -303,7 +321,8 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
             String state = mIssueState != null ? mIssueState : "opened";
             if (mProjectId > 0) {
                 return service.listIssues(mProjectId, state,
-                        mFilterLabel, mFilterMilestone, mFilterAssignee, page, 25, mSortMode, mOrder, mQuery, true)
+                        none(mFilterLabel), none(mFilterMilestone), assigneeUsername(), assigneeId(), page, 25,
+                        mSortMode, mOrder, mQuery, true)
                         .map(response -> {
                             if (response.isSuccessful())
                                 return Response.success(ApiHelpers.toPage(response));
@@ -314,7 +333,8 @@ public class IssueListFragment extends PagedDataBaseFragment<GitLabIssue> {
                 return SingleFactory.getProjectId(mRepoOwner, mRepoName)
                         .doOnSuccess(id -> mProjectId = id)
                         .flatMap(id -> service.listIssues(id, state,
-                                mFilterLabel, mFilterMilestone, mFilterAssignee, page, 25, mSortMode, mOrder, mQuery, true))
+                                none(mFilterLabel), none(mFilterMilestone), assigneeUsername(), assigneeId(), page, 25,
+                                mSortMode, mOrder, mQuery, true))
                         .map(response -> {
                             if (response.isSuccessful())
                                 return Response.success(ApiHelpers.toPage(response));
