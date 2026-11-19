@@ -65,6 +65,11 @@ public abstract class FragmentFactory {
         return false;
     }
 
+    /** Back handled within the screen, e.g. Search back to All (#337); false otherwise. */
+    protected boolean onBackPressed() {
+        return false;
+    }
+
     protected void onSaveInstanceState(Bundle outState) {}
 
     protected void onRestoreInstanceState(Bundle state) {}

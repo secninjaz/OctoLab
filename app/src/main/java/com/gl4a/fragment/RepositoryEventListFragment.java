@@ -31,7 +31,8 @@ public class RepositoryEventListFragment extends EventListFragment {
     @Override
     protected Single<Response<GitLabPage<GitLabEvent>>> loadRawPage(int page, boolean bypassCache) {
         GitLabUserService service = ServiceFactory.get(GitLabUserService.class, bypassCache);
-        return service.getProjectEvents(mRepository.id(), page, 30)
+        return service.getProjectEvents(mRepository.id(), page, 30,
+                java.util.Collections.emptyMap())
                 .map(response -> {
                     if (!response.isSuccessful() || response.body() == null) {
                         return retrofit2.Response.<GitLabPage<GitLabEvent>>error(

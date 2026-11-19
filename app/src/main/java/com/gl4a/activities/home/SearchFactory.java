@@ -27,6 +27,24 @@ public class SearchFactory extends FragmentFactory {
 
     @Override
     protected Fragment makeFragment(int position) {
-        return SearchFragment.newInstance(SearchFragment.SEARCH_TYPE_ALL, null, false);
+        // The kind this account searched last (#337)
+        return SearchFragment.newRememberingInstance();
+    }
+
+    private SearchFragment mFragment;
+
+    @Override
+    protected void onFragmentInstantiated(Fragment f, int position) {
+        mFragment = (SearchFragment) f;
+    }
+
+    @Override
+    protected void onFragmentDestroyed(Fragment f) {
+        if (f == mFragment) mFragment = null;
+    }
+
+    @Override
+    protected boolean onBackPressed() {
+        return mFragment != null && mFragment.goBackToAll();
     }
 }

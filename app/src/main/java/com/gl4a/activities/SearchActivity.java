@@ -67,6 +67,10 @@ public class SearchActivity extends FragmentContainerActivity {
         SearchFragment fragment =
                 SearchFragment.newInstance(searchType, initialQuery, startSearchImmediately);
         long projectId = intent.getLongExtra("project_id", 0);
+        // Search opened without a kind (the search key, after login): the one last used (#337)
+        if (!intent.hasExtra("search_type") && projectId <= 0) {
+            SearchFragment.remembering(fragment);
+        }
         if (projectId > 0) {
             fragment.getArguments().putLong("project_id", projectId);
             fragment.getArguments().putString("project_name",

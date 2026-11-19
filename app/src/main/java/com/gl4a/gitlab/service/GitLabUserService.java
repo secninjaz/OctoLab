@@ -5,6 +5,7 @@ import com.gl4a.gitlab.model.GitLabProject;
 import com.gl4a.gitlab.model.GitLabUser;
 
 import java.util.List;
+import java.util.Map;
 
 import io.reactivex.Single;
 import retrofit2.Response;
@@ -98,7 +99,9 @@ public interface GitLabUserService {
     @GET("events")
     Single<Response<List<GitLabEvent>>> getCurrentUserEvents(
             @Query("page") int page,
-            @Query("per_page") int perPage
+            @Query("per_page") int perPage,
+            // Activity's filter and order (#336): target_type or action, and sort
+            @retrofit2.http.QueryMap Map<String, String> options
     );
 
     // Events from a specific project
@@ -106,7 +109,9 @@ public interface GitLabUserService {
     Single<Response<List<GitLabEvent>>> getProjectEvents(
             @retrofit2.http.Path("id") long projectId,
             @Query("page") int page,
-            @Query("per_page") int perPage
+            @Query("per_page") int perPage,
+            // Activity's filter and order (#336); none for a project's own activity
+            @retrofit2.http.QueryMap Map<String, String> options
     );
 
     /**
@@ -116,7 +121,9 @@ public interface GitLabUserService {
     @GET("events?scope=all")
     Single<Response<List<GitLabEvent>>> getEventsInOwnProjects(
             @Query("page") int page,
-            @Query("per_page") int perPage
+            @Query("per_page") int perPage,
+            // Activity's filter and order (#336)
+            @retrofit2.http.QueryMap Map<String, String> options
     );
 
     // All events visible to the authenticated user across accessible projects.

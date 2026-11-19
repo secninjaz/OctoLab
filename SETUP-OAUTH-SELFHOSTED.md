@@ -173,7 +173,9 @@ It should answer `200` with `content-type: application/json` and your file.
 
 ### Let Android check again
 
-Android checks when the app is installed or updated. If you add the file after installing, reinstall or update the app, or ask Android to check again over USB:
+Android checks when the app is installed or updated, from the phone itself: at that moment the phone must reach your instance. If your instance is only on your company network, be on that network, in the office or over your VPN, while installing or updating. With a VPN, route the whole phone through it, not only some apps (split tunnelling): the check is made by Android, not by OctoLab or the browser, so a VPN limited to those apps leaves it outside and it fails.
+
+If you add the file after installing, reinstall or update the app, or ask Android to check again over USB:
 
 ```bash
 adb shell pm verify-app-links --re-verify com.secninjaz.octolab.internal
@@ -188,6 +190,7 @@ adb shell pm get-app-links com.secninjaz.octolab.internal
 - **"The redirect URI included is not valid":** the application's Redirect URI doesn't match the installed build. Check the application ID of what you installed (debug builds end in `.debug`).
 - **"Client authentication failed":** the application is marked Confidential. Uncheck it.
 - **Your instance's links open in the browser, not the app:** see step 4. Check that the file answers 200 without a redirect, and that the application ID and fingerprint match the installed build.
+- **Links opened in the app before, and stopped after an update:** the phone couldn't reach your instance when the update was installed, e.g. outside the company network, or on a VPN that covers only some apps. Update again (or run the `--re-verify` command above) while the whole phone reaches the instance, or turn the links on by hand as described in step 4.
 
 ## Notes
 

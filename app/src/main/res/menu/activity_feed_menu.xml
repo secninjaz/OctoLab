@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Activity's filter and sort (#336): as To-dos' filter and Starred's sort order -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/activity_filter"
+        android:icon="@drawable/filter"
+        android:title="@string/issue_filter"
+        app:showAsAction="ifRoom">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item android:id="@+id/activity_filter_all" android:title="@string/activity_type_all" />
+                <item android:id="@+id/activity_filter_issues" android:title="@string/activity_type_issues" />
+                <item android:id="@+id/activity_filter_merge_requests" android:title="@string/activity_type_merge_requests" />
+                <item android:id="@+id/activity_filter_comments" android:title="@string/activity_type_comments" />
+                <item android:id="@+id/activity_filter_pushes" android:title="@string/activity_type_pushes" />
+            </group>
+        </menu>
+    </item>
+    <item
+        android:id="@+id/activity_sort"
+        android:icon="@drawable/menu_sort_order"
+        android:title="@string/repo_sort"
+        app:showAsAction="ifRoom">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item android:id="@+id/activity_sort_newest" android:title="@string/activity_sort_newest" />
+                <item android:id="@+id/activity_sort_oldest" android:title="@string/activity_sort_oldest" />
+            </group>
+        </menu>
+    </item>
+</menu>

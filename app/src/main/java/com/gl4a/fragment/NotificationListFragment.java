@@ -60,6 +60,7 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
     private static final int MODE_BUILD_FAILED = 6;
 
     private int mFilterMode = MODE_UNREAD;
+    private MenuItem mFilterMenuItem;
 
     private NotificationAdapter mAdapter;
     private MenuItem mMarkAllAsReadMenuItem;
@@ -243,6 +244,8 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
         menu.findItem(R.id.group_by_project).setChecked(isGrouped());
         mMarkAllAsReadMenuItem = menu.findItem(R.id.mark_all_as_read);
         updateMenuItemVisibility();
+        mFilterMenuItem = menu.findItem(R.id.notifications_type);
+        markFilter();
 
         super.onCreateOptionsMenu(menu, inflater);
     }
@@ -261,16 +264,30 @@ public class NotificationListFragment extends LoadingListFragmentBase implements
                 ConfirmationDialogFragment.show(this, R.string.mark_all_as_read_question,
                         R.string.mark_all_as_read, null, "markallreadconfirm");
                 return true;
-            case R.id.todo_filter_unread:       mFilterMode = MODE_UNREAD;       item.setChecked(true); onRefresh(); return true;
-            case R.id.todo_filter_all:          mFilterMode = MODE_ALL;          item.setChecked(true); onRefresh(); return true;
-            case R.id.todo_action_assigned:     mFilterMode = MODE_ASSIGNED;     item.setChecked(true); onRefresh(); return true;
-            case R.id.todo_action_mentioned:    mFilterMode = MODE_MENTIONED;    item.setChecked(true); onRefresh(); return true;
-            case R.id.todo_action_review_requested: mFilterMode = MODE_REVIEW;   item.setChecked(true); onRefresh(); return true;
-            case R.id.todo_action_unmergeable:  mFilterMode = MODE_UNMERGEABLE;  item.setChecked(true); onRefresh(); return true;
-            case R.id.todo_action_build_failed: mFilterMode = MODE_BUILD_FAILED; item.setChecked(true); onRefresh(); return true;
+            case R.id.todo_filter_unread:       mFilterMode = MODE_UNREAD;       selectFilter(item); return true;
+            case R.id.todo_filter_all:          mFilterMode = MODE_ALL;          selectFilter(item); return true;
+            case R.id.todo_action_assigned:     mFilterMode = MODE_ASSIGNED;     selectFilter(item); return true;
+            case R.id.todo_action_mentioned:    mFilterMode = MODE_MENTIONED;    selectFilter(item); return true;
+            case R.id.todo_action_review_requested: mFilterMode = MODE_REVIEW;   selectFilter(item); return true;
+            case R.id.todo_action_unmergeable:  mFilterMode = MODE_UNMERGEABLE;  selectFilter(item); return true;
+            case R.id.todo_action_build_failed: mFilterMode = MODE_BUILD_FAILED; selectFilter(item); return true;
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    private void selectFilter(MenuItem item) {
+        item.setChecked(true);
+        markFilter();
+        onRefresh();
+    }
+
+    /** The funnel's dot while the filter isn't Pending, as Activity's (#336). */
+    private void markFilter() {
+        if (mFilterMenuItem != null) {
+            com.gl4a.utils.FilterIndicator.apply(requireContext(), mFilterMenuItem,
+                    R.drawable.filter, mFilterMode != MODE_UNREAD);
+        }
     }
 
     @Override

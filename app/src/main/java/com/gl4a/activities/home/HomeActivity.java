@@ -249,6 +249,7 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
         }
         // Before any tab is picked: Assigned moved before Created (#323)
         IssueListFactory.moveRememberedTabs(getPrefs());
+        NewsFeedFactory.moveRememberedTabs(getPrefs());
         if (savedInstanceState != null) {
             mSelectedFactoryId = savedInstanceState.getInt(STATE_KEY_FACTORY_ITEM);
         } else {
@@ -804,6 +805,10 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
 
     @Override
     public void onBackPressed() {
+        // A screen going back within itself first, e.g. Search from a "Show all" to All (#337)
+        if (mFactory != null && mFactory.onBackPressed()) {
+            return;
+        }
         FragmentManager fm = getSupportFragmentManager();
         if (!closeDrawers() && fm.getBackStackEntryCount() > 0) {
             fm.popBackStack();

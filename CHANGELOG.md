@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-11-19
+
+### Added
+- Activity can show only issues, merge requests, comments or pushes, newest or oldest first, with the same filter and sort buttons as To-dos and Starred; remembered per account, and marked with a dot when not the default (#336, [GitHub #7](https://github.com/secninjaz/OctoLab/issues/7))
+- Search opens on the kind each account searched last (#337)
+
+### Changed
+- Targets Android 15, so F-Droid and Obtainium can install updates without asking (#334)
+- Activity opens on Your projects, then Starred, then Your activity, and is named Activity; the tab you last used stays (#335, [GitHub #6](https://github.com/secninjaz/OctoLab/issues/6))
+- To-dos and Participating mark their filter button with a dot when it isn't on Pending (#336)
+
+### Fixed
+- Search with All shows each kind as soon as GitLab answers it, instead of waiting for the slowest one (#337)
+- Back after a search's "Show all" returns to the All results, and switching kind for the same search shows what was already found instead of searching again (#337)
+
 ## [1.6.1] - 2026-11-15
 
 ### Added

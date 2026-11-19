@@ -35,7 +35,8 @@ public class PrivateEventListFragment extends EventListFragment {
     protected Single<Response<GitLabPage<GitLabEvent>>> loadRawPage(int page, boolean bypassCache) {
         final GitLabUserService service = ServiceFactory.get(GitLabUserService.class, bypassCache);
         // GitLab has no org-events endpoint; use getCurrentUserEvents for the authenticated user's feed
-        return service.getCurrentUserEvents(page, 25)
+        return service.getCurrentUserEvents(page, 25,
+                        com.gl4a.utils.ActivityFeedOptions.queryParams())
                 .map(response -> {
                     if (!response.isSuccessful() || response.body() == null) {
                         return Response.<GitLabPage<GitLabEvent>>error(

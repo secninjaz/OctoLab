@@ -45,6 +45,7 @@ import com.gl4a.gitlab.model.GitLabUser;
 import com.gl4a.gitlab.service.GitLabProjectService;
 import com.gl4a.gitlab.service.GitLabSearchService;
 import com.gl4a.utils.ApiHelpers;
+import com.gl4a.utils.RxUtils;
 import com.gl4a.utils.StringUtils;
 
 import java.util.List;
@@ -66,6 +67,37 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
         args.putBoolean("do_initial_load", startSearchImmediately);
         f.setArguments(args);
         return f;
+    }
+
+    /**
+     * The drawer's Search: on the kind the account searched last, kept when changed (#337).
+     * Searches opened for one kind (a project's code, a link) stay on that kind.
+     */
+    public static SearchFragment newRememberingInstance() {
+        return remembering(newInstance(SEARCH_TYPE_ALL, null, false));
+    }
+
+    /** {@code f} on the kind the account searched last, keeping it when changed (#337). */
+    public static SearchFragment remembering(SearchFragment f) {
+        f.getArguments().putInt("search_type", rememberedType());
+        f.getArguments().putBoolean("remember_type", true);
+        return f;
+    }
+
+    private static final String KEY_LAST_TYPE = "search_last_type_";
+
+    private static android.content.SharedPreferences prefs() {
+        return com.gl4a.Gl4Application.get().getSharedPreferences(SettingsFragment.PREF_NAME,
+                Context.MODE_PRIVATE);
+    }
+
+    private static int rememberedType() {
+        int type = prefs().getInt(KEY_LAST_TYPE + com.gl4a.Gl4Application.get().getAuthLogin(),
+                SEARCH_TYPE_ALL);
+        for (int known : SPINNER_TYPES) {
+            if (known == type) return type;
+        }
+        return SEARCH_TYPE_ALL;
     }
 
     // Kept as stored in search history; the menu lists them in SPINNER_TYPES order
@@ -132,6 +164,23 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
     private SearchView mSearch;
     private int mSelectedSearchType;
     private String mQuery;
+
+    // After a "Show all" in All: Back shows All's results again, not the screen before (#337)
+    private final androidx.activity.OnBackPressedCallback mBackToAll =
+            new androidx.activity.OnBackPressedCallback(false) {
+                @Override
+                public void handleOnBackPressed() {
+                    goBackToAll();
+                }
+            };
+
+    /** Back from a "Show all" to All's results; false when not in one. */
+    public boolean goBackToAll() {
+        if (!mBackToAll.isEnabled() || mSearchType == null) return false;
+        mBackToAll.setEnabled(false);
+        mSearchType.setSelection(spinnerPositionOf(SEARCH_TYPE_ALL));
+        return true;
+    }
     // Searching one project's code (#295): its ID, name and branch; 0 for the app-wide search
     private long mProjectId;
     private String mProjectName;
@@ -141,10 +190,14 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
+        requireActivity().getOnBackPressedDispatcher().addCallback(this, mBackToAll);
         mProjectId = getArguments().getLong("project_id", 0);
         mProjectName = getArguments().getString("project_name");
         mProjectRef = getArguments().getString("ref");
-        if (savedInstanceState != null) {
+        // Only a search's own saved state: the home screens share one pager, which can hand a
+        // new Search the saved state of another screen's fragment, without a kind in it; that
+        // started every reopened Search on All instead of the kind kept for it (#337)
+        if (savedInstanceState != null && savedInstanceState.containsKey(STATE_KEY_SEARCH_TYPE)) {
             mQuery = savedInstanceState.getString(STATE_KEY_QUERY);
             mSelectedSearchType = savedInstanceState.getInt(STATE_KEY_SEARCH_TYPE, SEARCH_TYPE_ALL);
         } else {
@@ -222,8 +275,12 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
             empty.setItems(java.util.Collections.emptyList());
             return Single.just(Response.success(empty));
         }
+        // A switch of kind resubmits the same query, which forces a refresh: its first page
+        // may still come from what this search already has (#337)
+        boolean reuse = !bypassCache || mReuseKept;
+        mReuseKept = false;
         // From All to one kind, same search: the results All already has, no new request (#294)
-        if (page == 1 && !bypassCache && mSelectedSearchType != SEARCH_TYPE_ALL
+        if (page == 1 && reuse && mSelectedSearchType != SEARCH_TYPE_ALL
                 && mQuery.equals(mAllQuery)) {
             Response<GitLabPage<Object>> kept = mAllResults.get(mSelectedSearchType);
             if (kept != null && kept.body() != null) {
@@ -232,7 +289,7 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
             }
         }
         switch (mSelectedSearchType) {
-            case SEARCH_TYPE_ALL: return makeAllSearchSingle(page, bypassCache);
+            case SEARCH_TYPE_ALL: return makeAllSearchSingle(page, bypassCache, reuse);
             case SEARCH_TYPE_REPO: return makeRepoSearchSingle(page, bypassCache);
             case SEARCH_TYPE_GROUP: return makeGroupSearchSingle(page, bypassCache);
             case SEARCH_TYPE_ISSUE:
@@ -252,8 +309,10 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
 
     @Override
     public void onItemClick(Object item) {
+        if (item == SearchAdapter.PENDING) return;
         if (item instanceof SearchAdapter.Section) {
-            // "Show all": that kind's own search, all its results (#262)
+            // "Show all": that kind's own search, all its results (#262); Back returns to All
+            mBackToAll.setEnabled(true);
             mSearchType.setSelection(
                     spinnerPositionOf(((SearchAdapter.Section) item).searchType));
             return;
@@ -431,11 +490,18 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
         }
         mSelectedSearchType = newType;
         mAdapter.setMode(newType);
+        if (newType == SEARCH_TYPE_ALL) mBackToAll.setEnabled(false);
+        if (getArguments() != null && getArguments().getBoolean("remember_type")) {
+            prefs().edit().putInt(KEY_LAST_TYPE + com.gl4a.Gl4Application.get().getAuthLogin(),
+                    newType).apply();
+        }
 
         updateSearchViewHint();
         updateEmptyState();
         resetSubject();
 
+        // Same query, another kind: what's already fetched is shown, not searched again (#337)
+        mReuseKept = true;
         mSearch.setQuery(mQuery, true);
     }
 
@@ -667,12 +733,50 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
      * "Show all" that opens that kind's search. A kind the instance can't search (e.g. code
      * without advanced search) is left out (#262).
      */
-    private Single<Response<GitLabPage<Object>>> makeAllSearchSingle(int page, boolean bypassCache) {
+    private Single<Response<GitLabPage<Object>>> makeAllSearchSingle(int page, boolean bypassCache,
+            boolean reuse) {
         if (page > 1) {
             return Single.just(objectPage(java.util.Collections.emptyList(), page, 0));
         }
+        // Back to All for the same search: its list as it was, no new requests (#337)
+        if (reuse && mAllItems != null && mQuery.equals(mAllQuery)) {
+            return Single.just(objectPage(new java.util.ArrayList<>(mAllItems), 1, 0));
+        }
+        // Each section comes on its own (#337): the list starts as one loading row
+        mAllBypassCache = bypassCache;
+        return Single.just(objectPage(
+                java.util.Collections.singletonList(SearchAdapter.PENDING), 1, 0));
+    }
+
+    // All's sections being asked, and whether a refresh asked for them
+    @androidx.annotation.Nullable
+    private io.reactivex.disposables.CompositeDisposable mAllSections;
+    private boolean mAllBypassCache;
+    // The next load follows a switch of kind: kept results may be shown (#337)
+    private boolean mReuseKept;
+    // All's finished list for mAllQuery
+    @androidx.annotation.Nullable
+    private List<Object> mAllItems;
+
+    @Override
+    protected void onAddData(RootAdapter<Object, ? extends RecyclerView.ViewHolder> adapter,
+            java.util.Collection<Object> data) {
+        super.onAddData(adapter, data);
+        if (data.contains(SearchAdapter.PENDING)) startAllSections();
+    }
+
+    /**
+     * All's sections, each shown as soon as GitLab answers it, in their usual order, with one
+     * loading row below while others are still coming (#337): before, nothing showed until
+     * the slowest search (on gitlab.com, site-wide issues, merge requests or code) was done.
+     */
+    private void startAllSections() {
+        if (mAllSections != null) mAllSections.dispose();
+        mAllSections = new io.reactivex.disposables.CompositeDisposable();
+        boolean bypassCache = mAllBypassCache;
         String query = mQuery;
         mAllResults.clear();
+        mAllItems = null;
         mAllQuery = query;
         // A section GitLab refused for too many requests: shown as such when nothing came (#294)
         java.util.concurrent.atomic.AtomicReference<Response<?>> limited =
@@ -696,18 +800,56 @@ public class SearchFragment extends PagedDataBaseFragment<Object> implements
                 section(SEARCH_TYPE_CODE, R.string.search_section_code,
                         keep(SEARCH_TYPE_CODE, query, limited,
                                 makeCodeSearchSingle(1, bypassCache))));
-        return Single.zip(sections, results -> {
-            List<Object> items = new java.util.ArrayList<>();
-            for (Object result : results) {
-                items.addAll((List<?>) result);
+        List<List<Object>> results = new java.util.ArrayList<>(
+                java.util.Collections.nCopies(sections.size(), (List<Object>) null));
+        for (int i = 0; i < sections.size(); i++) {
+            int index = i;
+            mAllSections.add(sections.get(i)
+                    .compose(RxUtils::doInBackground)
+                    .subscribe(items -> {
+                        results.set(index, items);
+                        showAllSections(query, results, limited.get());
+                    }, error -> {
+                        results.set(index, java.util.Collections.emptyList());
+                        showAllSections(query, results, limited.get());
+                    }));
+        }
+    }
+
+    private void showAllSections(String query, List<List<Object>> results,
+            @androidx.annotation.Nullable Response<?> refused) {
+        if (mAdapter == null || getView() == null || !query.equals(mQuery)
+                || mSelectedSearchType != SEARCH_TYPE_ALL) {
+            return;
+        }
+        List<Object> items = new java.util.ArrayList<>();
+        boolean finished = true;
+        for (List<Object> result : results) {
+            if (result == null) {
+                finished = false;
+            } else {
+                items.addAll(result);
             }
-            Response<?> refused = limited.get();
-            if (items.isEmpty() && refused != null) {
-                // Not "nothing found": GitLab didn't search
-                throw new com.gl4a.ApiRequestException(refused);
-            }
-            return objectPage(items, 1, 0);
-        });
+        }
+        if (!finished) {
+            items.add(SearchAdapter.PENDING);
+        } else {
+            mAllItems = new java.util.ArrayList<>(items);
+        }
+        mAdapter.clear();
+        mAdapter.addAll(items);
+        if (finished && items.isEmpty() && refused != null) {
+            // Not "nothing found": GitLab didn't search
+            handleLoadFailure(new com.gl4a.ApiRequestException(refused));
+            return;
+        }
+        updateEmptyState();
+    }
+
+    @Override
+    public void onDestroyView() {
+        if (mAllSections != null) mAllSections.dispose();
+        super.onDestroyView();
     }
 
     /** The search All last ran, and each kind's first page of it (#294). */

@@ -3,6 +3,7 @@ package com.gl4a.fragment;
 import android.os.Bundle;
 
 import com.gl4a.ServiceFactory;
+import com.gl4a.utils.ActivityFeedOptions;
 import com.gl4a.gitlab.model.GitLabEvent;
 import com.gl4a.gitlab.model.GitLabPage;
 import com.gl4a.gitlab.model.GitLabProject;
@@ -52,7 +53,8 @@ public class ProjectScopeEventListFragment extends EventListFragment {
         if (!SCOPE_STARRED.equals(mScope)) {
             // GitLab's own activity across your projects, as on GitLab web: one request a page,
             // not one per project and again for every page (#315)
-            return userService.getEventsInOwnProjects(page, PER_PAGE)
+            return userService.getEventsInOwnProjects(page, PER_PAGE,
+                            ActivityFeedOptions.queryParams())
                     .map(response -> response.isSuccessful()
                             ? Response.success(ApiHelpers.toPage(response))
                             : Response.<GitLabPage<GitLabEvent>>error(response.errorBody(),
@@ -85,7 +87,8 @@ public class ProjectScopeEventListFragment extends EventListFragment {
                     for (int i = 0; i < limit; i++) {
                         long projectId = projects.get(i).id();
                         eventSingles.add(
-                                userService.getProjectEvents(projectId, 1, 10)
+                                userService.getProjectEvents(projectId, 1, 10,
+                                                ActivityFeedOptions.queryParams())
                                         .subscribeOn(Schedulers.io())
                                         .map(r -> r.isSuccessful() && r.body() != null
                                                 ? r.body() : new ArrayList<GitLabEvent>())
@@ -97,9 +100,12 @@ public class ProjectScopeEventListFragment extends EventListFragment {
                             //noinspection unchecked
                             merged.addAll((List<GitLabEvent>) r);
                         }
+                        // Newest first, or oldest first as chosen (#336)
+                        boolean oldest = ActivityFeedOptions.isOldestFirst();
                         merged.sort((a, b) -> {
                             if (a.createdAt == null || b.createdAt == null) return 0;
-                            return b.createdAt.compareTo(a.createdAt);
+                            return oldest ? a.createdAt.compareTo(b.createdAt)
+                                    : b.createdAt.compareTo(a.createdAt);
                         });
                         return merged;
                     });

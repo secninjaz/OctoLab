@@ -48,6 +48,7 @@ public class ParticipatingListFragment extends LoadingListFragmentBase implement
     private static final int FILTER_ISSUES = 2;
     private static final int FILTER_MERGE_REQUESTS = 3;
     private int mFilter = FILTER_UNREAD;
+    private MenuItem mFilterMenuItem;
 
     private NotificationAdapter mAdapter;
     // Project groups shown in full (#288), and the list, to go back to a collapsed group's header
@@ -131,6 +132,8 @@ public class ParticipatingListFragment extends LoadingListFragmentBase implement
         menu.findItem(R.id.group_by_project).setChecked(isGrouped());
         mMarkAllAsReadMenuItem = menu.findItem(R.id.mark_all_as_read);
         updateMenuItemVisibility();
+        mFilterMenuItem = menu.findItem(R.id.participating_filter);
+        markFilter();
         super.onCreateOptionsMenu(menu, inflater);
     }
 
@@ -151,6 +154,7 @@ public class ParticipatingListFragment extends LoadingListFragmentBase implement
         if (filter >= 0) {
             mFilter = filter;
             item.setChecked(true);
+            markFilter();
             load();
             return true;
         }
@@ -163,6 +167,14 @@ public class ParticipatingListFragment extends LoadingListFragmentBase implement
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    /** The funnel's dot while the filter isn't Pending, as To-dos' (#336). */
+    private void markFilter() {
+        if (mFilterMenuItem != null) {
+            com.gl4a.utils.FilterIndicator.apply(requireContext(), mFilterMenuItem,
+                    R.drawable.filter, mFilter != FILTER_UNREAD);
+        }
     }
 
     @Override

@@ -42,6 +42,9 @@ public class SearchAdapter extends RootAdapter<Object, RecyclerView.ViewHolder> 
         }
     }
 
+    /** All's sections still coming: one loading row below those already shown (#337). */
+    public static final Object PENDING = new Object();
+
     // Each kind of row in its own range, so one list can mix them (the All search, #262)
     private static final int KIND_USER = 10000;
     private static final int KIND_REPO = 20000;
@@ -49,6 +52,7 @@ public class SearchAdapter extends RootAdapter<Object, RecyclerView.ViewHolder> 
     private static final int KIND_GROUP = 40000;
     private static final int KIND_ISSUE = 50000;
     private static final int KIND_SECTION = 60000;
+    private static final int KIND_PENDING = 70000;
 
     private UserAdapter mUserAdapter;
     private RepositoryAdapter mRepoAdapter;
@@ -72,7 +76,9 @@ public class SearchAdapter extends RootAdapter<Object, RecyclerView.ViewHolder> 
 
     @Override
     public int getItemViewType(Object item) {
-        if (item instanceof Section) {
+        if (item == PENDING) {
+            return KIND_PENDING;
+        } else if (item instanceof Section) {
             return KIND_SECTION;
         } else if (item instanceof GitLabUser) {
             return mUserAdapter.getItemViewType((GitLabUser) item) + KIND_USER;
@@ -93,6 +99,9 @@ public class SearchAdapter extends RootAdapter<Object, RecyclerView.ViewHolder> 
         int kind = viewType / 10000 * 10000;
         int subType = viewType % 10000;
         switch (kind) {
+            case KIND_PENDING:
+                // THE "loading in place" row (#321)
+                return new GroupViewHolder(com.gl4a.utils.InlineLoading.create(parent));
             case KIND_SECTION:
                 return new SectionViewHolder(
                         inflater.inflate(R.layout.row_search_section, parent, false));
@@ -113,7 +122,9 @@ public class SearchAdapter extends RootAdapter<Object, RecyclerView.ViewHolder> 
 
     @Override
     public void onBindViewHolder(RecyclerView.ViewHolder holder, Object item) {
-        if (item instanceof Section) {
+        if (item == PENDING) {
+            return;
+        } else if (item instanceof Section) {
             ((SectionViewHolder) holder).title.setText(((Section) item).title);
         } else if (item instanceof GitLabUser) {
             mUserAdapter.onBindViewHolder((UserAdapter.ViewHolder) holder, (GitLabUser) item);

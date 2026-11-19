@@ -8,6 +8,7 @@ import androidx.fragment.app.Fragment;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -22,8 +23,10 @@ import com.gl4a.ServiceFactory;
 import com.gl4a.fragment.PrivateEventListFragment;
 import com.gl4a.fragment.ProjectScopeEventListFragment;
 import com.gl4a.fragment.RepositoryListFragment;
+import com.gl4a.utils.ActivityFeedOptions;
 import com.gl4a.utils.ApiHelpers;
 import com.gl4a.utils.AvatarHandler;
+import com.gl4a.utils.FilterIndicator;
 
 import java.util.List;
 
@@ -38,11 +41,33 @@ public class NewsFeedFactory extends FragmentFactory implements Spinner.OnItemSe
 
     private static final int ID_LOADER_ORGS = 100;
 
+    // Your projects and Starred first, as GitLab's dashboard activity; your own last (#335)
     private static final int[] TAB_TITLES = new int[] {
-        R.string.activity_filter_your_activity,
         R.string.activity_filter_your_projects,
-        R.string.activity_filter_starred
+        R.string.activity_filter_starred,
+        R.string.activity_filter_your_activity
     };
+    private static final String PREF_PROJECTS_FIRST = "activity_tabs_projects_first";
+
+    /**
+     * Once, after the tabs moved (#335): the last tab each account used here is kept by
+     * position, so a remembered Your activity (0) becomes 2, Your projects (1) 0 and Starred
+     * (2) 1, and everyone stays on the tab they were on.
+     */
+    public static void moveRememberedTabs(android.content.SharedPreferences prefs) {
+        if (prefs.getBoolean(PREF_PROJECTS_FIRST, false)) return;
+        android.content.SharedPreferences.Editor editor = prefs.edit();
+        for (java.util.Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
+            String key = e.getKey();
+            if (!key.startsWith("last_tab_") || !key.endsWith("_news_feed")
+                    || !(e.getValue() instanceof Integer)) {
+                continue;
+            }
+            int tab = (Integer) e.getValue();
+            if (tab >= 0 && tab <= 2) editor.putInt(key, (tab + 2) % 3);
+        }
+        editor.putBoolean(PREF_PROJECTS_FIRST, true).apply();
+    }
 
     public NewsFeedFactory(HomeActivity activity, String userLogin) {
         super(activity);
@@ -62,10 +87,10 @@ public class NewsFeedFactory extends FragmentFactory implements Spinner.OnItemSe
     @Override
     protected Fragment makeFragment(int position) {
         switch (position) {
-            case 1:
+            case 0:
                 // Events from projects you're a member of
                 return ProjectScopeEventListFragment.newInstance(ProjectScopeEventListFragment.SCOPE_MEMBER);
-            case 2:
+            case 1:
                 // Events from your starred projects
                 return ProjectScopeEventListFragment.newInstance(ProjectScopeEventListFragment.SCOPE_STARRED);
             default:
@@ -88,8 +113,24 @@ public class NewsFeedFactory extends FragmentFactory implements Spinner.OnItemSe
 
     @Override
     protected boolean onCreateOptionsMenu(Menu menu) {
+        // Filter and sort as To-dos' and Starred's, the current ones checked and the buttons
+        // marked when they aren't All and Newest first (#336)
+        mActivity.getMenuInflater().inflate(R.menu.activity_feed_menu, menu);
+        String filter = ActivityFeedOptions.filter();
+        // Only the current one: in a single-choice group Android checks any item set at all,
+        // even with false, so the last one (Pushes) always showed as chosen
+        for (int i = 0; i < FILTERS.length; i++) {
+            if (FILTERS[i].equals(filter)) menu.findItem(FILTER_ITEMS[i]).setChecked(true);
+        }
+        boolean oldest = ActivityFeedOptions.isOldestFirst();
+        menu.findItem(oldest ? R.id.activity_sort_oldest : R.id.activity_sort_newest)
+                .setChecked(true);
+        FilterIndicator.apply(mActivity, menu.findItem(R.id.activity_filter), R.drawable.filter,
+                ActivityFeedOptions.isFiltered());
+        FilterIndicator.apply(mActivity, menu.findItem(R.id.activity_sort),
+                R.drawable.menu_sort_order, oldest);
         if (mUserScopes == null || mSelf == null) {
-            return super.onCreateOptionsMenu(menu);
+            return true;
         }
 
         mActivity.getMenuInflater().inflate(R.menu.user_selector, menu);
@@ -104,6 +145,49 @@ public class NewsFeedFactory extends FragmentFactory implements Spinner.OnItemSe
         spinner.setOnItemSelectedListener(this);
 
         return true;
+    }
+
+    private static final int[] FILTER_ITEMS = {
+        R.id.activity_filter_all, R.id.activity_filter_issues,
+        R.id.activity_filter_merge_requests, R.id.activity_filter_comments,
+        R.id.activity_filter_pushes,
+    };
+    private static final String[] FILTERS = {
+        ActivityFeedOptions.FILTER_ALL, ActivityFeedOptions.FILTER_ISSUES,
+        ActivityFeedOptions.FILTER_MERGE_REQUESTS, ActivityFeedOptions.FILTER_COMMENTS,
+        ActivityFeedOptions.FILTER_PUSHES,
+    };
+
+    @Override
+    protected boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        for (int i = 0; i < FILTERS.length; i++) {
+            if (id == FILTER_ITEMS[i]) {
+                ActivityFeedOptions.setFilter(FILTERS[i]);
+                onOptionsChanged();
+                return true;
+            }
+        }
+        if (id == R.id.activity_sort_newest || id == R.id.activity_sort_oldest) {
+            ActivityFeedOptions.setSort(id == R.id.activity_sort_oldest
+                    ? ActivityFeedOptions.SORT_OLDEST : ActivityFeedOptions.SORT_NEWEST);
+            onOptionsChanged();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    /** What the tabs show, the title's second line and the buttons follow the new choice. */
+    private void onOptionsChanged() {
+        mActivity.invalidateFragments();
+        mActivity.invalidateTitle();
+        mActivity.supportInvalidateOptionsMenu();
+    }
+
+    /** The current filter and sort under the title, when they aren't the default (#336). */
+    @Override
+    protected CharSequence getSubtitle() {
+        return ActivityFeedOptions.summary(mActivity);
     }
 
     @Override

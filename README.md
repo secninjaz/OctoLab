@@ -35,7 +35,7 @@ Built and maintained by [SecNinjaz](https://secninjaz.com).
 - Notifications for new to-dos and comments, with counts per account
 
 **Activity**
-- Your activity, your projects' and starred projects' activity
+- Your projects' and starred projects' activity, and your own; show only issues, merge requests, comments or pushes, newest or oldest first
 
 **Projects**
 - Browse files, README, branches, tags, commits and releases

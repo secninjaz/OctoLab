@@ -326,7 +326,7 @@
     <string name="user_members">Members</string><!-- For type organization -->
     <string name="user_created_at">Member since %1$s</string>
     <string name="user_pub_repos">Repositories</string>
-    <string name="user_news_feed">Your Activity</string>
+    <string name="user_news_feed">Activity</string>
     <string name="user_public_activity">Public activity</string>
     <string name="user_organizations">Groups</string>
     <string name="user_follow_action">Follow</string>
@@ -770,6 +770,14 @@
 
     <string name="activity_filter_your_activity">Your activity</string>
     <string name="activity_filter_your_projects">Your projects</string>
+    <!-- Activity's filter and sort (#336) -->
+    <string name="activity_type_all">All</string>
+    <string name="activity_type_issues">Issues</string>
+    <string name="activity_type_merge_requests">Merge requests</string>
+    <string name="activity_type_comments">Comments</string>
+    <string name="activity_type_pushes">Pushes</string>
+    <string name="activity_sort_newest">Newest first</string>
+    <string name="activity_sort_oldest">Oldest first</string>
     <string name="activity_filter_starred">Starred</string>
 
     <!-- Debug logging -->
