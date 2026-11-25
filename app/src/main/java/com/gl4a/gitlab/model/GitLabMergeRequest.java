@@ -49,6 +49,8 @@ public class GitLabMergeRequest implements Parcelable {
     @Json(name = "base") public GitLabMRBranch base;
     /** Whether the user gets GitLab's notifications about it (#290); single MR answers only. */
     @Json(name = "subscribed") public Boolean subscribed;
+    /** Time spent and estimated, for the MR page's header (#344). */
+    @Json(name = "time_stats") public GitLabIssue.TimeStats timeStats;
 
     // GitHub SDK compatible methods (PullRequest)
     public long id() { return id; }
@@ -142,6 +144,7 @@ public class GitLabMergeRequest implements Parcelable {
             diffRefs.startSha = in.readString();
         }
         subscribed = (Boolean) in.readValue(Boolean.class.getClassLoader());
+        timeStats = GitLabIssue.TimeStats.readFrom(in);
     }
 
     @Override
@@ -201,6 +204,7 @@ public class GitLabMergeRequest implements Parcelable {
             dest.writeInt(0);
         }
         dest.writeValue(subscribed);
+        GitLabIssue.TimeStats.writeTo(dest, timeStats);
     }
 
     @Override

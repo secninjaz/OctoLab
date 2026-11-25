@@ -25,6 +25,7 @@ import android.widget.TextView;
 
 import com.gl4a.Gl4Application;
 import com.gl4a.R;
+import com.gl4a.activities.WhatsNewActivity;
 import android.net.Uri;
 import android.widget.Toast;
 import androidx.core.content.FileProvider;
@@ -52,6 +53,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
     /** Notify new comments on issues and MRs the user participates in (#267). */
     public static final String KEY_NOTIFY_PARTICIPATING = "notify_participating";
     private static final String KEY_ABOUT = "about";
+    private static final String KEY_WHATS_NEW = "whats_new";
     private static final String KEY_LINK_HANDLING = "link_handling";
     private Preference mLinkHandlingPref;
     private static final String KEY_OPEN_SOURCE_COMPONENTS = "open_source_components";
@@ -67,6 +69,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
     private OnStateChangeListener mListener;
     private IntegerListPreference mThemePref;
     private Preference mAboutPref;
+    private Preference mWhatsNewPref;
     private Preference mOpenSourcePref;
     private TwoStatePreference mNotificationsPref;
     private IntegerListPreference mNotificationIntervalPref;
@@ -105,6 +108,9 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         mAboutPref = findPreference(KEY_ABOUT);
         mAboutPref.setOnPreferenceClickListener(this);
         mAboutPref.setSummary(getAppName());
+
+        mWhatsNewPref = findPreference(KEY_WHATS_NEW);
+        mWhatsNewPref.setOnPreferenceClickListener(this);
 
         mOpenSourcePref = findPreference(KEY_OPEN_SOURCE_COMPONENTS);
         mOpenSourcePref.setOnPreferenceClickListener(this);
@@ -261,6 +267,10 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
             boolean loggedIn = Gl4Application.get().isAuthorized();
             AboutDialogFragment.newInstance(getAppName(), loggedIn)
                     .show(getChildFragmentManager(), "about");
+            return true;
+        } else if (pref == mWhatsNewPref) {
+            // The changelog (#347)
+            startActivity(WhatsNewActivity.makeIntent(requireContext()));
             return true;
         } else if (pref == mOpenSourcePref) {
             new OpenSourceComponentListDialogFragment()

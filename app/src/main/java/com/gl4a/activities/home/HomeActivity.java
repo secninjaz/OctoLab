@@ -293,6 +293,9 @@ public class HomeActivity extends BaseFragmentPagerActivity implements
                     com.google.android.material.snackbar.Snackbar.LENGTH_LONG).show();
         }
 
+        // Updated since the last start: say so, once, with What's new (#347)
+        com.gl4a.activities.WhatsNewActivity.showBarIfUpdated(this);
+
         // Opened from a to-do's notification: go to its target (#178)
         if (savedInstanceState == null && getIntent() != null) {
             openTodoTarget(getIntent());

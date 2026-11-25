@@ -1,0 +1,8 @@
+Added:
+• Activity can show only issues, merge requests, comments or pushes, newest or oldest first, with the same filter and sort buttons as To-dos and Starred; remembered per account, and marked with a dot when not the default (GitHub #7)
+Changed:
+• Targets Android 15, so F-Droid and Obtainium can install updates without asking
+Fixed:
+• Search with All shows each kind as soon as GitLab answers it, instead of waiting for the slowest one
+…
+All changes: github.com/secninjaz/OctoLab/releases

@@ -141,6 +141,13 @@
         android:key="about"
         android:title="@string/about" />
 
+    <!-- What's new, from the changelog (#347) -->
+    <Preference
+        app:iconSpaceReserved="false"
+        android:key="whats_new"
+        android:title="@string/whats_new"
+        android:summary="@string/whats_new_summary" />
+
     <Preference
         app:iconSpaceReserved="false"
         android:key="open_source_components"

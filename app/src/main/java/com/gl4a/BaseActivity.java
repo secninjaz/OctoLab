@@ -146,6 +146,9 @@ public abstract class BaseActivity extends AppCompatActivity implements
     private final int[] mProgressColors = new int[2];
     private Animator mHeaderTransition;
     private final Handler mHandler = new Handler();
+    // GitLab asked to wait (429): when the screen loads again by itself, 0 when it won't (#350)
+    private long mRateLimitRetryAt;
+    private final Runnable mRateLimitTick = this::onRateLimitTick;
 
     private final ActivityResultLauncher<Intent> mIssueReportLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -573,11 +576,17 @@ public abstract class BaseActivity extends AppCompatActivity implements
         super.onResume();
         // A connection error on view loads again once the network is back (#326)
         mNetworkReload.start();
+        // The wait GitLab asked for goes on, and ends in a reload if it ended meanwhile (#350)
+        if (mRateLimitRetryAt > 0) {
+            mHandler.removeCallbacks(mRateLimitTick);
+            mHandler.post(mRateLimitTick);
+        }
     }
 
     @Override
     protected void onPause() {
         mNetworkReload.stop();
+        mHandler.removeCallbacks(mRateLimitTick);
         super.onPause();
     }
 
@@ -724,10 +733,62 @@ public abstract class BaseActivity extends AppCompatActivity implements
                 .compose(mRxLoader.makeSingleTransformer(id, force));
     }
 
+    /** Longest wait shown, whatever GitLab's Retry-After says (#350). */
+    private static final long RATE_LIMIT_MAX_WAIT_S = 120;
+    private static final long RATE_LIMIT_DEFAULT_WAIT_S = 60;
+
+    /** Counts down the wait GitLab asked for, then loads again as Try again does (#350). */
+    private void startRateLimitCountdown(ApiRequestException e) {
+        Long retryAfter = e.getRetryAfterSeconds();
+        long seconds = retryAfter != null ? retryAfter : RATE_LIMIT_DEFAULT_WAIT_S;
+        seconds = Math.max(1, Math.min(RATE_LIMIT_MAX_WAIT_S, seconds));
+        long retryAt = android.os.SystemClock.elapsedRealtime() + seconds * 1000L;
+        // Several requests may be refused at once: the longest wait is kept
+        mRateLimitRetryAt = Math.max(mRateLimitRetryAt, retryAt);
+        mHandler.removeCallbacks(mRateLimitTick);
+        onRateLimitTick();
+    }
+
+    private void stopRateLimitCountdown() {
+        mRateLimitRetryAt = 0;
+        mHandler.removeCallbacks(mRateLimitTick);
+    }
+
+    private void onRateLimitTick() {
+        if (mRateLimitRetryAt == 0 || !mErrorShown || isFinishing()) return;
+        // Counted on screen only; onResume goes on (or reloads) when it's shown again
+        boolean resumed = getLifecycle().getCurrentState()
+                .isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED);
+        long left = mRateLimitRetryAt - android.os.SystemClock.elapsedRealtime();
+        if (left <= 0) {
+            if (resumed) {
+                setErrorViewVisibility(false, null);
+                onRefresh();
+            }
+            return;
+        }
+        View error = findViewById(R.id.error);
+        TextView messageView = error != null ? error.findViewById(R.id.error_message) : null;
+        if (messageView != null) {
+            int seconds = (int) ((left + 999) / 1000);
+            messageView.setText(getString(R.string.load_failure_rate_limited_retrying, seconds));
+        }
+        if (resumed) {
+            // On the next whole second
+            long delay = left % 1000;
+            mHandler.postDelayed(mRateLimitTick, delay > 0 ? delay : 1000);
+        }
+    }
+
     protected void setErrorViewVisibility(boolean visible, Throwable e) {
         View content = findViewById(R.id.content);
         View error = findViewById(R.id.error);
 
+        // Only GitLab's "wait" is counted down; anything else shown or hidden ends it (#350)
+        if (!visible || !(e instanceof ApiRequestException)
+                || !((ApiRequestException) e).isRateLimited()) {
+            stopRateLimitCountdown();
+        }
         content.setVisibility(visible ? View.GONE : View.VISIBLE);
         mErrorShown = visible;
         mConnectionErrorShown = visible && com.gl4a.utils.NetworkReload.isConnectionError(e);
@@ -761,9 +822,10 @@ public abstract class BaseActivity extends AppCompatActivity implements
                 messageView.setText(com.gl4a.utils.ProjectAccess.refusedMessage(this, e));
                 retryButton.setVisibility(View.GONE);
             } else if (re != null && re.isRateLimited()) {
-                // GitLab limits how many requests (e.g. searches) come in a short time (#294)
-                messageView.setText(R.string.load_failure_rate_limited);
+                // GitLab limits how many requests (e.g. searches) come in a short time (#294):
+                // its wait is counted down, then the screen loads again; Try again stays (#350)
                 retryButton.setVisibility(View.VISIBLE);
+                startRateLimitCountdown(re);
             } else if (re != null && re.getMessage() != null) {
                 messageView.setText(
                         getString(R.string.load_failure_explanation_with_reason, re.getMessage()));

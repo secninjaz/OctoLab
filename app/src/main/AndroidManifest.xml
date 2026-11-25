@@ -169,6 +169,7 @@
             android:exported="false"
             android:configChanges="orientation|screenSize" />
         <activity android:name=".activities.WikiListActivity" android:exported="false" />
+        <activity android:name=".activities.WhatsNewActivity" android:exported="false" />
         <activity android:name=".activities.home.HomeActivity" android:exported="false" />
         <activity android:name=".activities.ReviewActivity" android:exported="false" />
 

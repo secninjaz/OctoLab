@@ -19,6 +19,10 @@
     <dimen name="card_top_bottom_margin">4dp</dimen>
     <dimen name="floating_action_button_margin_mini">26dp</dimen>
     <dimen name="issue_label_padding">2dp</dimen>
+    <!-- The colour square in label settings, a bit rounded; labels themselves are pills (#341) -->
+    <dimen name="issue_label_corner_radius">6dp</dimen>
+    <!-- A scoped label's border around its value, as GitLab (#341) -->
+    <dimen name="issue_label_scoped_border">1.5dp</dimen>
     <dimen name="issue_label_text_size">12sp</dimen>
     <dimen name="issue_label_margin">2dp</dimen>
     <dimen name="mini_fab_size_with_margin">56dp</dimen> <!-- 40dp FAB + 16dp margin -->

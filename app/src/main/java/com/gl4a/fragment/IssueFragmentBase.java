@@ -473,9 +473,12 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
         }
 
         bindAssignees(mIssue.assignees());
+        bindWorkItemRows();
 
         ReactionBar reactions = mListHeaderView.findViewById(R.id.reactions);
         reactions.setCallback(this, this);
+        // Under the description, 👍 and 👎 always, as GitLab web (#346)
+        reactions.setAlwaysShowThumbs(true);
         reactions.setDetailsCache(mReactionDetailsCache);
         // GitLabIssue.reactions() always returns null — fetch award emojis from API instead
         loadIssueBodyReactions(reactions);
@@ -553,6 +556,245 @@ public abstract class IssueFragmentBase extends ListDataBaseFragment<TimelineIte
                     }
                 }, error -> android.util.Log.d(Gl4Application.LOG_TAG,
                         "Description edit details unavailable", error));
+    }
+
+    /**
+     * The rows GitLab web shows beside an issue (#344): weight, due date and time tracking
+     * from REST first, then status, parent, weight, iteration, dates and health from the work
+     * item. Each row only when set. An epic binds its own dates and parent (#312).
+     */
+    private void bindWorkItemRows() {
+        if (mIssue.isEpic()) {
+            return;
+        }
+        bindTextRow(R.id.weight_container, R.id.tv_weight,
+                mIssue.weight != null ? String.valueOf(mIssue.weight) : null);
+        bindDatesRow(null, mIssue.dueDate);
+        bindTimeTracking();
+        loadWorkItemRows();
+    }
+
+    /** Shows a header row with its text, or hides it when there's none (#344). */
+    private void bindTextRow(int containerId, int textId,
+            @androidx.annotation.Nullable CharSequence text) {
+        View container = mListHeaderView.findViewById(containerId);
+        if (!android.text.TextUtils.isEmpty(text)) {
+            ((TextView) mListHeaderView.findViewById(textId)).setText(text);
+            container.setVisibility(View.VISIBLE);
+        } else {
+            container.setVisibility(View.GONE);
+        }
+    }
+
+    /** "Start: 1 Nov 2026 · Due: 30 Nov 2026", the parts that are set; hidden if neither. */
+    protected void bindDatesRow(@androidx.annotation.Nullable String start,
+            @androidx.annotation.Nullable String due) {
+        List<String> parts = new java.util.ArrayList<>();
+        if (start != null) {
+            parts.add(getString(R.string.epic_start_date, formatDate(start)));
+        }
+        if (due != null) {
+            parts.add(getString(R.string.epic_due_date, formatDate(due)));
+        }
+        bindTextRow(R.id.dates_container, R.id.tv_dates,
+                android.text.TextUtils.join(" · ", parts));
+    }
+
+    private CharSequence formatDate(String date) {
+        java.util.Date parsed = StringUtils.parseIsoDate(date);
+        return parsed != null ? android.text.format.DateUtils.formatDateTime(getActivity(),
+                parsed.getTime(), android.text.format.DateUtils.FORMAT_SHOW_DATE
+                        | android.text.format.DateUtils.FORMAT_SHOW_YEAR
+                        | android.text.format.DateUtils.FORMAT_UTC) : date;
+    }
+
+    /** The parent row, opening the parent on tap; left as it is without a link. */
+    protected void bindParentRow(@androidx.annotation.Nullable String title,
+            @androidx.annotation.Nullable String webUrl) {
+        if (webUrl == null) return;
+        View container = mListHeaderView.findViewById(R.id.parent_container);
+        ((TextView) mListHeaderView.findViewById(R.id.tv_parent)).setText(title);
+        container.setOnClickListener(v -> IntentUtils.openLinkInternallyOrExternally(
+                getActivity(), android.net.Uri.parse(webUrl)));
+        container.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * "Spent 2h of 5h estimate", "Spent 2h" or "Estimate 5h", in GitLab's own words for the
+     * times; hidden when neither is set (#344).
+     */
+    protected void bindTimeTracking() {
+        if (mListHeaderView == null) return;
+        GitLabIssue.TimeStats stats = mIssue != null ? mIssue.timeStats : null;
+        String spent = stats != null && stats.totalTimeSpent > 0
+                && !StringUtils.isBlank(stats.humanTotalTimeSpent)
+                ? stats.humanTotalTimeSpent : null;
+        String estimate = stats != null && stats.timeEstimate > 0
+                && !StringUtils.isBlank(stats.humanTimeEstimate)
+                ? stats.humanTimeEstimate : null;
+        String text = null;
+        if (spent != null && estimate != null) {
+            text = getString(R.string.issue_time_spent_of_estimate, spent, estimate);
+        } else if (spent != null) {
+            text = getString(R.string.issue_time_spent, spent);
+        } else if (estimate != null) {
+            text = getString(R.string.issue_time_estimate, estimate);
+        }
+        bindTextRow(R.id.time_container, R.id.tv_time, text);
+    }
+
+    // %s: the work item's container, read as project. Kept apart from the "Edited by" query:
+    // a widget type GitLab doesn't know (GitLab Free, older versions) fails the whole query
+    private static final String WORK_ITEM_ROWS_QUERY =
+            "query($path: ID!, $iid: String!) { project: %s(fullPath: $path) {"
+            + " workItems(iid: $iid) { nodes { widgets {"
+            + " ... on WorkItemWidgetStatus { status { name } }"
+            + " ... on WorkItemWidgetHierarchy { parent { title webUrl } }"
+            + " ... on WorkItemWidgetWeight { weight }"
+            + " ... on WorkItemWidgetIteration { iteration { title startDate dueDate } }"
+            + " ... on WorkItemWidgetStartAndDueDate { startDate dueDate }"
+            + " ... on WorkItemWidgetHealthStatus { healthStatus }"
+            + " } } } } }";
+
+    // The same, without the paid tiers' widgets: when GitLab doesn't know one of those
+    // (GitLab Free, older versions), parent and dates still show
+    private static final String WORK_ITEM_ROWS_FREE_QUERY =
+            "query($path: ID!, $iid: String!) { project: %s(fullPath: $path) {"
+            + " workItems(iid: $iid) { nodes { widgets {"
+            + " ... on WorkItemWidgetHierarchy { parent { title webUrl } }"
+            + " ... on WorkItemWidgetStartAndDueDate { startDate dueDate }"
+            + " } } } } }";
+
+    /** What the work item query found; null fields weren't set or weren't answered. */
+    private static class WorkItemRows {
+        String status;
+        String parentTitle;
+        String parentUrl;
+        Integer weight;
+        String iteration;
+        String startDate;
+        String dueDate;
+        String healthStatus;
+    }
+
+    /**
+     * Status, parent, weight, iteration, dates and health from the issue's work item (#344),
+     * best effort: if GitLab can't answer, the rows keep what REST had. Not for merge
+     * requests, which aren't work items.
+     */
+    private void loadWorkItemRows() {
+        String path = getWorkItemContainerPath();
+        if (isMergeRequestView() || path == null) {
+            return;
+        }
+        workItemRowsQuery(path, WORK_ITEM_ROWS_QUERY)
+                // GitLab answered with errors and no data: a widget it doesn't have; once more
+                // without the paid tiers' ones
+                .flatMap(response -> response.get("data") == null
+                        ? workItemRowsQuery(path, WORK_ITEM_ROWS_FREE_QUERY)
+                        : io.reactivex.Single.just(response))
+                .map(IssueFragmentBase::workItemRowsOf)
+                .compose(RxUtils::doInBackground)
+                .subscribe(rows -> {
+                    if (isAdded() && mListHeaderView != null) {
+                        showWorkItemRows(rows);
+                    }
+                }, error -> android.util.Log.d(Gl4Application.LOG_TAG,
+                        "Work item details unavailable", error));
+    }
+
+    private io.reactivex.Single<Map<String, Object>> workItemRowsQuery(String path,
+            String query) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("path", path);
+        variables.put("iid", String.valueOf(mIssue.number()));
+        Map<String, Object> body = new HashMap<>();
+        body.put("query", String.format(query, getWorkItemContainer()));
+        body.put("variables", variables);
+        return ServiceFactory.getGraphQL(com.gl4a.gitlab.service.GitLabGraphQLService.class)
+                .rawQuery(body)
+                .map(ApiHelpers::throwOnFailure);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static WorkItemRows workItemRowsOf(Map<String, Object> response) {
+        WorkItemRows rows = new WorkItemRows();
+        Object data = response != null ? response.get("data") : null;
+        Object project = data instanceof Map ? ((Map<String, Object>) data).get("project") : null;
+        Object workItems = project instanceof Map
+                ? ((Map<String, Object>) project).get("workItems") : null;
+        Object nodes = workItems instanceof Map
+                ? ((Map<String, Object>) workItems).get("nodes") : null;
+        if (!(nodes instanceof List)) {
+            return rows;
+        }
+        for (Object node : (List<?>) nodes) {
+            Object widgets = node instanceof Map ? ((Map<String, Object>) node).get("widgets")
+                    : null;
+            if (!(widgets instanceof List)) continue;
+            for (Object w : (List<?>) widgets) {
+                if (!(w instanceof Map)) continue;
+                Map<String, Object> widget = (Map<String, Object>) w;
+                Object status = widget.get("status");
+                if (status instanceof Map) {
+                    rows.status = stringOf(((Map<String, Object>) status).get("name"));
+                }
+                Object parent = widget.get("parent");
+                if (parent instanceof Map) {
+                    rows.parentTitle = stringOf(((Map<String, Object>) parent).get("title"));
+                    rows.parentUrl = stringOf(((Map<String, Object>) parent).get("webUrl"));
+                }
+                Object weight = widget.get("weight");
+                if (weight instanceof Number) {
+                    rows.weight = ((Number) weight).intValue();
+                }
+                Object iteration = widget.get("iteration");
+                if (iteration instanceof Map) {
+                    Map<String, Object> it = (Map<String, Object>) iteration;
+                    String title = stringOf(it.get("title"));
+                    rows.iteration = title != null ? title
+                            : StringUtils.formatShortDateRange(Gl4Application.get(),
+                                    stringOf(it.get("startDate")), stringOf(it.get("dueDate")));
+                }
+                if (widget.containsKey("startDate") || widget.containsKey("dueDate")) {
+                    rows.startDate = stringOf(widget.get("startDate"));
+                    rows.dueDate = stringOf(widget.get("dueDate"));
+                }
+                String health = stringOf(widget.get("healthStatus"));
+                if (health != null) {
+                    rows.healthStatus = health;
+                }
+            }
+        }
+        return rows;
+    }
+
+    @androidx.annotation.Nullable
+    private static String stringOf(@androidx.annotation.Nullable Object value) {
+        return value instanceof String && !((String) value).isEmpty() ? (String) value : null;
+    }
+
+    private void showWorkItemRows(WorkItemRows rows) {
+        bindTextRow(R.id.status_container, R.id.tv_status, rows.status);
+        bindParentRow(rows.parentTitle, rows.parentUrl);
+        if (mIssue.weight == null && rows.weight != null) {
+            bindTextRow(R.id.weight_container, R.id.tv_weight, String.valueOf(rows.weight));
+        }
+        bindTextRow(R.id.iteration_container, R.id.tv_iteration, rows.iteration);
+        // The work item's dates include its start, which REST leaves out
+        if (rows.startDate != null || rows.dueDate != null) {
+            bindDatesRow(rows.startDate, rows.dueDate);
+        }
+        int health = 0;
+        if ("onTrack".equals(rows.healthStatus)) {
+            health = R.string.issue_health_on_track;
+        } else if ("needsAttention".equals(rows.healthStatus)) {
+            health = R.string.issue_health_needs_attention;
+        } else if ("atRisk".equals(rows.healthStatus)) {
+            health = R.string.issue_health_at_risk;
+        }
+        bindTextRow(R.id.health_container, R.id.tv_health,
+                health != 0 ? getString(health) : null);
     }
 
     /**

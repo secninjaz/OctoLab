@@ -120,6 +120,24 @@ public final class MarkdownStyle {
                 // A list item's paragraphs keep their gap, as in Android text (#254)
                 .append("blockquote>:last-child,.markdown-alert>:last-child")
                 .append("{margin-bottom:0}")
+                // A collapsible section's title next to its ▶, as GitLab web, though GitLab
+                // sends it as a paragraph (#342)
+                .append("summary>p{display:inline;margin:0}")
+                // Its title bold, as GitLab web; opened, a gap under it and its content
+                // indented under the title's text (#342)
+                .append("summary{font-weight:bold}")
+                .append("details[open]>summary{margin-bottom:").append(BLOCK_GAP_EM)
+                .append("em}")
+                .append("details>:not(summary){margin-left:1em}")
+                // Label references (~"label") as labels, as in Android text (#345): a pill;
+                // a scoped one's value on the page inside a border of its colour
+                .append(".gl-label{display:inline-flex;border-radius:1em;overflow:hidden;")
+                .append("vertical-align:middle;font-size:0.85em;line-height:1.5}")
+                .append(".gl-label a{text-decoration:none;display:inline-flex}")
+                .append(".gl-label-text,.gl-label-text-scoped{padding:0 0.6em}")
+                .append(".gl-label-text-light{color:#fff}.gl-label-text-dark{color:#1f1f1f}")
+                .append(".gl-label-scoped{box-shadow:var(--label-inset-border)}")
+                .append(".gl-label-text-scoped{color:").append(css(text)).append("}")
                 .append("a,a:visited{color:").append(css(link))
                 .append(";text-decoration:").append(UNDERLINE_LINKS ? "underline" : "none")
                 .append("}");

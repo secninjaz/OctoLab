@@ -44,8 +44,18 @@ public final class ProjectLookup {
      * GitLab's project at {@code encodedPath} ("group%2Fproject"), as
      * {@link GitLabProjectService#getProjectByPath} answers it.
      */
-    public static synchronized Single<Response<GitLabProject>> byPath(String encodedPath,
+    public static Single<Response<GitLabProject>> byPath(String encodedPath,
             boolean bypassCache) {
+        return byPath(encodedPath, bypassCache, false);
+    }
+
+    /**
+     * As {@link #byPath(String, boolean)}; {@code withLicense} also asks for the licence GitLab
+     * detected (the project screen's About shortcut), in the same request (#350). The answer
+     * serves the plain lookups too.
+     */
+    public static synchronized Single<Response<GitLabProject>> byPath(String encodedPath,
+            boolean bypassCache, boolean withLicense) {
         Gl4Application app = Gl4Application.get();
         String key = app.getInstanceUrl() + "|" + app.getAuthLogin() + "|"
                 + Uri.decode(encodedPath).toLowerCase(Locale.ROOT);
@@ -55,12 +65,19 @@ public final class ProjectLookup {
             return entry.answer;
         }
         Entry[] mine = new Entry[1];
-        Single<Response<GitLabProject>> answer = ServiceFactory
-                .get(GitLabProjectService.class, bypassCache)
-                .getProjectByPath(encodedPath)
+        GitLabProjectService service = ServiceFactory.get(GitLabProjectService.class, bypassCache);
+        Single<Response<GitLabProject>> answer = (withLicense
+                ? service.getProjectByPathWithLicense(encodedPath)
+                : service.getProjectByPath(encodedPath))
                 // Only a project is kept: a refusal or failure is asked again next time
                 .doOnSuccess(response -> {
-                    if (!response.isSuccessful() || response.body() == null) forget(key, mine[0]);
+                    if (!response.isSuccessful() || response.body() == null) {
+                        forget(key, mine[0]);
+                    } else {
+                        // Its path for activity rows, which only have its number: the
+                        // project's own Activity tab then needn't ask for it again (#350)
+                        ProjectPaths.put(response.body());
+                    }
                 })
                 .doOnError(error -> forget(key, mine[0]))
                 .cache();

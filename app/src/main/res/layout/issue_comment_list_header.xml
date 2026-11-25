@@ -85,6 +85,15 @@
         android:visibility="gone"
         tools:text="Edited 2 days ago by Jay B" />
 
+    <!-- Reactions right under the description, as on GitLab web (#344) -->
+    <com.gl4a.widget.ReactionBar
+        android:id="@+id/reactions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="@dimen/overview_item_spacing"
+        android:paddingLeft="@dimen/content_padding"
+        android:paddingRight="@dimen/content_padding" />
+
     <com.gl4a.widget.MergeRequestBranchInfoView
         android:id="@+id/branch_container"
         android:layout_width="match_parent"
@@ -95,8 +104,9 @@
         android:visibility="gone"
         tools:visibility="visible" />
 
+    <!-- The rows in GitLab web's order (#344), from the work item's status -->
     <RelativeLayout
-        android:id="@+id/label_container"
+        android:id="@+id/status_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingBottom="@dimen/overview_item_spacing"
@@ -106,28 +116,30 @@
         tools:visibility="visible">
 
         <ImageView
-            android:id="@+id/iv_labels"
+            android:id="@+id/iv_status"
             android:layout_width="30dp"
             android:layout_height="30dp"
             android:layout_marginRight="10dp"
-            android:src="@drawable/labels" />
+            android:padding="8dp"
+            android:src="@drawable/circle"
+            app:tint="@color/icon_foreground" />
 
         <com.gl4a.widget.LinkHandlingTextView
-            android:id="@+id/tv_labels_label"
+            android:id="@+id/tv_status_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_toRightOf="@id/iv_labels"
-            android:text="@string/issue_labels"
+            android:layout_toRightOf="@id/iv_status"
+            android:text="@string/issue_status"
             android:textAppearance="@style/TextAppearance.AppCompat.Body1"
             android:textColor="?android:attr/textColorPrimary" />
 
         <com.gl4a.widget.LinkHandlingTextView
-            android:id="@+id/labels"
-            android:layout_width="match_parent"
+            android:id="@+id/tv_status"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_below="@id/tv_labels_label"
-            android:layout_toRightOf="@id/iv_labels"
-            tools:text="colored labels here" />
+            android:layout_below="@id/tv_status_label"
+            android:layout_toRightOf="@id/iv_status"
+            android:textAppearance="@style/TextAppearance.AppCompat.Small" />
 
     </RelativeLayout>
 
@@ -204,6 +216,122 @@
     </RelativeLayout>
 
     <RelativeLayout
+        android:id="@+id/label_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="@dimen/overview_item_spacing"
+        android:paddingLeft="@dimen/content_padding"
+        android:paddingRight="@dimen/content_padding"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <ImageView
+            android:id="@+id/iv_labels"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginRight="10dp"
+            android:src="@drawable/labels" />
+
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_labels_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@id/iv_labels"
+            android:text="@string/issue_labels"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+            android:textColor="?android:attr/textColorPrimary" />
+
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/labels"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_labels_label"
+            android:layout_toRightOf="@id/iv_labels"
+            tools:text="colored labels here" />
+
+    </RelativeLayout>
+
+    <!-- The parent: an epic's (#312), an issue's (#344), opened on tap -->
+    <RelativeLayout
+        android:id="@+id/parent_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackground"
+        android:paddingBottom="@dimen/overview_item_spacing"
+        android:paddingLeft="@dimen/content_padding"
+        android:paddingRight="@dimen/content_padding"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <ImageView
+            android:id="@+id/iv_parent"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginRight="10dp"
+            android:padding="3dp"
+            android:src="@drawable/epic" />
+
+        <TextView
+            android:id="@+id/tv_parent_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@id/iv_parent"
+            android:text="@string/epic_parent"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+            android:textColor="?android:attr/textColorPrimary" />
+
+        <TextView
+            android:id="@+id/tv_parent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_parent_label"
+            android:layout_toRightOf="@id/iv_parent"
+            android:textAppearance="@style/TextAppearance.AppCompat.Small"
+            android:textColor="?android:attr/textColorLink"
+            tools:text="F-06: Automated Incident Logging" />
+
+    </RelativeLayout>
+
+    <!-- Weight (#344) -->
+    <RelativeLayout
+        android:id="@+id/weight_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="@dimen/overview_item_spacing"
+        android:paddingLeft="@dimen/content_padding"
+        android:paddingRight="@dimen/content_padding"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <ImageView
+            android:id="@+id/iv_weight"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginRight="10dp"
+            android:padding="3dp"
+            android:src="@drawable/size_small"
+            app:tint="@color/icon_foreground" />
+
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_weight_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@id/iv_weight"
+            android:text="@string/issue_weight"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+            android:textColor="?android:attr/textColorPrimary" />
+
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_weight"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_weight_label"
+            android:layout_toRightOf="@id/iv_weight"
+            android:textAppearance="@style/TextAppearance.AppCompat.Small" />
+
+    </RelativeLayout>
+
+    <RelativeLayout
         android:id="@+id/milestone_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -240,7 +368,46 @@
 
     </RelativeLayout>
 
-    <!-- An epic's start and due dates (#312) -->
+    <!-- Iteration (#344) -->
+    <RelativeLayout
+        android:id="@+id/iteration_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="@dimen/overview_item_spacing"
+        android:paddingLeft="@dimen/content_padding"
+        android:paddingRight="@dimen/content_padding"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <ImageView
+            android:id="@+id/iv_iteration"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginRight="10dp"
+            android:padding="3dp"
+            android:src="@drawable/icon_timeline"
+            app:tint="@color/icon_foreground" />
+
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_iteration_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@id/iv_iteration"
+            android:text="@string/issue_iteration"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+            android:textColor="?android:attr/textColorPrimary" />
+
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_iteration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_iteration_label"
+            android:layout_toRightOf="@id/iv_iteration"
+            android:textAppearance="@style/TextAppearance.AppCompat.Small" />
+
+    </RelativeLayout>
+
+    <!-- Start and due dates: an epic's (#312), an issue's (#344) -->
     <RelativeLayout
         android:id="@+id/dates_container"
         android:layout_width="match_parent"
@@ -280,12 +447,11 @@
 
     </RelativeLayout>
 
-    <!-- An epic's parent epic (#312), opened on tap -->
+    <!-- Health status (#344) -->
     <RelativeLayout
-        android:id="@+id/parent_container"
+        android:id="@+id/health_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/selectableItemBackground"
         android:paddingBottom="@dimen/overview_item_spacing"
         android:paddingLeft="@dimen/content_padding"
         android:paddingRight="@dimen/content_padding"
@@ -293,31 +459,69 @@
         tools:visibility="visible">
 
         <ImageView
-            android:id="@+id/iv_parent"
+            android:id="@+id/iv_health"
             android:layout_width="30dp"
             android:layout_height="30dp"
             android:layout_marginRight="10dp"
             android:padding="3dp"
-            android:src="@drawable/epic" />
+            android:src="@drawable/reaction_heart"
+            app:tint="@color/icon_foreground" />
 
-        <TextView
-            android:id="@+id/tv_parent_label"
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_health_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_toRightOf="@id/iv_parent"
-            android:text="@string/epic_parent"
+            android:layout_toRightOf="@id/iv_health"
+            android:text="@string/issue_health_status"
             android:textAppearance="@style/TextAppearance.AppCompat.Body1"
             android:textColor="?android:attr/textColorPrimary" />
 
-        <TextView
-            android:id="@+id/tv_parent"
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_health"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_below="@id/tv_parent_label"
-            android:layout_toRightOf="@id/iv_parent"
-            android:textAppearance="@style/TextAppearance.AppCompat.Small"
-            android:textColor="?android:attr/textColorLink"
-            tools:text="F-06: Automated Incident Logging" />
+            android:layout_below="@id/tv_health_label"
+            android:layout_toRightOf="@id/iv_health"
+            android:textAppearance="@style/TextAppearance.AppCompat.Small" />
+
+    </RelativeLayout>
+
+    <!-- Time spent and estimated (#344) -->
+    <RelativeLayout
+        android:id="@+id/time_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="@dimen/overview_item_spacing"
+        android:paddingLeft="@dimen/content_padding"
+        android:paddingRight="@dimen/content_padding"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <ImageView
+            android:id="@+id/iv_time"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginRight="10dp"
+            android:padding="3dp"
+            android:src="@drawable/due_small"
+            app:tint="@color/icon_foreground" />
+
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_time_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@id/iv_time"
+            android:text="@string/issue_time_tracking"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+            android:textColor="?android:attr/textColorPrimary" />
+
+        <com.gl4a.widget.LinkHandlingTextView
+            android:id="@+id/tv_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_time_label"
+            android:layout_toRightOf="@id/iv_time"
+            android:textAppearance="@style/TextAppearance.AppCompat.Small" />
 
     </RelativeLayout>
 
@@ -398,13 +602,5 @@
         android:textColor="?android:attr/textColorLink"
         android:visibility="gone"
         tools:visibility="visible" />
-
-    <com.gl4a.widget.ReactionBar
-        android:id="@+id/reactions"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingBottom="@dimen/overview_item_spacing"
-        android:paddingLeft="@dimen/content_padding"
-        android:paddingRight="@dimen/content_padding" />
 
 </LinearLayout>

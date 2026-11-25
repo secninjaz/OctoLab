@@ -67,6 +67,7 @@ public class CommitListFragment extends PagedDataBaseFragment<GitLabCommit> impl
     private String mRef;
     private String mFilePath;
     private boolean mFollowRenames;
+    private String mOverviewPath;
 
     private CommitAdapter mAdapter;
     private ContextSelectionCallback mCallback;
@@ -82,8 +83,11 @@ public class CommitListFragment extends PagedDataBaseFragment<GitLabCommit> impl
         String ownerPath = repo.pathWithNamespace != null
                 ? repo.pathWithNamespace.substring(0, Math.max(0, repo.pathWithNamespace.lastIndexOf('/')))
                 : (repo.namespace != null ? repo.namespace.path : repo.owner().login());
-        return newInstance(ownerPath, repo.path, repo.id(),
+        CommitListFragment f = newInstance(ownerPath, repo.path, repo.id(),
                 StringUtils.isBlank(ref) ? repo.defaultBranch() : ref, null);
+        // The project's Commits tab: its first page can come with the overview (#350)
+        f.getArguments().putString("overview_path", repo.pathWithNamespace);
+        return f;
     }
 
     public static CommitListFragment newInstance(String repoOwner, String repoName,
@@ -109,6 +113,7 @@ public class CommitListFragment extends PagedDataBaseFragment<GitLabCommit> impl
         mProjectId = getArguments().getLong("project_id");
         mRef = getArguments().getString("ref");
         mFilePath = getArguments().getString("path");
+        mOverviewPath = getArguments().getString("overview_path");
         if (savedInstanceState != null) {
             mFollowRenames = savedInstanceState.getBoolean("follow_renames");
         }
@@ -217,6 +222,29 @@ public class CommitListFragment extends PagedDataBaseFragment<GitLabCommit> impl
         final GitLabCommitService service =
                 ServiceFactory.get(GitLabCommitService.class, bypassCache);
 
+        if (page == 1 && mOverviewPath != null && mFilePath == null) {
+            // The first page from the project's overview, shared with About and Files, when
+            // it has it (#350); the next pages are asked for as before
+            return com.gl4a.utils.ProjectOverview.get(mOverviewPath, mProjectId, mRef,
+                            bypassCache)
+                    .<Response<GitLabPage<GitLabCommit>>>flatMap(overview ->
+                            overview.commits != null
+                                    ? Single.just(Response.success(firstPage(overview)))
+                                    : loadRestPage(service, page));
+        }
+        return loadRestPage(service, page);
+    }
+
+    private static GitLabPage<GitLabCommit> firstPage(
+            com.gl4a.utils.ProjectOverview.Data overview) {
+        List<GitLabCommit> commits = overview.commitsCopy();
+        // As GitLab's page headers say it: page 2 follows when there are more
+        return new GitLabPage<>(commits, 1, overview.moreCommits ? 2 : 0,
+                overview.moreCommits ? 2 : 1, commits.size());
+    }
+
+    private Single<Response<GitLabPage<GitLabCommit>>> loadRestPage(GitLabCommitService service,
+            int page) {
         return resolveProjectId()
                 .flatMap(projectId -> service.listCommits(projectId, mRef, mFilePath, page, 25, null, null))
                 .map(response -> {

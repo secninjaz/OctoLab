@@ -162,6 +162,9 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
 
         if (savedInstanceState != null) {
             mSelectedRef = savedInstanceState.getString(STATE_KEY_SELECTED_REF);
+        } else {
+            // Opening the project shows it as it is now, as before (#350)
+            com.gl4a.utils.ProjectOverview.forget(mRepoOwner + "/" + mRepoName);
         }
 
         mActionBar = getSupportActionBar();
@@ -302,6 +305,9 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
 
     @Override
     public void onRefresh() {
+        // The tabs ask GitLab again, in one query they share (#350)
+        com.gl4a.utils.ProjectOverview.forget(mRepository != null
+                ? mRepository.pathWithNamespace : mRepoOwner + "/" + mRepoName);
         mRepositoryFragment = null;
         mContentListFragment = null;
         mActivityFragment = null;
@@ -436,8 +442,10 @@ public class RepositoryActivity extends BaseFragmentPagerActivity implements
         // We always skip the cache in this case, since the project endpoint may change open issues count etc.
         boolean skipCache = true;
         // Asks GitLab, and keeps the answer for the screens that follow (#333)
+        // With the licence for About's shortcut, in the same request (#350)
         com.gl4a.utils.ProjectLookup.byPath(
-                URLEncoder.encode(mRepoOwner + "/" + mRepoName, StandardCharsets.UTF_8), skipCache)
+                URLEncoder.encode(mRepoOwner + "/" + mRepoName, StandardCharsets.UTF_8), skipCache,
+                true)
                 .map(ApiHelpers::throwOnFailure)
                 .compose(makeLoaderSingle(ID_LOADER_REPO, skipCache))
                 .subscribe(result -> {

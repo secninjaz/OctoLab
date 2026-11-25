@@ -102,7 +102,8 @@ public final class CommitAuthors {
         return value instanceof Map ? (Map<String, Object>) value : null;
     }
 
-    private static GitLabUser toUser(Map<String, Object> author) {
+    /** A commit's linked account as GraphQL gives it; also used by ProjectOverview (#350). */
+    static GitLabUser toUser(Map<String, Object> author) {
         GitLabUser user = new GitLabUser();
         String gid = (String) author.get("id");
         if (gid != null) {

@@ -76,9 +76,25 @@ public class ApiRequestException extends RuntimeException {
 
     private final ErrorBody mErrorBody;
     private final int mStatus;
+    // GitLab's Retry-After, in seconds; null when it gave none (#350)
+    private final Long mRetryAfterSeconds;
+
+    /**
+     * GitLab's Retry-After on an answer, in seconds, as a number; null when there is none
+     * (#322, #350).
+     */
+    public static Long retryAfterSeconds(Response<?> response) {
+        String header = response.headers().get("Retry-After");
+        try {
+            if (header != null) return Long.parseLong(header.trim());
+        } catch (NumberFormatException ignored) {
+        }
+        return null;
+    }
 
     public ApiRequestException(Response response) {
         mStatus = response.code();
+        mRetryAfterSeconds = retryAfterSeconds(response);
 
         ErrorBody parsed = null;
         try {
@@ -100,6 +116,11 @@ public class ApiRequestException extends RuntimeException {
     /** GitLab's "too many requests": a rate limit, e.g. on searches (#294). */
     public boolean isRateLimited() {
         return mStatus == 429;
+    }
+
+    /** How long GitLab asks to wait before asking again, in seconds; null when it didn't say. */
+    public Long getRetryAfterSeconds() {
+        return mRetryAfterSeconds;
     }
 
     /**

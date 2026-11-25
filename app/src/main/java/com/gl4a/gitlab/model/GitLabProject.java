@@ -110,6 +110,13 @@ public class GitLabProject implements Parcelable {
         }
     }
 
+    /** The licence GitLab detected, when the project was asked for with it (#350, #271). */
+    @Json(name = "license") public License license;
+
+    public static class License {
+        @Json(name = "name") public String name;
+    }
+
     public static class GitLabProjectPermissions {
         @Json(name = "project_access") public GitLabAccess projectAccess;
         @Json(name = "group_access") public GitLabAccess groupAccess;
@@ -172,6 +179,11 @@ public class GitLabProject implements Parcelable {
         mergeRequestsAccessLevel = in.readString();
         issuesAccessLevel = in.readString();
         wikiAccessLevel = in.readString();
+        String licenseName = in.readString();
+        if (licenseName != null) {
+            license = new License();
+            license.name = licenseName;
+        }
     }
 
     @Override
@@ -205,6 +217,7 @@ public class GitLabProject implements Parcelable {
         dest.writeString(mergeRequestsAccessLevel);
         dest.writeString(issuesAccessLevel);
         dest.writeString(wikiAccessLevel);
+        dest.writeString(license != null ? license.name : null);
     }
 
     @Override

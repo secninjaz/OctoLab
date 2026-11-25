@@ -44,6 +44,13 @@
     <string name="about">About</string>
     <string name="retry">Retry</string>
     <string name="open_source_components">Open source components</string>
+    <!-- What's new, from the changelog (#347) -->
+    <string name="whats_new">What\'s new</string>
+    <string name="whats_new_summary">Changes in each version of OctoLab</string>
+    <string name="whats_new_unreleased">Unreleased</string>
+    <!-- A version's header: "1.6.2 · 19 Nov 2026" -->
+    <string name="whats_new_version_header">%1$s · %2$s</string>
+    <string name="whats_new_updated_to">Updated to %1$s</string>
     <string name="my_profile">My profile</string>
     <string name="user_context">Account</string>
     <string name="add_account">Add account</string>
@@ -87,7 +94,7 @@
     <string name="load_failure_explanation">Loading the data from GitLab failed. Please verify you have a working network connection and try again.</string>
     <string name="load_failure_explanation_dmca">This repository was taken down for legal reasons.\nPlease see %1$s for details.</string>
     <string name="load_failure_explanation_parsing">There was an error while parsing GitLab\'s response. You can use the button below to report this issue to the app developers.</string>
-    <string name="load_failure_rate_limited">GitLab\'s limit on requests in a short time (e.g. searches) was reached. Try again in a minute.</string>
+    <string name="load_failure_rate_limited_retrying">GitLab asked to wait. Retrying in %1$d s</string>
     <string name="load_failure_explanation_with_reason">Loading the data from GitLab failed. GitLab told us the following reason:\n%1$s</string>
     <string name="snackbar_network_error">%1$s. Please check your internet connection.</string>
     <string name="snackbar_application_error">%1$s. You can copy the error log to provide more details when reporting the issue to the app developers.</string>
@@ -133,6 +140,18 @@
     <string name="issue_milestone_hint">Milestone</string>
     <string name="issue_assignee_hint">Assignees</string>
     <string name="mr_reviewer_hint">Reviewers</string>
+    <!-- The issue and MR page's rows in GitLab web's order (#344) -->
+    <string name="issue_status">Status</string>
+    <string name="issue_weight">Weight</string>
+    <string name="issue_iteration">Iteration</string>
+    <string name="issue_health_status">Health status</string>
+    <string name="issue_health_on_track">On track</string>
+    <string name="issue_health_needs_attention">Needs attention</string>
+    <string name="issue_health_at_risk">At risk</string>
+    <string name="issue_time_tracking">Time tracking</string>
+    <string name="issue_time_spent_of_estimate">Spent %1$s of %2$s estimate</string>
+    <string name="issue_time_spent">Spent %1$s</string>
+    <string name="issue_time_estimate">Estimate %1$s</string>
     <string name="link_not_openable">Link could not be opened</string>
     <string name="download_created">Created %1$s</string>
     <string name="download_mobile_warning_title">Mobile connection download</string>

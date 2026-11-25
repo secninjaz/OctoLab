@@ -161,7 +161,13 @@ public class IssueLabelAdapter extends
         int color = com.gl4a.utils.ApiHelpers.parseGitLabColor(colorString);
         int textColor = UiUtils.textColorForBackground(mContext, color);
 
-        holder.color.setBackgroundColor(color);
+        // The label's colour with its rounded corners (#341)
+        android.graphics.drawable.GradientDrawable swatch =
+                new android.graphics.drawable.GradientDrawable();
+        swatch.setColor(color);
+        swatch.setCornerRadius(mContext.getResources()
+                .getDimension(R.dimen.issue_label_corner_radius));
+        holder.color.setBackground(swatch);
         holder.editor.setBackgroundColor(color);
         holder.customColorButton.setBackgroundColor(color);
         holder.customColorButton.setTextColor(textColor);

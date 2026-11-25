@@ -36,6 +36,15 @@ public class DebugLoggingInterceptor implements Interceptor {
                 bodyLength = response.body().contentLength();
             }
             logger.api(request.method(), url, response.code(), bodyLength);
+            // Which of GitLab's limits was reached, and how long it asks to wait (#350)
+            if (response.code() == 429) {
+                String name = response.header("RateLimit-Name");
+                String retryAfter = response.header("Retry-After");
+                if (name != null || retryAfter != null) {
+                    logger.log("API", "429 RateLimit-Name: " + (name != null ? name : "-")
+                            + ", Retry-After: " + (retryAfter != null ? retryAfter : "-"));
+                }
+            }
         }
 
         return response;

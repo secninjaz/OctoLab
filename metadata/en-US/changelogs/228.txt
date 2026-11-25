@@ -1,0 +1,8 @@
+Added:
+• Settings → What's new shows what changed in each version, and after an update a bar points to it once; F-Droid shows each version's changes too
+Changed:
+• Labels look as on GitLab: pills, and scoped labels like bug::functional in two parts
+Fixed:
+• Opening a project sends far fewer requests (4 instead of about 16 on gitlab.com), and when GitLab asks to wait, screens show the wait and retry by themselves
+…
+All changes: github.com/secninjaz/OctoLab/releases

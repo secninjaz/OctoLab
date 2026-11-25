@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-11-26
+
+### Added
+- Settings → What's new shows what changed in each version, and after an update a bar points to it once; F-Droid shows each version's changes too (#347)
+- Issue and MR pages follow GitLab's order and show Status, Parent, Weight, Iteration, Dates, Health status and Time tracking when set (#344)
+
+### Changed
+- Labels look as on GitLab: pills, and scoped labels like bug::functional in two parts (#341)
+- Label references in comments and descriptions look like labels too (#345)
+- Under a description, 👍 and 👎 always show, at 0 too, and one tap adds yours (#346)
+
+### Fixed
+- Opening a project sends far fewer requests (4 instead of about 16 on gitlab.com), and when GitLab asks to wait, screens show the wait and retry by themselves (#350)
+- A collapsible section's title shows next to its ▶, bold, with its content indented when opened (#342)
+- Saved profile pictures show at once, without waiting for other pictures' downloads on a slow connection (#343)
+
 ## [1.6.2] - 2026-11-19
 
 ### Added
@@ -29,7 +45,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Notifications: a background check can no longer wait without end on a network that went away and hold back the next ones; after a check couldn't reach a server, it checks again as soon as you're back online, connect a VPN or join Wi-Fi (#325)
 - A screen showing a connection error loads again by itself when the network comes back or changes, e.g. once a VPN connects (#326)
-- Opening projects and folders on gitlab.com no longer runs into "too many requests": file sizes come in one request per folder, and a project is looked up once for all its screens (#333)
+- Opening projects and folders on gitlab.com sends far fewer requests, so it runs into "too many requests" much less: file sizes come in one request per folder, and a project is looked up once for all its screens (#333)
 - Tapping a merge request comment in Activity opens it in the app at the comment instead of the browser (#328, [GitHub #5](https://github.com/secninjaz/OctoLab/issues/5))
 - Reporters can close and reopen work items, as on GitLab; authors can always reopen their own (#329, [GitHub #4](https://github.com/secninjaz/OctoLab/issues/4))
 - Filtering issues or merge requests by label, milestone or assignee no longer says the project doesn't exist when the list was opened from a merge request or a link; "No label", "No milestone" and "No assignee" show only those without one (#330, [GitHub #3](https://github.com/secninjaz/OctoLab/issues/3))

@@ -77,25 +77,8 @@ public class EpicFragment extends IssueFragmentBase {
     }
 
     private void bindDates(View headerView) {
-        List<String> parts = new ArrayList<>();
-        if (mIssue.startDate != null) {
-            parts.add(getString(R.string.epic_start_date, formatDate(mIssue.startDate)));
-        }
-        if (mIssue.dueDate != null) {
-            parts.add(getString(R.string.epic_due_date, formatDate(mIssue.dueDate)));
-        }
-        headerView.findViewById(R.id.dates_container)
-                .setVisibility(parts.isEmpty() ? View.GONE : View.VISIBLE);
-        ((TextView) headerView.findViewById(R.id.tv_dates))
-                .setText(android.text.TextUtils.join(" · ", parts));
-    }
-
-    private CharSequence formatDate(String date) {
-        java.util.Date parsed = StringUtils.parseIsoDate(date);
-        return parsed != null ? android.text.format.DateUtils.formatDateTime(getActivity(),
-                parsed.getTime(), android.text.format.DateUtils.FORMAT_SHOW_DATE
-                        | android.text.format.DateUtils.FORMAT_SHOW_YEAR
-                        | android.text.format.DateUtils.FORMAT_UTC) : date;
+        // The issue page's dates row, shared (#344)
+        bindDatesRow(mIssue.startDate, mIssue.dueDate);
     }
 
     private static final String DETAILS_QUERY =
@@ -166,12 +149,9 @@ public class EpicFragment extends IssueFragmentBase {
 
     private void bindParent(View headerView,
             @Nullable GitLabEpicDetailsResponse.Parent parent) {
-        if (parent == null || parent.webUrl == null) return;
-        View container = headerView.findViewById(R.id.parent_container);
-        ((TextView) headerView.findViewById(R.id.tv_parent)).setText(parent.title);
-        container.setOnClickListener(v -> IntentUtils.openLinkInternallyOrExternally(
-                getActivity(), android.net.Uri.parse(parent.webUrl)));
-        container.setVisibility(View.VISIBLE);
+        if (parent == null) return;
+        // The issue page's parent row, shared (#344)
+        bindParentRow(parent.title, parent.webUrl);
     }
 
     /** "5 epics · 5 issues · 2 of 10 closed" and its progress bar, GitLab's numbers. */

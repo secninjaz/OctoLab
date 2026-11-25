@@ -69,6 +69,12 @@ public interface GitLabProjectService {
     @GET("projects/{id}?license=true")
     Single<Response<Map<String, Object>>> getProjectWithLicense(@Path("id") long projectId);
 
+    /** By path, with the licence GitLab detected: the project screen's one request (#350). */
+    @GET("projects/{id}?license=true")
+    Single<Response<GitLabProject>> getProjectByPathWithLicense(
+            @Path(value = "id", encoded = true) String id
+    );
+
     // Get project by namespace/name — id must be URL-encoded as "namespace%2Frepo"
     // Callers must pass URLEncoder.encode(namespace + "/" + repo, "UTF-8")
     @GET("projects/{id}")

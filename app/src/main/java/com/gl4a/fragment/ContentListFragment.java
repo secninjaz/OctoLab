@@ -304,7 +304,7 @@ public class ContentListFragment extends ListDataBaseFragment<GitLabTreeItem> im
         long projectId = mRepository.id();
         String ref = mRef != null ? mRef : mRepository.defaultBranch();
 
-        return contentService.getTree(projectId, mPath, ref, false, 1, 100)
+        Single<List<GitLabTreeItem>> rest = contentService.getTree(projectId, mPath, ref, false, 1, 100)
                 .map(response -> {
                     // 403: insufficient access (Guest on private repo) — return empty list
                     // 404: repo empty or path not found — return empty list
@@ -316,7 +316,15 @@ public class ContentListFragment extends ListDataBaseFragment<GitLabTreeItem> im
                 .compose(RxUtils.mapFailureToValue(
                         HttpURLConnection.HTTP_FORBIDDEN, new ArrayList<GitLabTreeItem>()))
                 .compose(RxUtils.mapFailureToValue(
-                        HttpURLConnection.HTTP_NOT_FOUND, new ArrayList<GitLabTreeItem>()))
+                        HttpURLConnection.HTTP_NOT_FOUND, new ArrayList<GitLabTreeItem>()));
+        if (!StringUtils.isBlank(mPath)) {
+            return rest.compose(RxUtils.sortList(COMPARATOR));
+        }
+        // The root from the project's overview, shared with About and Commits, when it has
+        // it (#350); folders below are asked for as before
+        return com.gl4a.utils.ProjectOverview.get(mRepository, ref, bypassCache)
+                .<List<GitLabTreeItem>>flatMap(overview -> overview.rootFiles != null
+                        ? Single.just(overview.rootFilesCopy()) : rest)
                 .compose(RxUtils.sortList(COMPARATOR));
     }
 

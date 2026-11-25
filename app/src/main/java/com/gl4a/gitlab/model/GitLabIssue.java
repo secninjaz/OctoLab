@@ -131,9 +131,9 @@ public class GitLabIssue implements Parcelable {
         if (hasWeight == 1) {
             weight = in.readInt();
         }
-        // timeStats and references are skipped in parcelling (not displayed from parcel path)
-        // but we must write/read a flag to keep the stream in sync.
-        in.readInt(); // timeStats placeholder
+        // Time tracking, shown on the issue and MR page (#344); references are skipped, but
+        // keep a flag to keep the stream in sync.
+        timeStats = TimeStats.readFrom(in);
         in.readInt(); // references placeholder
         groupId = in.readLong();
         workItemId = in.readLong();
@@ -179,8 +179,8 @@ public class GitLabIssue implements Parcelable {
         } else {
             dest.writeInt(0);
         }
-        // timeStats and references: placeholder flags (not yet Parcelable)
-        dest.writeInt(0);
+        TimeStats.writeTo(dest, timeStats);
+        // references: placeholder flag (not yet Parcelable)
         dest.writeInt(0);
         dest.writeLong(groupId);
         dest.writeLong(workItemId);
@@ -210,5 +210,29 @@ public class GitLabIssue implements Parcelable {
         @Json(name = "total_time_spent") public int totalTimeSpent;
         @Json(name = "human_time_estimate") public String humanTimeEstimate;
         @Json(name = "human_total_time_spent") public String humanTotalTimeSpent;
+
+        /** Writes a flag, then the fields if there are any (#344). */
+        public static void writeTo(Parcel dest, @androidx.annotation.Nullable TimeStats stats) {
+            if (stats == null) {
+                dest.writeInt(0);
+                return;
+            }
+            dest.writeInt(1);
+            dest.writeInt(stats.timeEstimate);
+            dest.writeInt(stats.totalTimeSpent);
+            dest.writeString(stats.humanTimeEstimate);
+            dest.writeString(stats.humanTotalTimeSpent);
+        }
+
+        @androidx.annotation.Nullable
+        public static TimeStats readFrom(Parcel in) {
+            if (in.readInt() != 1) return null;
+            TimeStats stats = new TimeStats();
+            stats.timeEstimate = in.readInt();
+            stats.totalTimeSpent = in.readInt();
+            stats.humanTimeEstimate = in.readString();
+            stats.humanTotalTimeSpent = in.readString();
+            return stats;
+        }
     }
 }

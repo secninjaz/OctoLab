@@ -515,12 +515,24 @@ public class RepositoryFragment extends LoadingFragmentBase implements
                 }, this::handleLoadFailure);
     }
 
+    /**
+     * The project's overview, one GraphQL query shared by the tabs (#350); each part missing
+     * from it is asked for as before.
+     */
+    private Single<com.gl4a.utils.ProjectOverview.Data> overview(boolean force) {
+        return com.gl4a.utils.ProjectOverview.get(mRepository,
+                mRef != null ? mRef : mRepository.defaultBranch(), force);
+    }
+
     private void loadMergeRequestCount(boolean force) {
         GitLabMergeRequestService service = ServiceFactory.get(GitLabMergeRequestService.class, force);
         long projectId = mRepository.id();
 
-        service.listMergeRequests(projectId, "opened", null, null, null, null, 1, 1, null, null, null,
-                false)
+        // From the overview when it has it, else GitLab's count of the list as before (#350)
+        overview(force).<Integer>flatMap(overview -> overview.openMergeRequests != null
+                ? Single.just(overview.openMergeRequests)
+                : service.listMergeRequests(projectId, "opened", null, null, null, null, 1, 1,
+                        null, null, null, false)
                 .map(response -> {
                     if (!response.isSuccessful()) {
                         throw new com.gl4a.ApiRequestException(response);
@@ -532,7 +544,7 @@ public class RepositoryFragment extends LoadingFragmentBase implements
                     }
                     // Fallback: count items in the response body
                     return response.body() != null ? response.body().size() : 0;
-                })
+                }))
                 .compose(makeLoaderSingle(ID_LOADER_MR_COUNT, force))
                 .subscribe(count -> {
                     int issueCount = mRepository.openIssuesCount;
@@ -568,10 +580,14 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         body.put("query", "query($path: ID!) { project(fullPath: $path) {"
                 + " languages { name share color } } }");
         body.put("variables", variables);
-        ServiceFactory.getGraphQL(com.gl4a.gitlab.service.GitLabGraphQLService.class)
-                .rawQuery(body)
-                .map(ApiHelpers::throwOnFailure)
-                .map(RepositoryFragment::languagesOf)
+        // From the overview when it has them, else their own query as before (#350)
+        overview(force).<java.util.List<java.util.Map<String, Object>>>flatMap(
+                overview -> overview.languages != null
+                ? Single.just(overview.languages)
+                : ServiceFactory.getGraphQL(com.gl4a.gitlab.service.GitLabGraphQLService.class)
+                        .rawQuery(body)
+                        .map(ApiHelpers::throwOnFailure)
+                        .map(RepositoryFragment::languagesOf))
                 .compose(makeLoaderSingle(ID_LOADER_LANGUAGES, force))
                 .subscribe(this::showLanguages, error -> showLanguages(
                         java.util.Collections.emptyList()));
@@ -633,6 +649,14 @@ public class RepositoryFragment extends LoadingFragmentBase implements
     /** The licence GitLab detected, named on its shortcut (#271). */
     @SuppressWarnings("unchecked")
     private void loadLicense(boolean force) {
+        // Already there when the project screen asked for the project with it (#350): no
+        // request of its own; a refresh asks again as before
+        if (!force && mRepository.license != null) {
+            mLicenseName = android.text.TextUtils.isEmpty(mRepository.license.name)
+                    ? null : mRepository.license.name;
+            showFileShortcuts();
+            return;
+        }
         ServiceFactory.get(GitLabProjectService.class, force)
                 .getProjectWithLicense(mRepository.id())
                 .map(ApiHelpers::throwOnFailure)
@@ -652,23 +676,33 @@ public class RepositoryFragment extends LoadingFragmentBase implements
     /** The selected branch's top-level files (for the shortcuts) and last commit (#271). */
     private void loadBranchDetails(boolean force) {
         final String ref = mRef != null ? mRef : mRepository.defaultBranch();
-        ServiceFactory.get(GitLabRepositoryService.class, force)
-                .getTree(mRepository.id(), null, ref, false, 1, 100)
-                .map(ApiHelpers::throwOnFailure)
+        // Both from the overview, shared with Files and Commits, when it has them (#350)
+        Single<com.gl4a.utils.ProjectOverview.Data> overview = overview(force);
+        overview.<java.util.List<com.gl4a.gitlab.model.GitLabTreeItem>>flatMap(
+                o -> o.rootFiles != null
+                ? Single.just(o.rootFilesCopy())
+                : ServiceFactory.get(GitLabRepositoryService.class, force)
+                        .getTree(mRepository.id(), null, ref, false, 1, 100)
+                        .map(ApiHelpers::throwOnFailure))
                 .compose(makeLoaderSingle(ID_LOADER_TOP_FILES, true))
                 .subscribe(files -> {
                     mTopFiles = files;
                     showFileShortcuts();
                 }, error -> { });
-        ServiceFactory.get(com.gl4a.gitlab.service.GitLabCommitService.class, force)
-                .listCommits(mRepository.id(), ref, null, 1, 1, null, null)
-                .map(ApiHelpers::throwOnFailure)
+        overview.<java.util.List<com.gl4a.gitlab.model.GitLabCommit>>flatMap(
+                o -> o.commits != null
+                ? Single.just(o.commitsCopy())
+                : ServiceFactory.get(com.gl4a.gitlab.service.GitLabCommitService.class, force)
+                        .listCommits(mRepository.id(), ref, null, 1, 1, null, null)
+                        .map(ApiHelpers::throwOnFailure)
+                        // The account GitLab links the commit to, as in commit lists (#244)
+                        .map(commits -> com.gl4a.utils.CommitAuthors.attach(
+                                new java.util.ArrayList<com.gl4a.gitlab.model.GitLabCommit>(
+                                        commits))))
                 .map(commits -> {
                     if (commits.isEmpty()) {
                         throw new java.io.IOException("No commits on " + ref);
                     }
-                    // The account GitLab links the commit to, as in commit lists (#244)
-                    com.gl4a.utils.CommitAuthors.attach(new java.util.ArrayList<>(commits));
                     return commits.get(0);
                 })
                 .compose(makeLoaderSingle(ID_LOADER_LAST_COMMIT, true))
@@ -840,7 +874,11 @@ public class RepositoryFragment extends LoadingFragmentBase implements
         }
         GitLabProjectService service = ServiceFactory.get(GitLabProjectService.class, force);
         long projectId = mRepository.id();
-        service.getStarrers(projectId, 1, 100)
+        // From the overview (the user's starred projects named so) when it knows, else the
+        // starrers as before (#350)
+        overview(force).<Boolean>flatMap(overview -> overview.starred != null
+                ? Single.just(overview.starred)
+                : service.getStarrers(projectId, 1, 100)
                 .map(response -> {
                     if (!response.isSuccessful() || response.body() == null) {
                         return false;
@@ -853,7 +891,7 @@ public class RepositoryFragment extends LoadingFragmentBase implements
                     }
                     return false;
                 })
-                .onErrorReturn(e -> false)
+                .onErrorReturn(e -> false))
                 .compose(makeLoaderSingle(ID_LOADER_STARRING, force))
                 .subscribe(result -> {
                     mIsStarring = result;

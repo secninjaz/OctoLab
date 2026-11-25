@@ -116,14 +116,36 @@ public class ReactionBar extends HorizontalScrollView implements View.OnClickLis
         setReactions(null);
     }
 
+    // Under a description: 👍 and 👎 always, at 0 too, as GitLab web (#346)
+    private boolean mAlwaysShowThumbs;
+    @Nullable
+    private GitLabReactions mReactions;
+
+    /** 👍 and 👎 shown even at 0, and the bar even without reactions (#346). */
+    public void setAlwaysShowThumbs(boolean always) {
+        mAlwaysShowThumbs = always;
+        setReactions(mReactions);
+    }
+
     public void setReactions(GitLabReactions reactions) {
+        mReactions = reactions;
         if (mPopup != null) {
             mPopup.update();
         }
         if (mAddReactionMenuHelper != null) {
             mAddReactionMenuHelper.updateMenuItems();
         }
-        if (reactions != null && reactions.totalCount() > 0) {
+        if (mAlwaysShowThumbs) {
+            showCount(mPlusOneView, reactions != null ? reactions.plusOne() : 0);
+            showCount(mMinusOneView, reactions != null ? reactions.minusOne() : 0);
+            updateView(mLaughView, reactions != null ? reactions.laugh() : 0);
+            updateView(mHoorayView, reactions != null ? reactions.hooray() : 0);
+            updateView(mConfusedView, reactions != null ? reactions.confused() : 0);
+            updateView(mHeartView, reactions != null ? reactions.heart() : 0);
+            updateView(mRocketView, reactions != null ? reactions.rocket() : 0);
+            updateView(mEyesView, reactions != null ? reactions.eyes() : 0);
+            setVisibility(View.VISIBLE);
+        } else if (reactions != null && reactions.totalCount() > 0) {
             updateView(mPlusOneView, reactions.plusOne());
             updateView(mMinusOneView, reactions.minusOne());
             updateView(mLaughView, reactions.laugh());
@@ -249,6 +271,25 @@ public class ReactionBar extends HorizontalScrollView implements View.OnClickLis
             mAddReactionPopup.show();
             return;
         }
+        // 👍 or 👎 at 0: one tap adds yours, as on GitLab web (#346)
+        if (mAlwaysShowThumbs && (view == mPlusOneView || view == mMinusOneView)
+                && "0".contentEquals(((TextView) view).getText())
+                && Gl4Application.get().isAuthorized() && mCallback != null
+                && mCallback.canAddReaction() && mDetailsCache != null
+                && mReferenceItem != null) {
+            List<GitLabReaction> details = mDetailsCache.getReactions(mReferenceItem);
+            if (details == null) {
+                details = new ArrayList<>();
+                // Kept first, so the bar hears of the change
+                mDetailsCache.putReactions(mReferenceItem, details);
+            }
+            toggleReaction(view == mPlusOneView ? GitLabReaction.CONTENT_PLUS_ONE
+                            : GitLabReaction.CONTENT_MINUS_ONE, null,
+                    new ArrayList<>(details), mCallback, mReferenceItem, mDetailsCache)
+                    .subscribe(result -> { }, error -> Log.d(Gl4Application.LOG_TAG,
+                            "Adding reaction failed", error));
+            return;
+        }
         for (int i = 0; i < REACTION_VIEW_IDS.length; i++) {
             if (view.getId() == REACTION_VIEW_IDS[i]) {
                 if (mPopup == null) {
@@ -259,6 +300,11 @@ public class ReactionBar extends HorizontalScrollView implements View.OnClickLis
                 mPopup.show(REACTION_CONTENTS[i]);
             }
         }
+    }
+
+    private void showCount(TextView view, int count) {
+        view.setText(String.valueOf(count));
+        view.setVisibility(View.VISIBLE);
     }
 
     private void updateView(TextView view, int count) {

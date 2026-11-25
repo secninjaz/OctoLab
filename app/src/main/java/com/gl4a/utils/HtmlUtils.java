@@ -578,7 +578,7 @@ public class HtmlUtils {
             } else if (tag.equalsIgnoreCase("summary")) {
                 startBlockElement(attributes, 1);
             } else if (tag.equalsIgnoreCase("span")) {
-                startCssStyle(attributes);
+                startSpan(attributes);
             } else if (tag.equalsIgnoreCase("hr")) {
                 HorizontalLineSpan span = new HorizontalLineSpan(mDividerHeight, MarkdownStyle.RULE_COLOR);
                 appendNewlines(1);
@@ -678,7 +678,7 @@ public class HtmlUtils {
                        tag.equalsIgnoreCase("summary")) {
                 endBlockElement();
             } else if (tag.equalsIgnoreCase("span")) {
-                endCssStyle();
+                endSpan();
             } else if (tag.equalsIgnoreCase("strong")) {
                 end(Bold.class, new StyleSpan(Typeface.BOLD));
             } else if (tag.equalsIgnoreCase("b")) {
@@ -1018,6 +1018,98 @@ public class HtmlUtils {
             if (obj != null) {
                 setSpanFromMark(obj, spans);
             }
+        }
+
+        // GitLab's label references (~"label"), drawn as the app draws labels (#345): GitLab
+        // sends <span class="gl-label"> holding the name in a coloured span, or for a scoped
+        // label the scope in a coloured span and the value in another
+        private static final class GlLabel {
+            @androidx.annotation.Nullable Integer color;
+            int split = -1;
+        }
+
+        // What each open <span> is: a label, a part inside one, or a styled span
+        private final java.util.ArrayDeque<Object> mSpans = new java.util.ArrayDeque<>();
+        private static final Object LABEL_PART = new Object();
+        private static final Object CSS_SPAN = new Object();
+
+        private static boolean hasClass(Attributes attributes, String name) {
+            String classes = attributes.getValue("", "class");
+            if (classes == null) return false;
+            for (String c : classes.trim().split("\\s+")) {
+                if (c.equals(name)) return true;
+            }
+            return false;
+        }
+
+        private void startSpan(Attributes attributes) {
+            GlLabel label = getLast(GlLabel.class);
+            if (label != null) {
+                // A part of a label: its colour is the label's, its end the scope's end
+                if (label.color == null) label.color = styleColor(attributes, true);
+                mSpans.push(LABEL_PART);
+            } else if (hasClass(attributes, "gl-label")) {
+                GlLabel mark = new GlLabel();
+                // A scoped label carries its colour as the text colour
+                mark.color = styleColor(attributes, false);
+                start(mark);
+                mSpans.push(mark);
+            } else {
+                startCssStyle(attributes);
+                mSpans.push(CSS_SPAN);
+            }
+        }
+
+        private void endSpan() {
+            Object span = mSpans.isEmpty() ? CSS_SPAN : mSpans.pop();
+            if (span == CSS_SPAN) {
+                endCssStyle();
+            } else if (span == LABEL_PART) {
+                GlLabel label = getLast(GlLabel.class);
+                if (label != null && label.split < 0) {
+                    label.split = mSpannableStringBuilder.length();
+                }
+            } else if (span instanceof GlLabel) {
+                endLabel((GlLabel) span);
+            }
+        }
+
+        @androidx.annotation.Nullable
+        private Integer styleColor(Attributes attributes, boolean background) {
+            String style = attributes.getValue("", "style");
+            if (style == null) return null;
+            Matcher m = (background ? getBackgroundColorPattern() : getForegroundColorPattern())
+                    .matcher(style);
+            return m.find() ? parseColor(m.group(1)) : null;
+        }
+
+        /** The label's text, "scope::value" for a scoped one, drawn as a label, link kept. */
+        private void endLabel(GlLabel mark) {
+            int start = mSpannableStringBuilder.getSpanStart(mark);
+            mSpannableStringBuilder.removeSpan(mark);
+            int end = mSpannableStringBuilder.length();
+            if (start < 0 || start >= end) return;
+            String text = mSpannableStringBuilder.subSequence(start, end).toString();
+            String name = mark.split > start && mark.split < end
+                    ? text.substring(0, mark.split - start) + "::"
+                            + text.substring(mark.split - start)
+                    : text;
+            android.text.style.ClickableSpan[] links = mSpannableStringBuilder.getSpans(start,
+                    end, android.text.style.ClickableSpan.class);
+            for (Object link : links) mSpannableStringBuilder.removeSpan(link);
+            mSpannableStringBuilder.replace(start, end, name);
+            int nameEnd = start + name.length();
+            for (Object link : links) {
+                mSpannableStringBuilder.setSpan(link, start, nameEnd,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            com.gl4a.gitlab.model.GitLabLabel label = new com.gl4a.gitlab.model.GitLabLabel();
+            label.name = name;
+            label.color = mark.color != null
+                    ? String.format("%06X", mark.color & 0xFFFFFF) : null;
+            mSpannableStringBuilder.setSpan(
+                    new com.gl4a.widget.IssueLabelSpan(mContext, label, false),
+                    start, nameEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
 
         private void startCssStyle(Attributes attributes) {

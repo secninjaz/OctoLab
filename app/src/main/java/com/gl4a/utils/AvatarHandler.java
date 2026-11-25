@@ -93,6 +93,31 @@ public class AvatarHandler {
         // Square org/group logos have content at the corners; full circle clips them.
         boolean isLogo;
         ArrayList<ViewDelegate> views;
+        // The copy saved on the phone, read ahead of the download (#343)
+        java.util.concurrent.Future<Bitmap> disk;
+    }
+
+    // Saved pictures are read here, one after another, apart from the downloads: on one worker
+    // a saved picture waited for every download queued before it, so on a slow connection a
+    // list or account picker stayed on initials though its pictures were on the phone (#343)
+    private static final java.util.concurrent.ExecutorService sDiskReader =
+            java.util.concurrent.Executors.newSingleThreadExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "AvatarDisk");
+                thread.setDaemon(true);
+                return thread;
+            });
+
+    /** Shows {@code request}'s saved picture as soon as it's read, before any download. */
+    private static void readFromDisk(int requestId, Request request) {
+        long id = request.id;
+        request.disk = sDiskReader.submit(() -> {
+            Context ctx = com.gl4a.Gl4Application.get();
+            Bitmap bitmap = ctx != null ? loadAvatarFromDisk(ctx, id) : null;
+            if (bitmap != null) {
+                sHandler.obtainMessage(MSG_DISK_LOADED, requestId, 0, bitmap).sendToTarget();
+            }
+            return bitmap;
+        });
     }
     private static final LongSparseArray<Request> sRequests = new LongSparseArray<>();
     private static int sMaxImageSizePx = -1;
@@ -243,12 +268,9 @@ public class AvatarHandler {
 
     /** GitLab's Retry-After on a 429, in milliseconds; a minute when it gives none (#322). */
     static long retryAfterMs(retrofit2.Response<?> response) {
-        String header = response.headers().get("Retry-After");
-        try {
-            if (header != null) return Math.max(1, Long.parseLong(header.trim())) * 1000L;
-        } catch (NumberFormatException ignored) {
-        }
-        return 60 * 1000L;
+        // The one reading of GitLab's Retry-After (#350)
+        Long seconds = com.gl4a.ApiRequestException.retryAfterSeconds(response);
+        return seconds != null ? Math.max(1, seconds) * 1000L : 60 * 1000L;
     }
 
     /** A response's body; throws {@link RateLimitedException} on 429 (#322). */
@@ -471,6 +493,7 @@ public class AvatarHandler {
             sWorkerThread.start();
             sWorkerHandler = new WorkerHandler(sWorkerThread.getLooper());
         }
+        readFromDisk(requestId, request);
         sWorkerHandler.obtainMessage(MSG_LOAD, requestId, 0, request.url).sendToTarget();
     }
 
@@ -637,6 +660,7 @@ public class AvatarHandler {
             sWorkerThread.start();
             sWorkerHandler = new WorkerHandler(sWorkerThread.getLooper());
         }
+        readFromDisk(requestId, request);
         sWorkerHandler.obtainMessage(MSG_LOAD, requestId, 0, (Object) null).sendToTarget();
     }
 
@@ -903,6 +927,7 @@ public class AvatarHandler {
             sWorkerThread.start();
             sWorkerHandler = new WorkerHandler(sWorkerThread.getLooper());
         }
+        readFromDisk(requestId, request);
         Message msg = sWorkerHandler.obtainMessage(MSG_LOAD, requestId, 0, request.url);
         msg.sendToTarget();
     }
@@ -1365,17 +1390,15 @@ public class AvatarHandler {
                     int requestId = msg.arg1;
                     Request req = sRequests.get(requestId);
                     Bitmap bitmap = null;
-                    // Read disk before network so we can send a placeholder immediately and
-                    // compare after the fetch — both on the background thread.
+                    // The saved copy, read (and shown) by sDiskReader ahead of this download;
+                    // waited for so the download is compared with it, and its placeholder
+                    // always comes before this result (#343)
                     Bitmap diskBitmap = null;
-                    if (req != null) {
-                        Context ctx = com.gl4a.Gl4Application.get();
-                        if (ctx != null) {
-                            diskBitmap = loadAvatarFromDisk(ctx, req.id);
-                            if (diskBitmap != null) {
-                                sHandler.obtainMessage(MSG_DISK_LOADED, requestId, 0, diskBitmap)
-                                        .sendToTarget();
-                            }
+                    if (req != null && req.disk != null) {
+                        try {
+                            diskBitmap = req.disk.get();
+                        } catch (Exception e) {
+                            // No saved copy to compare with
                         }
                     }
                     if (req != null && req.apiFirst && req.projectId > 0) {

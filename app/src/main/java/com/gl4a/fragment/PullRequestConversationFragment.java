@@ -105,6 +105,7 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
         stub.milestone = mr.milestone;
         stub.assignees = mr.assignees;
         stub.assignee = mr.assignee;
+        stub.timeStats = mr.timeStats;
         return stub;
     }
 
@@ -118,9 +119,11 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
             mIssue.milestone  = mr.milestone;
             mIssue.assignees  = mr.assignees;
             mIssue.assignee   = mr.assignee;
+            mIssue.timeStats  = mr.timeStats;
         }
         if (mListHeaderView != null) {
             fillReviewers(mListHeaderView);
+            bindTimeTracking();
         }
         assignHighlightColor();
         reloadEvents(false);
@@ -151,6 +154,7 @@ public class PullRequestConversationFragment extends IssueFragmentBase {
             mIssue.milestone = mMergeRequest.milestone;
             mIssue.assignees = mMergeRequest.assignees;
             mIssue.assignee = mMergeRequest.assignee;
+            mIssue.timeStats = mMergeRequest.timeStats;
         }
         setHasOptionsMenu(true);
     }
